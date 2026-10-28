@@ -1525,6 +1525,11 @@
             </button>
           </div>
           <div class="panel-body">
+            <div id="trade-log-filter" class="sp-chips" style="display:none; gap:6px; padding:10px 20px 4px; flex-wrap:wrap">
+              <button class="sp-chip active" data-f="all" onclick="setTradeFilter('all')">All</button>
+              <button class="sp-chip" data-f="win" onclick="setTradeFilter('win')">Winners</button>
+              <button class="sp-chip" data-f="loss" onclick="setTradeFilter('loss')">Losers</button>
+            </div>
             <div id="trade-log-list" class="saved-list"></div>
           </div>
         </div>
@@ -2742,6 +2747,45 @@ function sp2Select(i) { if (sp2G[i]) { sp2.sel = sp2G[i].key; sp2Save(); renderS
 function sp2Set(k, v) { v = parseFloat(v); if (v > 0) { sp2[k] = v; sp2Save(); if (k === 'days') sp2.data = {}; renderSPerf(); } }
 function sp2Net(on) { sp2.net = !!on; sp2Save(); renderSPerf(); }
 function sp2Refresh() { delete sp2.data[sp2.sel]; renderSPerf(); }
+
+/* ---------- Time-of-day analysis: which entry hours (IST) make or lose money ---------- */
+function sp2HourBlock(sessions, side, usd, cls) {
+  const rows = [];
+  (sessions || []).forEach(se => (se.trades || []).forEach(T => {
+    if (T.xp == null || T.et == null) return;
+    const ist = new Date(T.et + 19800000), r = sp2Pnl(T, side);
+    rows.push({ h: ist.getUTCHours(), m: ist.getUTCMinutes(), r });
+  }));
+  if (rows.length < 5) return '<div class="sp-note">Time-of-day analysis appears once there are at least 5 closed trades.</div>';
+  const b = {};
+  rows.forEach(x => { const k = x.h; (b[k] = b[k] || { n: 0, w: 0, net: 0, sw: 0, sl: 0 }); const o = b[k]; o.n++; o.net += x.r; if (x.r > 0) { o.w++; o.sw += x.r; } else o.sl += x.r; });
+  const hrs = Object.keys(b).map(Number).sort((a, c) => a - c);
+  const mx = Math.max(...hrs.map(h => Math.abs(b[h].net)), 1e-9);
+  const hh = h => String(h).padStart(2, '0');
+  const tr = hrs.map(h => { const o = b[h], pw = Math.abs(o.net) / mx * 100, few = o.n < 3;
+    return `<div style="display:flex; align-items:center; gap:8px; font-size:12px; padding:3px 0; ${few ? 'opacity:.55' : ''}">
+      <span style="width:74px; font-family:var(--mono)">${hh(h)}:00–${hh((h + 1) % 24)}</span>
+      <span style="flex:1; height:8px; background:var(--border-soft); border-radius:4px; overflow:hidden"><span style="display:block; height:100%; width:${pw.toFixed(0)}%; background:${o.net >= 0 ? 'var(--green)' : 'var(--red)'}"></span></span>
+      <span style="width:34px; text-align:right; color:var(--text-faint)">${o.n}×</span>
+      <span style="width:38px; text-align:right">${(o.w / o.n * 100).toFixed(0)}%</span>
+      <span class="${cls(o.net)}" style="width:78px; text-align:right">${usd(o.net)}</span></div>`; }).join('');
+  // what-if: stop taking entries from hour H onward — pick the cutoff that gives the best net P/L
+  const total = rows.reduce((a, x) => a + x.r, 0);
+  let best = null;
+  hrs.forEach(h => { const kept = rows.filter(x => x.h < h), skipped = rows.length - kept.length;
+    if (!skipped || kept.length < 3) return;
+    const net = kept.reduce((a, x) => a + x.r, 0); if (net > total && (!best || net > best.net)) best = { h, net, skipped, kept: kept.length }; });
+  const late = rows.filter(x => x.h >= 11), early = rows.filter(x => x.h < 11);
+  const wr = a => a.length ? a.filter(x => x.r > 0).length / a.length * 100 : null, sum = a => a.reduce((t, x) => t + x.r, 0);
+  let ins = '';
+  if (late.length >= 3 && early.length >= 3) ins += `Before 11:00 IST: <b>${early.length}</b> trades, ${wr(early).toFixed(0)}% won, net <span class="${cls(sum(early))}">${usd(sum(early))}</span>. From 11:00 IST: <b>${late.length}</b> trades, ${wr(late).toFixed(0)}% won, net <span class="${cls(sum(late))}">${usd(sum(late))}</span>. `;
+  if (best) ins += `<br><b>What-if:</b> skipping entries from ${hh(best.h)}:00 IST onward would have changed net P/L from ${usd(total)} to <span class="${cls(best.net)}">${usd(best.net)}</span> (${best.skipped} of ${rows.length} trades skipped).`;
+  else ins += '<br>No entry-time cutoff would have improved the total — losses aren\'t concentrated late in the day in this sample.';
+  return `<div class="sp-note" style="margin-top:10px"><b>Time of day (entry hour, IST)</b>
+    <div style="display:flex; gap:8px; font-size:11px; color:var(--text-faint); padding:6px 0 2px"><span style="width:74px">Hour</span><span style="flex:1"></span><span style="width:34px; text-align:right">Trades</span><span style="width:38px; text-align:right">Win</span><span style="width:78px; text-align:right">Net</span></div>
+    ${tr}<div style="margin-top:8px">${ins}</div>
+    <div style="margin-top:6px; color:var(--text-faint); font-size:11px">Faded rows have fewer than 3 trades. Hours are the entry time; a small sample can mislead, so check across more sessions (30) before changing the strategy.</div></div>`;
+}
 function renderSPerf() {
   const el = document.getElementById('sperf-body'); if (!el) return;
   sp2G = sp2Groups();
@@ -2779,7 +2823,7 @@ function renderSPerf() {
       <div class="sp-card"><div class="sp-k">ROI on margin (${sp2.margin}%)</div><div class="sp-v ${cls(st.roiM)}">${pct(st.roiM)}</div><div class="sp-sub">margin = ${sp2.margin}% of spot × qty</div></div>
       <div class="sp-card"><div class="sp-k">Avg win / avg loss</div><div class="sp-v" style="font-size:13px"><span class="sp-pos">${usd(st.avgW)}</span> / <span class="sp-neg">${usd(st.avgL)}</span></div><div class="sp-sub">profit factor ${pf}</div></div>
       <div class="sp-card"><div class="sp-k">Expectancy · Max drawdown</div><div class="sp-v" style="font-size:13px"><span class="${cls(st.exp)}">${usd(st.exp)}</span> · <span class="sp-neg">${st.n ? usd(-st.dd) : '–'}</span></div><div class="sp-sub">profitable days ${st.good} / ${st.trig}</div></div>
-    </div>${days}
+    </div>${sp2HourBlock(d.sessions, side, usd, cls)}${days}
     <div class="sp-note">Each session is one daily expiry (17:30 IST → 17:30 IST). Straddle exit: close above EMA 20 (Sell scans). Signals run on the session's real combined call+put premium chart (strikes picked at session start). Each trigger is then traded on the ATM strikes at that moment (strangle: ATM ±12 strikes) at the next candle's open, and the exit closes those same strikes. A trade still open at 17:30 IST is closed at the last expiry candle. Fees: the paper account's slippage + taker fee. Past results do not guarantee future ones.</div>`;
   }
   el.innerHTML = `<div class="sp-chips">${chips}</div>${ctl}<div style="margin-top:8px">${body}</div><div style="margin-top:10px"><button class="btn-ghost" onclick="sp2Refresh()">Refresh from option charts ↻</button></div>`;
@@ -8899,15 +8943,37 @@ function renderEquityCurve() {
     </svg>`;
 }
 
+let tradeFilter = 'all';
+function setTradeFilter(f) { tradeFilter = f; renderTradeLog(); }
 function renderTradeLog() {
   renderAnalytics();
-  document.getElementById('trade-log-count').textContent = tradeHistory.length ? `(${tradeHistory.length})` : '';
+  const countEl = document.getElementById('trade-log-count');
   const el = document.getElementById('trade-log-list');
+  const bar = document.getElementById('trade-log-filter');
   if (!tradeHistory.length) {
+    countEl.textContent = '';
+    if (bar) bar.style.display = 'none';
     el.innerHTML = `<div class="saved-empty">No trades yet — open a position above to get started.</div>`;
     return;
   }
-  el.innerHTML = tradeHistory.map(t => `
+  const wins = tradeHistory.filter(t => t.pnl >= 0).length, losses = tradeHistory.length - wins;
+  if (bar) {
+    bar.style.display = 'flex';
+    const label = { all: `All (${tradeHistory.length})`, win: `Winners (${wins})`, loss: `Losers (${losses})` };
+    bar.querySelectorAll('.sp-chip').forEach(b => {
+      b.textContent = label[b.dataset.f];
+      b.classList.toggle('active', b.dataset.f === tradeFilter);
+    });
+  }
+  const list = tradeFilter === 'win' ? tradeHistory.filter(t => t.pnl >= 0)
+             : tradeFilter === 'loss' ? tradeHistory.filter(t => t.pnl < 0) : tradeHistory;
+  const net = list.reduce((a, t) => a + t.pnl, 0);
+  countEl.textContent = tradeFilter === 'all' ? `(${tradeHistory.length})` : `(${list.length} of ${tradeHistory.length} · net ${fmtMoney(net)})`;
+  if (!list.length) {
+    el.innerHTML = `<div class="saved-empty">No ${tradeFilter === 'win' ? 'winning' : 'losing'} trades yet.</div>`;
+    return;
+  }
+  el.innerHTML = list.map(t => `
     <div class="trade-log-row">
       <span class="position-side ${t.side}">${t.side === 'long' ? 'LONG' : 'SHORT'}</span>
       <div class="trade-log-info">
