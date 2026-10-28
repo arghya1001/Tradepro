@@ -2783,9 +2783,11 @@ function sp2HourBlock(sessions, side, usd, cls) {
   if (best) ins += `<br><b>What-if:</b> skipping entries from ${hh(best.h)}:00 IST onward would have changed net P/L from ${usd(total)} to <span class="${cls(best.net)}">${usd(best.net)}</span> (${best.skipped} of ${rows.length} trades skipped).`;
   else ins += '<br>No entry-time cutoff would have improved the total — losses aren\'t concentrated late in the day in this sample.';
   return `<div class="sp-note" style="margin-top:10px"><b>Time of day (entry hour, IST)</b>
+    <div style="margin-top:6px">${ins}</div>
+    <details style="margin-top:8px"><summary style="cursor:pointer; color:var(--accent)">Show hour-by-hour table</summary>
     <div style="display:flex; gap:8px; font-size:11px; color:var(--text-faint); padding:6px 0 2px"><span style="width:74px">Hour</span><span style="flex:1"></span><span style="width:34px; text-align:right">Trades</span><span style="width:38px; text-align:right">Win</span><span style="width:78px; text-align:right">Net</span></div>
-    ${tr}<div style="margin-top:8px">${ins}</div>
-    <div style="margin-top:6px; color:var(--text-faint); font-size:11px">Faded rows have fewer than 3 trades. Hours are the entry time; a small sample can mislead, so check across more sessions (30) before changing the strategy.</div></div>`;
+    ${tr}
+    <div style="margin-top:6px; color:var(--text-faint); font-size:11px">Faded rows have fewer than 3 trades. Hours are the entry time; a small sample can mislead, so check across more sessions (30) before changing the strategy.</div></details></div>`;
 }
 function renderSPerf() {
   const el = document.getElementById('sperf-body'); if (!el) return;
@@ -2820,7 +2822,7 @@ function renderSPerf() {
       if (sp2.f !== 'all' && !s.err && !s.trades.some(T => { if (T.xp == null) return false; const r = sp2Pnl(T, side); return sp2.f === 'win' ? r > 0 : r <= 0; })) return '';
       return `<div class="sp2-day"><div class="sp2-h"><span class="sp2-t">${sp2Dm(s.start)} → ${sp2Dm(s.e)} IST${s.live ? ' · live' : ''}</span><span class="${cls(s.net)}">${s.k ? usd(s.net) : open ? 'open' : '–'}</span></div>${s.strikes ? `<div class="sp-sub">signal chart ${sscanEsc(s.strikes)} · ${s.bars} candles${s.skipped ? ' · ' + s.skipped + ' trigger(s) skipped, no option data' : ''}</div>` : ''}${rows}</div>`;
     }).join('');
-    body = `<div class="sp-note"><b>${st.n < 20 ? 'Early data' : st.n < 50 ? 'Building' : 'Meaningful sample'}</b> — ${st.n} closed trades over ${st.days} sessions. <span style="opacity:.6">(build 11: time-of-day + filter)</span></div>
+    body = `<div class="sp-note"><b>${st.n < 20 ? 'Early data' : st.n < 50 ? 'Building' : 'Meaningful sample'}</b> — ${st.n} closed trades over ${st.days} sessions. <span style="opacity:.6">(build 12)</span></div>
     <div class="sp-grid">
       <div class="sp-card"><div class="sp-k">Confidence (profitable trades)</div><div class="sp-v ${st.wr == null ? '' : st.wr >= 50 ? 'sp-pos' : 'sp-neg'}">${st.wr == null ? '–' : st.wr.toFixed(0) + '%'}</div><div class="sp-sub">${st.w} won · ${st.n - st.w} lost${st.n ? ` · 95% range ${st.lo.toFixed(0)}–${st.hi.toFixed(0)}%` : ''}</div></div>
       <div class="sp-card"><div class="sp-k">Net P/L</div><div class="sp-v ${cls(st.n ? st.total : null)}">${usd(st.n ? st.total : null)}</div><div class="sp-sub">${st.trig} of ${st.days} sessions triggered</div></div>
