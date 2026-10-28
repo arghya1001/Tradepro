@@ -733,6 +733,27 @@
   .price-tag.sl { background: var(--red); color: #1a0808; }
   .price-tag.tp { background: var(--green); color: #06201D; }
   .price-tag.order { background: #D9A441; color: #1a1408; }
+  /* Reserve a right gutter so price-scale labels sit beside the candles, not on top of them */
+  .chart-scroll { margin-right: 60px; }
+  .tool-more { display: none; }
+  @media (max-width: 700px) {
+    /* More room for the chart: one-line header, tighter paddings, collapsible tool column */
+    #replay-symbol-label { display: none; }
+    .panel-head { padding: 8px 12px; gap: 6px; }
+    .chart-body-row { padding: 0 2px; position: relative; }
+    .chart-toolbar {
+      position: absolute; left: 3px; top: 40px; z-index: 9; gap: 1px; padding: 2px;
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px;
+      max-height: calc(100% - 52px); overflow-y: auto;
+    }
+    .chart-toolbar:not(.open) { background: rgba(20,24,30,.55); }
+    .chart-toolbar:not(.open) > *:not(.tool-more) { display: none; }
+    .tool-more { display: flex; }
+    .tool-more.has-tool { color: var(--accent); }
+    .tool-btn { width: 28px; height: 28px; }
+    .chart-ohlc-readout { gap: 6px; font-size: 10.5px; line-height: 1.35; max-width: calc(100% - 64px); }
+    .chart-ohlc-readout .ohlc-sym { flex: 0 0 100%; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
   .price-tag.last { background: var(--surface-2); border: 1px solid var(--text-faint); color: var(--text); }
 
   .playback-bar { display: flex; align-items: center; gap: 8px; padding: 14px 20px 20px; }
@@ -1270,6 +1291,9 @@
           <div class="panel-body">
             <div class="chart-body-row">
               <div class="chart-toolbar" id="chart-toolbar">
+                <button class="tool-btn tool-more" id="tool-more" aria-label="Drawing tools" onclick="toggleToolbar()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 7l3 3"/></svg>
+                </button>
                 <button class="tool-btn active" data-tool="cursor" aria-label="Crosshair / select" onclick="setChartTool('cursor')">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="2.5"/></svg>
                 </button>
@@ -2793,6 +2817,34 @@ function fmtT(t) {
   if (t.length === 10) return t;
   if (t.length === 13) return t.replace('T',' ').slice(0,13) + ':00';
   return t.replace('T',' ');
+}
+// Memoised indicator math: calc() depends only on (candles, params), not on replayIndex, so during
+// replay it was being recomputed over the whole history on every single step. Cache by signature.
+const _indCache = new Map();
+function indCalc(key, def, candles, params) {
+  const n = candles.length, f = candles[0], l = candles[n - 1];
+  const sig = key + '|' + JSON.stringify(params) + '|' + n + '|' + (f && f.t) + '|' + (l && (l.t + ':' + l.o + ':' + l.h + ':' + l.l + ':' + l.c + ':' + l.v));
+  let r = _indCache.get(sig);
+  if (r === undefined) {
+    r = def.calc(candles, params);
+    _indCache.set(sig, r);
+    if (_indCache.size > 32) _indCache.delete(_indCache.keys().next().value);
+  }
+  return r;
+}
+function toggleToolbar() {
+  const tb = document.getElementById('chart-toolbar');
+  if (tb) tb.classList.toggle('open');
+}
+let chartDrawRange = null; // {lo, hi, total} candle indices currently emitted into the SVG
+// Axis label that shows the date (dd/mm) only when it differs from `prevT`'s date; otherwise just HH:MM.
+function fmtAxisLabelSmart(t, prevT) {
+  if (t.length === 10) return fmtAxisLabel(t);
+  const [date, time] = t.replace('T',' ').split(' ');
+  const hhmm = (time || '').slice(0,5);
+  const prevDate = prevT ? prevT.replace('T',' ').split(' ')[0] : date;
+  if (date !== prevDate) { const [,m,d] = date.split('-'); return d + '/' + m; }
+  return hhmm;
 }
 function fmtAxisLabel(t) {
   if (t.length === 10) { const [,m,d] = t.split('-'); return d + '/' + m; }
@@ -4870,7 +4922,8 @@ function renderChart(forceEnd) {
     return;
   }
 
-  const BASE_H = 340, VOLH = 56, PAD = 10, GAP = PAD + 16;
+  const BASE_H = window.innerWidth <= 700 ? Math.round(Math.max(340, Math.min(540, window.innerHeight * 0.5))) : 340;
+  const VOLH = 56, PAD = 10, GAP = PAD + 16;
   const OSC_GAP = 16, OSC_H = 70;
   const CANDLE_PX = candlePx;
   const revealed = replayCandles.slice(0, replayIndex);
@@ -4887,11 +4940,18 @@ function renderChart(forceEnd) {
   const oscInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'oscillator') : [];
   const overlayInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'overlay') : [];
   const signalInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'signal') : [];
-  const H = BASE_H + (oscInstances.length ? oscInstances.length * (OSC_GAP + OSC_H) : 0);
+  const H = BASE_H + (oscInstances.length ? oscInstances.length * (OSC_GAP + OSC_H) : 14); // +14: time labels get their own strip, clear of the volume bars
 
-  const Y_WINDOW = 260;
-  const yStart = Math.max(0, replayIndex - Y_WINDOW);
-  const yCandles = replayCandles.slice(yStart, replayIndex);
+  // Fit the price scale to the candles actually on screen (not a fixed 260-bar window),
+  // so one old spike far off-screen can't squash the visible candles into slivers.
+  const visCount = Math.ceil(((scrollEl.clientWidth || 340)) / candlePx) + 2;
+  const prevSL = scrollEl.scrollLeft, prevSW = scrollEl.scrollWidth, prevCW = scrollEl.clientWidth || 340;
+  const atRightEdge = forceEnd || !prevSW || (prevSW - prevCW - prevSL) < 30;
+  let yStart, yEnd;
+  if (atRightEdge) { yEnd = replayIndex; yStart = Math.max(0, yEnd - visCount); }
+  else { yStart = Math.max(0, Math.floor((prevSL - 10) / candlePx)); yEnd = Math.min(replayIndex, yStart + visCount); }
+  if (yEnd - yStart < 1) { yEnd = replayIndex; yStart = Math.max(0, yEnd - visCount); }
+  const yCandles = replayCandles.slice(yStart, yEnd);
   let winHigh = Math.max(...yCandles.map(c => c.h));
   let winLow = Math.min(...yCandles.map(c => c.l));
   // Deliberately NOT stretching this to fit entry/SL/TP/liquidation: a leveraged position's
@@ -4904,7 +4964,7 @@ function renderChart(forceEnd) {
   const yMax = winHigh + padY, yMin = winLow - padY;
   const maxVol = Math.max(...yCandles.map(c => c.v), 1);
 
-  const RIGHT_MARGIN_CANDLES = 6; // breathing room so the last candle never sits flush under the price tag
+  const RIGHT_MARGIN_CANDLES = 3; // breathing room so the last candle never sits flush under the price tag
   // Ichimoku's Senkou spans project `displacement` bars into the future (legitimately —
   // they're computed from already-revealed data, just plotted further right), so the
   // chart needs extra width to the right of the last candle to show that projection.
@@ -4913,6 +4973,15 @@ function renderChart(forceEnd) {
   const itemCount = (chartType === 'renko' ? renkoBricks.length : revealed.length) + ichimokuDisplacement;
   const W = Math.max(scrollEl.clientWidth || 340, PAD*2 + CANDLE_PX * (itemCount + RIGHT_MARGIN_CANDLES));
   const bodyW = Math.max(2, CANDLE_PX * 0.62);
+  // Only emit SVG for candles near the viewport (±2 screens). Thousands of <rect>/<line> nodes
+  // rebuilt on every replay step was the main cost; the scroll handler re-renders when the
+  // viewport nears the edge of this range.
+  const _vpW = scrollEl.clientWidth || 340;
+  const _targetSL = atRightEdge ? Math.max(0, W - _vpW) : prevSL;
+  const _vc = Math.ceil(_vpW / CANDLE_PX) + 2;
+  const drawLo = Math.max(0, Math.floor((_targetSL - PAD) / CANDLE_PX) - 2 * _vc);
+  const drawHi = Math.ceil((_targetSL + _vpW - PAD) / CANDLE_PX) + 2 * _vc;
+  chartDrawRange = { lo: drawLo, hi: drawHi, total: chartType === 'renko' ? renkoBricks.length : replayIndex };
   const xAt = i => PAD + CANDLE_PX * i + CANDLE_PX/2;
   const yAt = v => GAP + (BASE_H - GAP - VOLH - PAD) * (1 - (v - yMin) / (yMax - yMin));
   const volYAt = v => BASE_H - PAD - (VOLH * (v / maxVol));
@@ -4923,13 +4992,14 @@ function renderChart(forceEnd) {
   // overlay lines/band/markers instead of recalculating it a second time.
   let confluenceCalc = null;
   const confluenceInstForChart = overlayInstances.find(i => i.key === 'confluence');
-  if (confluenceInstForChart) confluenceCalc = INDICATOR_DEFS.confluence.calc(replayCandles, confluenceInstForChart.params);
+  if (confluenceInstForChart) confluenceCalc = indCalc('confluence', INDICATOR_DEFS.confluence, replayCandles, confluenceInstForChart.params);
 
   let bars = '', volBars = '';
   if (chartType === 'renko') {
     // Bricks have no wicks and aren't tied to the confluence signal candles (which are
     // keyed to real time steps) — plain up/down boxes, sequential, fixed width.
     renkoBricks.forEach((b, i) => {
+      if (i < drawLo || i > drawHi) return;
       const x = xAt(i);
       const color = b.up ? 'var(--green)' : 'var(--red)';
       const yTop = yAt(Math.max(b.o, b.c)), yBot = yAt(Math.min(b.o, b.c));
@@ -4940,6 +5010,7 @@ function renderChart(forceEnd) {
   } else {
     const srcCandles = chartType === 'heikinashi' ? haCandles : replayCandles;
     revealed.forEach((realC, i) => {
+      if (i < drawLo || i > drawHi) return;
       const c = srcCandles[i]; // OHLC to draw (real or Heikin-Ashi); volume always comes from the real candle
       const x = xAt(i);
       const up = c.c >= c.o;
@@ -4967,7 +5038,7 @@ function renderChart(forceEnd) {
     // every other caller omits it and gets the usual "up to what's revealed" behavior.
     let pts = [];
     const n = count != null ? count : replayIndex;
-    for (let i = 0; i < n; i++) {
+    for (let i = Math.max(0, drawLo - 1); i < Math.min(n, drawHi + 2); i++) {
       if (values[i] == null) continue;
       pts.push(`${xAt(i).toFixed(2)},${mapY(values[i]).toFixed(2)}`);
     }
@@ -4977,7 +5048,7 @@ function renderChart(forceEnd) {
   }
   function segmentedPath(values, flags, mapY, colorA, colorB, width) {
     let out = '';
-    for (let i = 1; i < replayIndex; i++) {
+    for (let i = Math.max(1, drawLo); i < Math.min(replayIndex, drawHi + 2); i++) {
       if (values[i] == null || values[i-1] == null) continue;
       const c = flags[i] ? colorA : colorB;
       out += `<line x1="${xAt(i-1).toFixed(2)}" y1="${mapY(values[i-1]).toFixed(2)}" x2="${xAt(i).toFixed(2)}" y2="${mapY(values[i]).toFixed(2)}" stroke="${c}" stroke-width="${width || 1.8}"/>`;
@@ -4988,7 +5059,7 @@ function renderChart(forceEnd) {
   let overlays = '', oscSvg = '', oscTagsHtml = '', signalMarkers = '';
   overlayInstances.forEach(inst => {
     const def = INDICATOR_DEFS[inst.key];
-    const result = inst.key === 'confluence' ? confluenceCalc : def.calc(replayCandles, inst.params);
+    const result = inst.key === 'confluence' ? confluenceCalc : indCalc(inst.key, def, replayCandles, inst.params);
     if (inst.key === 'bb') {
       let band = '';
       const pts = [];
@@ -5142,7 +5213,7 @@ function renderChart(forceEnd) {
 
   signalInstances.forEach(inst => {
     const def = INDICATOR_DEFS[inst.key];
-    const result = def.calc(replayCandles, inst.params);
+    const result = indCalc(inst.key, def, replayCandles, inst.params);
     const buyColor = inst.buyColor || inst.color || '#00C853';
     const sellColor = inst.sellColor || '#FF5252';
     for (let i = 0; i < replayIndex; i++) {
@@ -5175,7 +5246,7 @@ function renderChart(forceEnd) {
      Stochastic can all coexist without fighting over one shared 0-100 scale. ---- */
   oscInstances.forEach((inst, pi) => {
     const def = INDICATOR_DEFS[inst.key];
-    const result = def.calc(replayCandles, inst.params);
+    const result = indCalc(inst.key, def, replayCandles, inst.params);
     const top = BASE_H - PAD + OSC_GAP + pi * (OSC_H + OSC_GAP);
     const bottom = top + OSC_H;
 
@@ -5249,15 +5320,20 @@ function renderChart(forceEnd) {
   if (chartType === 'renko') {
     // Bricks aren't evenly spaced in time — each one's label is the timestamp of the real
     // bar that completed it, so the axis still reads as a (non-uniform) time scale.
-    for (let i = 0; i < renkoBricks.length; i += stride) {
-      xAxis += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">${fmtAxisLabel(renkoBricks[i].t)}</text>`;
+    let prevLblT = null;
+    for (let i = Math.floor(drawLo / stride) * stride; i < renkoBricks.length && i <= drawHi; i += stride) {
+      xAxis += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">${fmtAxisLabelSmart(renkoBricks[i].t, prevLblT)}</text>`;
+      prevLblT = renkoBricks[i].t;
     }
     if (activeIndicators.length) {
       xAxis += `<text x="6" y="12" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">Indicators are unavailable on Renko charts</text>`;
     }
   } else {
-    for (let i = 0; i < revealed.length; i += stride) {
-      xAxis += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">${fmtAxisLabel(revealed[i].t)}</text>`;
+    let prevLblT = null;
+    // start one stride early so the first visible label can still tell whether the date changed
+    for (let i = Math.floor(drawLo / stride) * stride; i < revealed.length && i <= drawHi; i += stride) {
+      xAxis += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">${fmtAxisLabelSmart(revealed[i].t, prevLblT)}</text>`;
+      prevLblT = revealed[i].t;
     }
   }
 
@@ -5611,6 +5687,32 @@ function initChartDrag() {
   });
   wrap.addEventListener('mousemove', e => { if (!draggingHandle && !brushDrawing) onChartPointerMove(e.clientX, e.clientY); });
   wrap.addEventListener('mouseleave', hideCrosshair);
+  let scrollRaf = 0, yRescaleTimer = null;
+  wrap.addEventListener('scroll', () => {
+    if (!chartGeom || !chartDrawRange || !replayCandles.length) return;
+    if (!scrollRaf) scrollRaf = requestAnimationFrame(() => {
+      scrollRaf = 0;
+      const px = chartGeom.CANDLE_PX, vc = Math.ceil(wrap.clientWidth / px) + 2;
+      const first = Math.max(0, Math.floor((wrap.scrollLeft - 10) / px)), last = first + vc;
+      const r = chartDrawRange, edge = vc * 0.5;
+      // viewport is nearing the edge of what's drawn -> redraw a fresh window around it
+      if ((first - r.lo < edge && r.lo > 0) || (r.hi - last < edge && r.hi < r.total - 1)) { renderChart(false); }
+    });
+    clearTimeout(yRescaleTimer);
+    yRescaleTimer = setTimeout(() => {
+      if (chartType === 'renko') return;
+      const px = chartGeom.CANDLE_PX, n = Math.ceil(wrap.clientWidth / px) + 2;
+      const atEdge = (wrap.scrollWidth - wrap.clientWidth - wrap.scrollLeft) < 30;
+      const a = atEdge ? Math.max(0, replayIndex - n) : Math.max(0, Math.floor((wrap.scrollLeft - 10) / px));
+      const vis = replayCandles.slice(a, Math.min(replayIndex, a + n));
+      if (!vis.length) return;
+      const hi = Math.max(...vis.map(c => c.h)), lo = Math.min(...vis.map(c => c.l));
+      const span = chartGeom.yMax - chartGeom.yMin;
+      if (Math.abs((hi - lo) * 1.2 - span) / span > 0.25 || hi > chartGeom.yMax || lo < chartGeom.yMin) renderChart(false);
+    }, 180);
+  }, { passive: true });
+  let _rzW = window.innerWidth, _rzT = null;
+  window.addEventListener('resize', () => { clearTimeout(_rzT); _rzT = setTimeout(() => { if (window.innerWidth !== _rzW) { _rzW = window.innerWidth; renderChart(false); } }, 250); });
   wrap.addEventListener('click', e => { if (!dragMoved && chartTool !== 'brush') onChartClick(e.clientX, e.clientY); });
 
   wrap.addEventListener('touchmove', e => {
@@ -6096,6 +6198,8 @@ function setChartTool(tool) {
   brushDrawing = false; pendingBrushPoints = null; brushLastVx = null; brushLastVy = null;
   closeDeleteDrawingPopup();
   document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+  const _more = document.getElementById('tool-more'); if (_more) _more.classList.toggle('has-tool', tool !== 'cursor');
+  const _tb = document.getElementById('chart-toolbar'); if (_tb && tool !== 'cursor') _tb.classList.remove('open');
   updateToolGroupButtons();
   renderChart();
 }
