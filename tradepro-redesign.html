@@ -685,6 +685,7 @@
     display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; max-width: calc(100% - 70px);
   }
   .chart-ohlc-readout .ohlc-sym { color: var(--text); font-weight: 600; font-family: var(--sans); font-size: 12px; }
+  .chart-ohlc-readout .ohlc-ist { color: #FFD43B; font-weight: 700; font-family: var(--mono); }
   .chart-ohlc-readout .ohlc-chg-pos { color: var(--green); }
   .chart-ohlc-readout .ohlc-chg-neg { color: var(--red); }
   .crosshair-v, .crosshair-h {
@@ -771,7 +772,8 @@
   .sp-tbl th:first-child, .sp-tbl td:first-child { text-align: left; }
   .sp2-day { border-top: 1px solid var(--border-soft); padding: 8px 0; }
   .sp2-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; font-family: var(--mono); }
-  .sp2-r { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; font-family: var(--mono); color: var(--text-muted); padding: 2px 0; }
+  .sp2-r { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; font-family: var(--mono); color: var(--text-muted); padding: 3px 0; }
+  .sp2-t { color: #FFD43B; font-weight: 600; }
   .sp2-r b { color: var(--text); font-weight: 500; }
   .sp-note { font-size: 11px; color: var(--text-faint); line-height: 1.45; margin-top: 8px; }
   .price-tag.last { background: var(--surface-2); border: 1px solid var(--text-faint); color: var(--text); }
@@ -1818,7 +1820,7 @@ const TEMPLATES = [
   { cat:'neutral', name:'Straddle', legs:'Call + put at the same strike (ATM) — buy for a big move, sell to collect decay', assets:['nifty','banknifty','btc','eth'],
     defLegs:[{action:'Buy', type:'Call', strike:'ATM'},{action:'Buy', type:'Put', strike:'ATM'}] },
   { cat:'neutral', name:'Strangle', legs:'Call (OTM) + put (OTM) — buy for a big move, sell to collect decay', assets:['nifty','banknifty','btc','eth'],
-    defLegs:[{action:'Buy', type:'Call', strike:'ATM+2%'},{action:'Buy', type:'Put', strike:'ATM-2%'}] },
+    defLegs:[{action:'Buy', type:'Call', strike:'ATM+12 strikes'},{action:'Buy', type:'Put', strike:'ATM-12 strikes'}] },
   { cat:'neutral', name:'Iron condor', legs:'Sell call spread + sell put spread', assets:['nifty','banknifty','sensex'],
     defLegs:[{action:'Sell', type:'Call', strike:'ATM+2%'},{action:'Buy', type:'Call', strike:'ATM+4%'},{action:'Sell', type:'Put', strike:'ATM-2%'},{action:'Buy', type:'Put', strike:'ATM-4%'}] },
   { cat:'neutral', name:'Iron butterfly', legs:'Sell call+put (ATM), buy call+put (wings)', assets:['nifty','banknifty'],
@@ -1872,6 +1874,8 @@ function persistSavedStrategies() { try { localStorage.setItem(SAVED_STRATS_KEY,
 function stratSpecKind(spec) {
   const t = String(spec == null ? '' : spec).trim().toUpperCase().replace(/\s+/g, '');
   if (t === 'ATM') return { k: 'atm' };
+  const ns = /^ATM([+-])(\d+)(?:STRIKES?|K)$/.exec(t);
+  if (ns) return { k: 'n', n: (ns[1] === '-' ? -1 : 1) * parseInt(ns[2], 10) };
   const m = /^ATM([+-])(\d+(?:\.\d+)?)%$/.exec(t) || /^([+-])(\d+(?:\.\d+)?)%$/.exec(t);
   if (m) return { k: 'pct', p: (m[1] === '-' ? -1 : 1) * parseFloat(m[2]) };
   if (/^\d+(?:\.\d+)?$/.test(t)) return { k: 'abs', v: parseFloat(t) };
@@ -1887,7 +1891,8 @@ function stratSpecsToOffsets(legs, S, spot) {
     const k = stratSpecKind(l.strike);
     const target = k.k === 'atm' ? spot : k.k === 'pct' ? spot * (1 + k.p / 100) : k.v;
     let idx = 0;
-    S.forEach((x, i) => { if (Math.abs(x - target) < Math.abs(S[idx] - target)) idx = i; });
+    if (k.k === 'n') idx = Math.max(0, Math.min(S.length - 1, atm + k.n)); // N listed strikes away from ATM
+    else S.forEach((x, i) => { if (Math.abs(x - target) < Math.abs(S[idx] - target)) idx = i; });
     const t = l.type === 'Put' ? 'P' : 'C', o = idx - atm, w = l.action === 'Sell' ? -1 : 1;
     const key = t + '|' + o;
     if (merged[key]) merged[key].w += w; else merged[key] = { t, o, w };
@@ -2225,7 +2230,7 @@ function persistSScans() { try { localStorage.setItem(SSCAN_KEY, JSON.stringify(
 let sscanResults = {};   // scan index -> { at, rows:[{und, ok, price, details, err}] }
 let sscanDraft = null, sscanEditing = null, sscanAutoTimer = null, sscanBusy = false;
 const sscanEsc = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-const sscanTime = sec => new Date(sec * 1000).toISOString().slice(5, 16).replace('T', ' ') + ' UTC';
+const sscanTime = sec => new Date(sec * 1000 + 19800000).toISOString().slice(5, 16).replace('T', ' ') + ' IST';
 let scanOverlay = null, scanOverlayTimer = null;   // activation markers drawn on the combined-strategy chart
 const sscanFmt = v => v == null ? '–' : v.toLocaleString('en-US', { maximumFractionDigits: v >= 100 ? 1 : 4 });
 function sscanRefLabel(c) { return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
@@ -2633,6 +2638,7 @@ const SP2_KEY = 'tradepro_sp2_v1', SP2_DAY = 86400000;
 let sp2 = { days: 14, qty: 0.1, net: true, margin: 10, sel: null, data: {}, busy: false }, sp2G = [];
 try { const v = JSON.parse(localStorage.getItem(SP2_KEY) || 'null'); if (v) { sp2.days = v.days || 14; sp2.qty = v.qty || 0.1; sp2.net = v.net !== false; sp2.margin = v.margin || 10; sp2.sel = v.sel || null; } } catch (e) { /* ignore */ }
 function sp2Save() { try { localStorage.setItem(SP2_KEY, JSON.stringify({ days: sp2.days, qty: sp2.qty, net: sp2.net, margin: sp2.margin, sel: sp2.sel })); } catch (e) { /* ignore */ } }
+const sp2U = ms => new Date(ms).toISOString().slice(11, 16);
 const sp2Dm = ms => { const s = new Date(ms + 19800000).toISOString(); return s.slice(8, 10) + ' ' + LIVE_MONTHS[+s.slice(5, 7) - 1] + ' ' + s.slice(11, 16); };
 function sp2Expiries(n) { const now = Date.now(), d = new Date(now); let e = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); if (e <= now) e += SP2_DAY; const o = []; for (let k = 0; k < n; k++) o.push(e - k * SP2_DAY); return o; }
 function sp2Groups() { const o = []; sscans.forEach(sc => { if (!sperfIsVolStrat(sc.strat)) return; sc.und.split(',').forEach(u => o.push({ key: sc.name + '|' + u + '|' + sc.tf + '|' + JSON.stringify(sc.conds), sc, und: u, label: sc.name + ' · ' + u + ' · ' + sc.tf })); }); return o; }
@@ -2647,7 +2653,8 @@ async function sp2Session(g, tpl, e, step, spots) {
   try {
     const spot = spots(start); if (!spot) throw new Error('no underlying price');
     const iso = new Date(e).toISOString(), dd = iso.slice(8, 10) + iso.slice(5, 7) + iso.slice(2, 4);
-    const base = tpl.defLegs.map(l => { const k = stratSpecKind(l.strike), tg = k && k.k === 'pct' ? spot * (1 + k.p / 100) : spot; return { t: l.type === 'Put' ? 'P' : 'C', k: Math.round(tg / step) * step }; });
+    const atmK = Math.round(spot / step) * step;
+    const base = tpl.defLegs.map(l => { const k = stratSpecKind(l.strike), tg = k && k.k === 'pct' ? spot * (1 + k.p / 100) : spot, kk = k && k.k === 'n' ? atmK + k.n * step : Math.round(tg / step) * step; return { t: l.type === 'Put' ? 'P' : 'C', k: kk, off: kk - atmK }; });
     const s = Math.floor(start / 1000), en = Math.floor(Math.min(e, now) / 1000);
     let legs = null;
     for (const sh of [0, 1, -1]) {
@@ -2666,13 +2673,32 @@ async function sp2Session(g, tpl, e, step, spots) {
     if (live && cs.length && liveTimeToSec(cs[cs.length - 1].t) + secs > now / 1000) cs.pop(); // the forming candle never counts
     if (cs.length < 5) throw new Error('too few option candles (' + cs.length + ')');
     const sig = sscanSignals(cs, g.sc.conds), fill = i => cs[i + 1] ? cs[i + 1].o : cs[i].c, close = i => liveTimeToSec(cs[i].t) * 1000 + secs * 1000;
-    sig.entries.forEach((ei, n) => {
-      const xi = sig.exits[n], T = { et: close(ei), ep: fill(ei) };
-      if (xi != null) { T.xt = close(xi); T.xp = fill(xi); }
-      else if (!live) { T.xt = e; T.xp = cs[cs.length - 1].c; T.expd = true; }
-      else T.mark = cs[cs.length - 1].c;
+    // Trades are executed on the ATM at the moment of the trigger (the signal itself comes from the session chart above),
+    // and the exit closes the SAME strikes that were opened.
+    const uc = liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${g.und}USD&resolution=${tf}&start=${s}&end=${en}`), tf);
+    const spotAt = ms => { const k = new Date(ms).toISOString().slice(0, 16); let p = null; for (const c of uc) { if (c.t <= k) p = c; else break; } return p ? (p.t === k ? p.o : p.c) : spot; };
+    const cache = {}, getLeg = async (t, k) => cache[t + k] || (cache[t + k] = await sp2Leg(g.und, t, k, dd, tf, s, en));
+    const pickAtm = async ms => {
+      const a0 = Math.round(spotAt(ms) / step) * step;
+      for (const sh of [0, 1, -1]) {
+        const ks = base.map(l => ({ t: l.t, k: a0 + l.off + sh * step })), arrs = await Promise.all(ks.map(l => getLeg(l.t, l.k)));
+        if (arrs.every(x => x.length >= 2)) return ks.map((l, i) => ({ t: l.t, k: l.k, c: arrs[i] }));
+      }
+      return null;
+    };
+    const px = (ls, t, w) => { let v = 0; for (const l of ls) { const x = liveLegAt(l.c, t); if (!x) return null; v += x[w]; } return v; };
+    const iso16 = ms => new Date(ms).toISOString().slice(0, 16), lastT = cs[cs.length - 1].t;
+    for (let n = 0; n < sig.entries.length; n++) {
+      const ei = sig.entries[n], xi = sig.exits[n], T = { et: close(ei), ec: close(ei) - secs * 1000 };
+      const ls = await pickAtm(T.et); if (!ls) { out.skipped = (out.skipped || 0) + 1; continue; }
+      T.ep = px(ls, iso16(T.et), 'o'); T.sk = ls.map(l => l.t + l.k).join(' + ');
+      if (T.ep == null || !(T.ep > 0)) { out.skipped = (out.skipped || 0) + 1; continue; }
+      if (xi != null) { T.xt = close(xi); T.xc = close(xi) - secs * 1000; T.xp = px(ls, iso16(T.xt), 'o'); }
+      else if (!live) { T.xt = e; T.xp = px(ls, lastT, 'c'); T.expd = true; }
+      else T.mark = px(ls, lastT, 'c');
+      if ((T.xt != null && T.xp == null) || (T.xt == null && T.mark == null)) { out.skipped = (out.skipped || 0) + 1; continue; }
       out.trades.push(T);
-    });
+    }
     out.spot = spot; out.strikes = legs.map(l => l.k).join(' + '); out.bars = cs.length;
   } catch (err) { out.err = err && err.message ? err.message : String(err); }
   return out;
@@ -2737,11 +2763,11 @@ function renderSPerf() {
     const days = d.sessions.map(s => {
       const rows = s.err ? `<div class="sp2-r"><span>Data unavailable — ${sscanEsc(s.err)}</span></div>` : !s.trades.length ? '<div class="sp2-r"><span>No trigger in this session</span></div>'
         : s.trades.map(T => { const r = sp2Pnl(T, side), roi = r / (T.ep * sp2.qty) * 100;
-          return `<div class="sp2-r"><span><b>${ent}</b> entry · ${sp2Dm(T.et)}</span><span>@ ${sscanFmt(T.ep)}</span></div>` +
-            (T.xp != null ? `<div class="sp2-r"><span><b>${ex}</b> exit · ${sp2Dm(T.xt)}${T.expd ? ' (expiry)' : ''}</span><span>@ ${sscanFmt(T.xp)} · <span class="${cls(r)}">${usd(r)} (${pct(roi)})</span></span></div>`
+          return `<div class="sp2-r"><span><b>${ent}</b> entry · <span class="sp2-t">${sp2Dm(T.et)} IST</span><br><small style="color:var(--text-faint)">signal candle ${sp2Dm(T.ec)} IST / ${sp2U(T.ec)} UTC<br>ATM ${sscanEsc(T.sk || '')}</small></span><span>@ ${sscanFmt(T.ep)}</span></div>` +
+            (T.xp != null ? `<div class="sp2-r"><span><b>${ex}</b> exit · <span class="sp2-t">${sp2Dm(T.xt)} IST</span>${T.expd ? ' (expiry)' : `<br><small style="color:var(--text-faint)">signal candle ${sp2Dm(T.xc)} IST / ${sp2U(T.xc)} UTC</small>`}</span><span>@ ${sscanFmt(T.xp)} · <span class="${cls(r)}">${usd(r)} (${pct(roi)})</span></span></div>`
               : `<div class="sp2-r"><span><b>OPEN</b> · not exited yet</span><span>now ${sscanFmt(T.mark)} · <span class="${cls(r)}">${usd(r)}</span></span></div>`); }).join('');
       const open = s.trades.some(T => T.xp == null);
-      return `<div class="sp2-day"><div class="sp2-h"><span>${sp2Dm(s.start)} → ${sp2Dm(s.e)} IST${s.live ? ' · live' : ''}</span><span class="${cls(s.net)}">${s.k ? usd(s.net) : open ? 'open' : '–'}</span></div>${s.strikes ? `<div class="sp-sub">${sscanEsc(s.strikes)} · ${s.bars} candles</div>` : ''}${rows}</div>`;
+      return `<div class="sp2-day"><div class="sp2-h"><span class="sp2-t">${sp2Dm(s.start)} → ${sp2Dm(s.e)} IST${s.live ? ' · live' : ''}</span><span class="${cls(s.net)}">${s.k ? usd(s.net) : open ? 'open' : '–'}</span></div>${s.strikes ? `<div class="sp-sub">signal chart ${sscanEsc(s.strikes)} · ${s.bars} candles${s.skipped ? ' · ' + s.skipped + ' trigger(s) skipped, no option data' : ''}</div>` : ''}${rows}</div>`;
     }).join('');
     body = `<div class="sp-note"><b>${st.n < 20 ? 'Early data' : st.n < 50 ? 'Building' : 'Meaningful sample'}</b> — ${st.n} closed trades over ${st.days} sessions.</div>
     <div class="sp-grid">
@@ -2752,7 +2778,7 @@ function renderSPerf() {
       <div class="sp-card"><div class="sp-k">Avg win / avg loss</div><div class="sp-v" style="font-size:13px"><span class="sp-pos">${usd(st.avgW)}</span> / <span class="sp-neg">${usd(st.avgL)}</span></div><div class="sp-sub">profit factor ${pf}</div></div>
       <div class="sp-card"><div class="sp-k">Expectancy · Max drawdown</div><div class="sp-v" style="font-size:13px"><span class="${cls(st.exp)}">${usd(st.exp)}</span> · <span class="sp-neg">${st.n ? usd(-st.dd) : '–'}</span></div><div class="sp-sub">profitable days ${st.good} / ${st.trig}</div></div>
     </div>${days}
-    <div class="sp-note">Each session is one daily expiry (17:30 IST → 17:30 IST). Strikes are picked at the session start from the underlying's price (strangle at the template's offset). Signals run on the real combined call+put premium candles and fill at the next candle's open; a trade still open at 17:30 IST is closed at the last expiry candle. Fees: the paper account's slippage + taker fee. Past results do not guarantee future ones.</div>`;
+    <div class="sp-note">Each session is one daily expiry (17:30 IST → 17:30 IST). Signals run on the session's real combined call+put premium chart (strikes picked at session start). Each trigger is then traded on the ATM strikes at that moment (strangle: ATM ±12 strikes) at the next candle's open, and the exit closes those same strikes. A trade still open at 17:30 IST is closed at the last expiry candle. Fees: the paper account's slippage + taker fee. Past results do not guarantee future ones.</div>`;
   }
   el.innerHTML = `<div class="sp-chips">${chips}</div>${ctl}<div style="margin-top:8px">${body}</div><div style="margin-top:10px"><button class="btn-ghost" onclick="sp2Refresh()">Refresh from option charts ↻</button></div>`;
 }
@@ -3170,7 +3196,13 @@ function toggleToolbar() {
 }
 let chartDrawRange = null; // {lo, hi, total} candle indices currently emitted into the SVG
 // Axis label that shows the date (dd/mm) only when it differs from `prevT`'s date; otherwise just HH:MM.
+function istOf(t) { // live candle times are UTC 'YYYY-MM-DDTHH:MM' -> show them as IST
+  const ms = Date.parse(t + ':00Z');
+  return isNaN(ms) ? t : new Date(ms + 19800000).toISOString().slice(0, 16);
+}
 function fmtAxisLabelSmart(t, prevT) {
+  if (liveMode && t.length === 16) t = istOf(t);
+  if (liveMode && prevT && prevT.length === 16) prevT = istOf(prevT);
   if (t.length === 10) return fmtAxisLabel(t);
   const [date, time] = t.replace('T',' ').split(' ');
   const hhmm = (time || '').slice(0,5);
@@ -3179,6 +3211,7 @@ function fmtAxisLabelSmart(t, prevT) {
   return hhmm;
 }
 function fmtAxisLabel(t) {
+  if (liveMode && t.length === 16) t = istOf(t);
   if (t.length === 10) { const [,m,d] = t.split('-'); return d + '/' + m; }
   const [date, time] = t.replace('T',' ').split(' ');
   const [,m,d] = date.split('-');
@@ -5669,7 +5702,7 @@ function renderChart(forceEnd) {
     // bar that completed it, so the axis still reads as a (non-uniform) time scale.
     let prevLblT = null;
     for (let i = Math.floor(drawLo / stride) * stride; i < renkoBricks.length && i <= drawHi; i += stride) {
-      xAxis += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">${fmtAxisLabelSmart(renkoBricks[i].t, prevLblT)}</text>`;
+      xAxis += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#FFD43B" font-family="var(--mono)">${fmtAxisLabelSmart(renkoBricks[i].t, prevLblT)}</text>`;
       prevLblT = renkoBricks[i].t;
     }
     if (activeIndicators.length) {
@@ -5679,7 +5712,7 @@ function renderChart(forceEnd) {
     let prevLblT = null;
     // start one stride early so the first visible label can still tell whether the date changed
     for (let i = Math.floor(drawLo / stride) * stride; i < revealed.length && i <= drawHi; i += stride) {
-      xAxis += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">${fmtAxisLabelSmart(revealed[i].t, prevLblT)}</text>`;
+      xAxis += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#FFD43B" font-family="var(--mono)">${fmtAxisLabelSmart(revealed[i].t, prevLblT)}</text>`;
       prevLblT = revealed[i].t;
     }
   }
@@ -6389,8 +6422,14 @@ function updateOhlcReadout(candle, index) {
   const chg = candle.c - prev;
   const chgPct = prev ? (chg / prev) * 100 : 0;
   const cls = chg >= 0 ? 'ohlc-chg-pos' : 'ohlc-chg-neg';
+  let istSpan = '';
+  if (liveMode && candle.t && candle.t.length === 16 && LIVE_RES[LIVE.res]) {
+    const o = istOf(candle.t), c = new Date(Date.parse(candle.t + ':00Z') + LIVE_RES[LIVE.res] * 1000 + 19800000).toISOString().slice(11, 16);
+    istSpan = `<span class="ohlc-ist">${o.slice(8, 10)}/${o.slice(5, 7)} ${o.slice(11, 16)} → ${c} IST</span>`;
+  }
   el.innerHTML = `
     <span class="ohlc-sym">${currentSymbolLabel()}</span>
+    ${istSpan}
     <span>O <b>${fmtPrice(candle.o)}</b></span>
     <span>H <b>${fmtPrice(candle.h)}</b></span>
     <span>L <b>${fmtPrice(candle.l)}</b></span>
