@@ -2235,7 +2235,8 @@ sscans.forEach(sc => {
   }
 });
 // One-time: the built-in short straddle scan gets the 600 minimum-premium entry filter (only if it was never set).
-sscans.forEach(sc => { if (sc && sc.strat === 'Straddle' && sc.minPrem == null && /^Short straddle — below EMA 10, EMA 20/.test(sc.name)) sc.minPrem = 600; });
+sscans.forEach(sc => { if (sc && sc.strat === 'Straddle' && sc.minPrem == null) sc.minPrem = 600; });
+try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ }
 function persistSScans() { try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ } }
 let sscanResults = {};   // scan index -> { at, rows:[{und, ok, price, details, err}] }
 let sscanDraft = null, sscanEditing = null, sscanAutoTimer = null, sscanBusy = false;
@@ -2829,7 +2830,7 @@ function renderSPerf() {
       if (sp2.f !== 'all' && !s.err && !s.trades.some(T => { if (T.xp == null) return false; const r = sp2Pnl(T, side); return sp2.f === 'win' ? r > 0 : r <= 0; })) return '';
       return `<div class="sp2-day"><div class="sp2-h"><span class="sp2-t">${sp2Dm(s.start)} → ${sp2Dm(s.e)} IST${s.live ? ' · live' : ''}</span><span class="${cls(s.net)}">${s.k ? usd(s.net) : open ? 'open' : '–'}</span></div>${s.strikes ? `<div class="sp-sub">signal chart ${sscanEsc(s.strikes)} · ${s.bars} candles${s.skipped ? ' · ' + s.skipped + ' trigger(s) skipped, no option data' : ''}</div>` : ''}${rows}</div>`;
     }).join('');
-    body = `<div class="sp-note"><b>${st.n < 20 ? 'Early data' : st.n < 50 ? 'Building' : 'Meaningful sample'}</b> — ${st.n} closed trades over ${st.days} sessions. <span style="opacity:.6">(build 12)</span></div>
+    body = `<div class="sp-note"><b>${st.n < 20 ? 'Early data' : st.n < 50 ? 'Building' : 'Meaningful sample'}</b> — ${st.n} closed trades over ${st.days} sessions. <span style="opacity:.6">(build 13)</span><br><span style="font-size:11.5px">Min entry premium: <b>${g.sc.minPrem > 0 ? g.sc.minPrem + ` (${d.sessions.reduce((a, x) => a + (x.minSkip || 0), 0)} entries skipped)` : 'OFF — set it in Edit scan'}</b></span></div>
     <div class="sp-grid">
       <div class="sp-card"><div class="sp-k">Confidence (profitable trades)</div><div class="sp-v ${st.wr == null ? '' : st.wr >= 50 ? 'sp-pos' : 'sp-neg'}">${st.wr == null ? '–' : st.wr.toFixed(0) + '%'}</div><div class="sp-sub">${st.w} won · ${st.n - st.w} lost${st.n ? ` · 95% range ${st.lo.toFixed(0)}–${st.hi.toFixed(0)}%` : ''}</div></div>
       <div class="sp-card"><div class="sp-k">Net P/L</div><div class="sp-v ${cls(st.n ? st.total : null)}">${usd(st.n ? st.total : null)}</div><div class="sp-sub">${st.trig} of ${st.days} sessions triggered</div></div>
