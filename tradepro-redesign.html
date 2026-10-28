@@ -769,6 +769,10 @@
   .sp-tbl th { text-align: right; font-weight: 500; color: var(--text-faint); padding: 5px 4px; font-size: 11px; }
   .sp-tbl td { text-align: right; padding: 6px 4px; border-top: 1px solid var(--border-soft); }
   .sp-tbl th:first-child, .sp-tbl td:first-child { text-align: left; }
+  .sp2-day { border-top: 1px solid var(--border-soft); padding: 8px 0; }
+  .sp2-h { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; font-family: var(--mono); }
+  .sp2-r { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; font-family: var(--mono); color: var(--text-muted); padding: 2px 0; }
+  .sp2-r b { color: var(--text); font-weight: 500; }
   .sp-note { font-size: 11px; color: var(--text-faint); line-height: 1.45; margin-top: 8px; }
   .price-tag.last { background: var(--surface-2); border: 1px solid var(--text-faint); color: var(--text); }
 
@@ -2504,6 +2508,7 @@ const sperfEligible = t => sperfIsVolStrat(t.st || ((sscans.find(x => x.name ===
 // Called from the chart on every render that has a scan applied. Fills are assumed at the NEXT candle's open
 // (a signal is only known once its candle has closed), so results don't look better than they could have been.
 function sperfLogFromChart(ov, sig, cs) {
+  return; // superseded by the session backtest below (sp2*)
   // only when BOTH the scan and the chart it's applied to are a straddle / strangle
   if (!sperfIsVolStrat(ov.strat) || !sperfChartIsVolStrat()) return;
   if (_sperfLastSig === sig) return;
@@ -2571,7 +2576,7 @@ function sperfExport() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'scanner-performance.csv';
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
-function renderSPerf() {
+function renderSPerfOld() {
   const el = document.getElementById('sperf-body');
   if (!el) return;
   _sperfGroups = [...new Set(sperf.trades.filter(sperfEligible).map(sperfGroup))];
@@ -2620,6 +2625,138 @@ function renderSPerf() {
     </div>
     <div class="sp-note">Straddle and strangle scans only. Trades are read from the strategy chart's own candles. Fills are assumed at the next candle's open after the signal closes. History fills in from the chart's loaded candles (about 1,000 bars) and keeps growing while the app is open; day totals use UTC dates. Past results do not guarantee future ones.</div>`;
 }
+/* ---------- Scanner performance v2: real session backtest on the OPTION chart ----------
+   One session = one daily expiry: 17:30 IST (12:00 UTC) the day before -> 17:30 IST on expiry day.
+   For every session the straddle / strangle premium candles are built from the real call + put candles,
+   the scan's entry/exit rules run on that chart, and each trigger is a SELL entry + BUY exit (or the reverse for Buy scans). */
+const SP2_KEY = 'tradepro_sp2_v1', SP2_DAY = 86400000;
+let sp2 = { days: 14, qty: 0.1, net: true, margin: 10, sel: null, data: {}, busy: false }, sp2G = [];
+try { const v = JSON.parse(localStorage.getItem(SP2_KEY) || 'null'); if (v) { sp2.days = v.days || 14; sp2.qty = v.qty || 0.1; sp2.net = v.net !== false; sp2.margin = v.margin || 10; sp2.sel = v.sel || null; } } catch (e) { /* ignore */ }
+function sp2Save() { try { localStorage.setItem(SP2_KEY, JSON.stringify({ days: sp2.days, qty: sp2.qty, net: sp2.net, margin: sp2.margin, sel: sp2.sel })); } catch (e) { /* ignore */ } }
+const sp2Dm = ms => { const s = new Date(ms + 19800000).toISOString(); return s.slice(8, 10) + ' ' + LIVE_MONTHS[+s.slice(5, 7) - 1] + ' ' + s.slice(11, 16); };
+function sp2Expiries(n) { const now = Date.now(), d = new Date(now); let e = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); if (e <= now) e += SP2_DAY; const o = []; for (let k = 0; k < n; k++) o.push(e - k * SP2_DAY); return o; }
+function sp2Groups() { const o = []; sscans.forEach(sc => { if (!sperfIsVolStrat(sc.strat)) return; sc.und.split(',').forEach(u => o.push({ key: sc.name + '|' + u + '|' + sc.tf + '|' + JSON.stringify(sc.conds), sc, und: u, label: sc.name + ' · ' + u + ' · ' + sc.tf })); }); return o; }
+function sp2Step(und) { const ex = liveExpsFor(und), S = ex.length ? stratStrikes(und, ex[0]) : []; let m = Infinity; for (let i = 1; i < S.length; i++) m = Math.min(m, S[i] - S[i - 1]); return isFinite(m) && m > 0 ? m : (und === 'BTC' ? 200 : und === 'ETH' ? 10 : 1); }
+async function sp2Spots(und, from) {
+  const r = liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${und}USD&resolution=1h&start=${Math.floor(from / 1000) - 3600}&end=${Math.floor(Date.now() / 1000)}`), '1h');
+  return ms => { const k = new Date(ms).toISOString().slice(0, 16); let p = null; for (const c of r) { if (c.t <= k) p = c; else break; } return p ? (p.t === k ? p.o : p.c) : null; };
+}
+async function sp2Leg(und, t, k, dd, res, s, e) { try { return liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${t}-${und}-${k}-${dd}&resolution=${res}&start=${s}&end=${e}`), res); } catch (err) { return []; } }
+async function sp2Session(g, tpl, e, step, spots) {
+  const start = e - SP2_DAY, now = Date.now(), live = e > now, tf = g.sc.tf, secs = LIVE_RES[tf], out = { e, start, live, trades: [] };
+  try {
+    const spot = spots(start); if (!spot) throw new Error('no underlying price');
+    const iso = new Date(e).toISOString(), dd = iso.slice(8, 10) + iso.slice(5, 7) + iso.slice(2, 4);
+    const base = tpl.defLegs.map(l => { const k = stratSpecKind(l.strike), tg = k && k.k === 'pct' ? spot * (1 + k.p / 100) : spot; return { t: l.type === 'Put' ? 'P' : 'C', k: Math.round(tg / step) * step }; });
+    const s = Math.floor(start / 1000), en = Math.floor(Math.min(e, now) / 1000);
+    let legs = null;
+    for (const sh of [0, 1, -1]) {
+      const arr = await Promise.all(base.map(l => sp2Leg(g.und, l.t, l.k + sh * step, dd, tf, s, en)));
+      if (arr.every(a => a.length >= 3)) { legs = base.map((l, i) => ({ k: l.t + (l.k + sh * step), c: arr[i] })); break; }
+    }
+    if (!legs) throw new Error('no option candles found for the ' + dd + ' expiry');
+    const t0 = new Date(start).toISOString().slice(0, 16), times = [...new Set(legs.flatMap(l => l.c.map(x => x.t)))].sort(), cs = [];
+    times.forEach(t => {
+      if (t < t0) return;
+      let o = 0, c = 0, ub = 0, lb = 0;
+      for (const l of legs) { const x = liveLegAt(l.c, t); if (!x) return; o += x.o; c += x.c; ub += x.h; lb += x.l; }
+      const top = Math.max(o, c), bot = Math.min(o, c);
+      cs.push({ t, o, h: top + 0.5 * Math.max(0, ub - top), l: bot - 0.5 * Math.max(0, bot - lb), c, v: 0 });
+    });
+    if (live && cs.length && liveTimeToSec(cs[cs.length - 1].t) + secs > now / 1000) cs.pop(); // the forming candle never counts
+    if (cs.length < 5) throw new Error('too few option candles (' + cs.length + ')');
+    const sig = sscanSignals(cs, g.sc.conds), fill = i => cs[i + 1] ? cs[i + 1].o : cs[i].c, close = i => liveTimeToSec(cs[i].t) * 1000 + secs * 1000;
+    sig.entries.forEach((ei, n) => {
+      const xi = sig.exits[n], T = { et: close(ei), ep: fill(ei) };
+      if (xi != null) { T.xt = close(xi); T.xp = fill(xi); }
+      else if (!live) { T.xt = e; T.xp = cs[cs.length - 1].c; T.expd = true; }
+      else T.mark = cs[cs.length - 1].c;
+      out.trades.push(T);
+    });
+    out.spot = spot; out.strikes = legs.map(l => l.k).join(' + '); out.bars = cs.length;
+  } catch (err) { out.err = err && err.message ? err.message : String(err); }
+  return out;
+}
+async function sp2Run() {
+  if (sp2.busy) return;
+  const g = sp2G.find(x => x.key === sp2.sel); if (!g) return;
+  sp2.busy = true; sp2.prog = 'Loading option contracts…'; renderSPerf();
+  try {
+    await liveLoadOptionProducts();
+    const step = sp2Step(g.und), exps = sp2Expiries(sp2.days), tpl = TEMPLATES.find(x => x.name === g.sc.strat);
+    const spots = await sp2Spots(g.und, exps[exps.length - 1] - SP2_DAY), sessions = [];
+    for (let i = 0; i < exps.length; i += 3) {
+      sp2.prog = 'Reading option charts… ' + i + ' / ' + exps.length + ' sessions'; renderSPerf();
+      sessions.push(...await Promise.all(exps.slice(i, i + 3).map(e => sp2Session(g, tpl, e, step, spots))));
+    }
+    sp2.data[g.key] = { at: Date.now(), sessions: sessions.sort((a, b) => b.e - a.e) };
+  } catch (err) { sp2.data[g.key] = { at: Date.now(), err: liveErrText(err) }; }
+  sp2.busy = false; renderSPerf();
+}
+function sp2Pnl(T, side) { const xp = T.xp != null ? T.xp : T.mark, gross = side === 'Sell' ? T.ep - xp : xp - T.ep, cost = T.xp != null && sp2.net ? (T.ep + xp) * ((costs.slippageBps || 0) / 10000 + (costs.takerPct || 0) / 100) : 0; return (gross - cost) * sp2.qty; }
+function sp2Stats(sessions, side) {
+  let n = 0, w = 0, sw = 0, sl = 0, cum = 0, pk = 0, dd = 0, prem = 0, marg = 0, trig = 0, good = 0, best = null, worst = null;
+  [...sessions].sort((a, b) => a.e - b.e).forEach(s => {
+    let dp = 0, k = 0;
+    (s.trades || []).forEach(T => {
+      if (T.xp == null) return;
+      const r = sp2Pnl(T, side); k++; n++; dp += r; if (r > 0) { w++; sw += r; } else sl += r;
+      cum += r; pk = Math.max(pk, cum); dd = Math.max(dd, pk - cum); prem += T.ep * sp2.qty; marg += (s.spot || 0) * sp2.margin / 100 * sp2.qty;
+    });
+    s.net = dp; s.k = k;
+    if (k) { trig++; if (dp > 0) good++; best = best == null ? dp : Math.max(best, dp); worst = worst == null ? dp : Math.min(worst, dp); }
+  });
+  const z = 1.96, p = n ? w / n : 0, d = 1 + z * z / n, c = p + z * z / (2 * n), m = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n));
+  return { n, w, wr: n ? p * 100 : null, lo: n ? (c - m) / d * 100 : null, hi: n ? (c + m) / d * 100 : null, total: cum, avgW: w ? sw / w : null, avgL: n - w ? sl / (n - w) : null,
+    pf: sl < 0 ? sw / -sl : (sw > 0 ? Infinity : null), exp: n ? cum / n : null, dd, roiP: prem ? cum / prem * 100 : null, roiM: marg ? cum / marg * 100 : null, trig, good, best, worst, days: sessions.length };
+}
+function sp2Select(i) { if (sp2G[i]) { sp2.sel = sp2G[i].key; sp2Save(); renderSPerf(); } }
+function sp2Set(k, v) { v = parseFloat(v); if (v > 0) { sp2[k] = v; sp2Save(); if (k === 'days') sp2.data = {}; renderSPerf(); } }
+function sp2Net(on) { sp2.net = !!on; sp2Save(); renderSPerf(); }
+function sp2Refresh() { delete sp2.data[sp2.sel]; renderSPerf(); }
+function renderSPerf() {
+  const el = document.getElementById('sperf-body'); if (!el) return;
+  sp2G = sp2Groups();
+  if (!sp2G.length) { el.innerHTML = '<div class="saved-empty">No straddle or strangle scanner yet. Build one (strategy: Straddle or Strangle) and its real trigger results on the option chart appear here.</div>'; return; }
+  if (!sp2G.some(x => x.key === sp2.sel)) sp2.sel = sp2G[0].key;
+  const g = sp2G.find(x => x.key === sp2.sel), d = sp2.data[g.key], side = g.sc.side;
+  if (!d && !sp2.busy) setTimeout(sp2Run, 0);
+  const chips = sp2G.map((x, i) => `<button class="sp-chip ${x.key === sp2.sel ? 'active' : ''}" onclick="sp2Select(${i})">${sscanEsc(x.label)}</button>`).join('');
+  const ctl = `<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12px; color:var(--text-muted)">
+    <label>Sessions <select class="field-input" style="width:auto; padding:5px 8px" onchange="sp2Set('days',this.value)">${[7, 14, 30].map(v => `<option ${v === sp2.days ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <label>Qty <input class="field-input" style="width:68px; padding:5px 8px" type="number" min="0.001" step="0.1" value="${sp2.qty}" onchange="sp2Set('qty',this.value)"></label>
+    <label>Margin % <input class="field-input" style="width:58px; padding:5px 8px" type="number" min="1" step="1" value="${sp2.margin}" onchange="sp2Set('margin',this.value)"></label>
+    <label><input type="checkbox" ${sp2.net ? 'checked' : ''} onchange="sp2Net(this.checked)"> After costs</label></div>`;
+  let body;
+  if (!d || sp2.busy) body = `<div class="sp-note">${sscanEsc(sp2.prog || 'Loading…')}</div>`;
+  else if (d.err) body = `<div class="sp-note" style="color:var(--red)">Could not load — ${sscanEsc(d.err)}</div>`;
+  else {
+    const st = sp2Stats(d.sessions, side), usd = v => v == null ? '–' : fmtMoney(v * USD_INR_RATE), cls = v => v == null ? '' : v > 0 ? 'sp-pos' : v < 0 ? 'sp-neg' : '';
+    const pct = v => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(1) + '%', pf = st.pf == null ? '–' : st.pf === Infinity ? '∞' : st.pf.toFixed(2);
+    const ent = side === 'Sell' ? 'SELL' : 'BUY', ex = side === 'Sell' ? 'BUY' : 'SELL';
+    const days = d.sessions.map(s => {
+      const rows = s.err ? `<div class="sp2-r"><span>Data unavailable — ${sscanEsc(s.err)}</span></div>` : !s.trades.length ? '<div class="sp2-r"><span>No trigger in this session</span></div>'
+        : s.trades.map(T => { const r = sp2Pnl(T, side), roi = r / (T.ep * sp2.qty) * 100;
+          return `<div class="sp2-r"><span><b>${ent}</b> entry · ${sp2Dm(T.et)}</span><span>@ ${sscanFmt(T.ep)}</span></div>` +
+            (T.xp != null ? `<div class="sp2-r"><span><b>${ex}</b> exit · ${sp2Dm(T.xt)}${T.expd ? ' (expiry)' : ''}</span><span>@ ${sscanFmt(T.xp)} · <span class="${cls(r)}">${usd(r)} (${pct(roi)})</span></span></div>`
+              : `<div class="sp2-r"><span><b>OPEN</b> · not exited yet</span><span>now ${sscanFmt(T.mark)} · <span class="${cls(r)}">${usd(r)}</span></span></div>`); }).join('');
+      const open = s.trades.some(T => T.xp == null);
+      return `<div class="sp2-day"><div class="sp2-h"><span>${sp2Dm(s.start)} → ${sp2Dm(s.e)} IST${s.live ? ' · live' : ''}</span><span class="${cls(s.net)}">${s.k ? usd(s.net) : open ? 'open' : '–'}</span></div>${s.strikes ? `<div class="sp-sub">${sscanEsc(s.strikes)} · ${s.bars} candles</div>` : ''}${rows}</div>`;
+    }).join('');
+    body = `<div class="sp-note"><b>${st.n < 20 ? 'Early data' : st.n < 50 ? 'Building' : 'Meaningful sample'}</b> — ${st.n} closed trades over ${st.days} sessions.</div>
+    <div class="sp-grid">
+      <div class="sp-card"><div class="sp-k">Confidence (profitable trades)</div><div class="sp-v ${st.wr == null ? '' : st.wr >= 50 ? 'sp-pos' : 'sp-neg'}">${st.wr == null ? '–' : st.wr.toFixed(0) + '%'}</div><div class="sp-sub">${st.w} won · ${st.n - st.w} lost${st.n ? ` · 95% range ${st.lo.toFixed(0)}–${st.hi.toFixed(0)}%` : ''}</div></div>
+      <div class="sp-card"><div class="sp-k">Net P/L</div><div class="sp-v ${cls(st.n ? st.total : null)}">${usd(st.n ? st.total : null)}</div><div class="sp-sub">${st.trig} of ${st.days} sessions triggered</div></div>
+      <div class="sp-card"><div class="sp-k">ROI on premium</div><div class="sp-v ${cls(st.roiP)}">${pct(st.roiP)}</div><div class="sp-sub">net P/L ÷ premium traded</div></div>
+      <div class="sp-card"><div class="sp-k">ROI on margin (${sp2.margin}%)</div><div class="sp-v ${cls(st.roiM)}">${pct(st.roiM)}</div><div class="sp-sub">margin = ${sp2.margin}% of spot × qty</div></div>
+      <div class="sp-card"><div class="sp-k">Avg win / avg loss</div><div class="sp-v" style="font-size:13px"><span class="sp-pos">${usd(st.avgW)}</span> / <span class="sp-neg">${usd(st.avgL)}</span></div><div class="sp-sub">profit factor ${pf}</div></div>
+      <div class="sp-card"><div class="sp-k">Expectancy · Max drawdown</div><div class="sp-v" style="font-size:13px"><span class="${cls(st.exp)}">${usd(st.exp)}</span> · <span class="sp-neg">${st.n ? usd(-st.dd) : '–'}</span></div><div class="sp-sub">profitable days ${st.good} / ${st.trig}</div></div>
+    </div>${days}
+    <div class="sp-note">Each session is one daily expiry (17:30 IST → 17:30 IST). Strikes are picked at the session start from the underlying's price (strangle at the template's offset). Signals run on the real combined call+put premium candles and fill at the next candle's open; a trade still open at 17:30 IST is closed at the last expiry candle. Fees: the paper account's slippage + taker fee. Past results do not guarantee future ones.</div>`;
+  }
+  el.innerHTML = `<div class="sp-chips">${chips}</div>${ctl}<div style="margin-top:8px">${body}</div><div style="margin-top:10px"><button class="btn-ghost" onclick="sp2Refresh()">Refresh from option charts ↻</button></div>`;
+}
+
 renderSScans();
 
 function spark(points, color) {
