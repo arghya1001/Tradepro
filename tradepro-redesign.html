@@ -2642,7 +2642,8 @@ function renderSPerfOld() {
    For every session the straddle / strangle premium candles are built from the real call + put candles,
    the scan's entry/exit rules run on that chart, and each trigger is a SELL entry + BUY exit (or the reverse for Buy scans). */
 const SP2_KEY = 'tradepro_sp2_v1', SP2_DAY = 86400000;
-let sp2 = { days: 14, qty: 0.1, net: true, margin: 10, sel: null, data: {}, busy: false }, sp2G = [];
+let sp2 = { days: 14, qty: 0.1, net: true, margin: 10, sel: null, data: {}, busy: false, f: 'all' }, sp2G = [];
+function sp2Filter(f) { sp2.f = f; renderSPerf(); }
 try { const v = JSON.parse(localStorage.getItem(SP2_KEY) || 'null'); if (v) { sp2.days = v.days || 14; sp2.qty = v.qty || 0.1; sp2.net = v.net !== false; sp2.margin = v.margin || 10; sp2.sel = v.sel || null; } } catch (e) { /* ignore */ }
 function sp2Save() { try { localStorage.setItem(SP2_KEY, JSON.stringify({ days: sp2.days, qty: sp2.qty, net: sp2.net, margin: sp2.margin, sel: sp2.sel })); } catch (e) { /* ignore */ } }
 const sp2U = ms => new Date(ms).toISOString().slice(11, 16);
@@ -2806,16 +2807,20 @@ function renderSPerf() {
     const st = sp2Stats(d.sessions, side), usd = v => v == null ? '–' : fmtMoney(v * USD_INR_RATE), cls = v => v == null ? '' : v > 0 ? 'sp-pos' : v < 0 ? 'sp-neg' : '';
     const pct = v => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(1) + '%', pf = st.pf == null ? '–' : st.pf === Infinity ? '∞' : st.pf.toFixed(2);
     const ent = side === 'Sell' ? 'SELL' : 'BUY', ex = side === 'Sell' ? 'BUY' : 'SELL';
+    const fc = { all: st.n, win: st.w, loss: st.n - st.w };
+    const fchips = `<div class="sp-chips" style="display:flex; gap:6px; margin:10px 0 2px">${[['all', 'All trades'], ['win', 'Winners'], ['loss', 'Losers']].map(([k, l]) => `<button class="sp-chip ${sp2.f === k ? 'active' : ''}" onclick="sp2Filter('${k}')">${l} (${fc[k]})</button>`).join('')}</div>`;
     const days = d.sessions.map(s => {
       const rows = s.err ? `<div class="sp2-r"><span>Data unavailable — ${sscanEsc(s.err)}</span></div>` : !s.trades.length ? '<div class="sp2-r"><span>No trigger in this session</span></div>'
         : s.trades.map(T => { const r = sp2Pnl(T, side), roi = r / (T.ep * sp2.qty) * 100;
+          if (sp2.f !== 'all' && (T.xp == null || (sp2.f === 'win' ? !(r > 0) : r > 0))) return '';
           return `<div class="sp2-r"><span><b>${ent}</b> entry · <span class="sp2-t">${sp2Dm(T.et)} IST</span><br><small style="color:var(--text-faint)">signal candle ${sp2Dm(T.ec)} IST / ${sp2U(T.ec)} UTC<br>ATM ${sscanEsc(T.sk || '')}</small></span><span>@ ${sscanFmt(T.ep)}</span></div>` +
             (T.xp != null ? `<div class="sp2-r"><span><b>${ex}</b> exit · <span class="sp2-t">${sp2Dm(T.xt)} IST</span>${T.expd ? ' (expiry)' : `<br><small style="color:var(--text-faint)">signal candle ${sp2Dm(T.xc)} IST / ${sp2U(T.xc)} UTC</small>`}</span><span>@ ${sscanFmt(T.xp)} · <span class="${cls(r)}">${usd(r)} (${pct(roi)})</span></span></div>`
               : `<div class="sp2-r"><span><b>OPEN</b> · not exited yet</span><span>now ${sscanFmt(T.mark)} · <span class="${cls(r)}">${usd(r)}</span></span></div>`); }).join('');
       const open = s.trades.some(T => T.xp == null);
+      if (sp2.f !== 'all' && !s.err && !s.trades.some(T => { if (T.xp == null) return false; const r = sp2Pnl(T, side); return sp2.f === 'win' ? r > 0 : r <= 0; })) return '';
       return `<div class="sp2-day"><div class="sp2-h"><span class="sp2-t">${sp2Dm(s.start)} → ${sp2Dm(s.e)} IST${s.live ? ' · live' : ''}</span><span class="${cls(s.net)}">${s.k ? usd(s.net) : open ? 'open' : '–'}</span></div>${s.strikes ? `<div class="sp-sub">signal chart ${sscanEsc(s.strikes)} · ${s.bars} candles${s.skipped ? ' · ' + s.skipped + ' trigger(s) skipped, no option data' : ''}</div>` : ''}${rows}</div>`;
     }).join('');
-    body = `<div class="sp-note"><b>${st.n < 20 ? 'Early data' : st.n < 50 ? 'Building' : 'Meaningful sample'}</b> — ${st.n} closed trades over ${st.days} sessions.</div>
+    body = `<div class="sp-note"><b>${st.n < 20 ? 'Early data' : st.n < 50 ? 'Building' : 'Meaningful sample'}</b> — ${st.n} closed trades over ${st.days} sessions. <span style="opacity:.6">(build 11: time-of-day + filter)</span></div>
     <div class="sp-grid">
       <div class="sp-card"><div class="sp-k">Confidence (profitable trades)</div><div class="sp-v ${st.wr == null ? '' : st.wr >= 50 ? 'sp-pos' : 'sp-neg'}">${st.wr == null ? '–' : st.wr.toFixed(0) + '%'}</div><div class="sp-sub">${st.w} won · ${st.n - st.w} lost${st.n ? ` · 95% range ${st.lo.toFixed(0)}–${st.hi.toFixed(0)}%` : ''}</div></div>
       <div class="sp-card"><div class="sp-k">Net P/L</div><div class="sp-v ${cls(st.n ? st.total : null)}">${usd(st.n ? st.total : null)}</div><div class="sp-sub">${st.trig} of ${st.days} sessions triggered</div></div>
@@ -2823,7 +2828,7 @@ function renderSPerf() {
       <div class="sp-card"><div class="sp-k">ROI on margin (${sp2.margin}%)</div><div class="sp-v ${cls(st.roiM)}">${pct(st.roiM)}</div><div class="sp-sub">margin = ${sp2.margin}% of spot × qty</div></div>
       <div class="sp-card"><div class="sp-k">Avg win / avg loss</div><div class="sp-v" style="font-size:13px"><span class="sp-pos">${usd(st.avgW)}</span> / <span class="sp-neg">${usd(st.avgL)}</span></div><div class="sp-sub">profit factor ${pf}</div></div>
       <div class="sp-card"><div class="sp-k">Expectancy · Max drawdown</div><div class="sp-v" style="font-size:13px"><span class="${cls(st.exp)}">${usd(st.exp)}</span> · <span class="sp-neg">${st.n ? usd(-st.dd) : '–'}</span></div><div class="sp-sub">profitable days ${st.good} / ${st.trig}</div></div>
-    </div>${sp2HourBlock(d.sessions, side, usd, cls)}${days}
+    </div>${sp2HourBlock(d.sessions, side, usd, cls)}${fchips}${days}
     <div class="sp-note">Each session is one daily expiry (17:30 IST → 17:30 IST). Straddle exit: close above EMA 20 (Sell scans). Signals run on the session's real combined call+put premium chart (strikes picked at session start). Each trigger is then traded on the ATM strikes at that moment (strangle: ATM ±12 strikes) at the next candle's open, and the exit closes those same strikes. A trade still open at 17:30 IST is closed at the last expiry candle. Fees: the paper account's slippage + taker fee. Past results do not guarantee future ones.</div>`;
   }
   el.innerHTML = `<div class="sp-chips">${chips}</div>${ctl}<div style="margin-top:8px">${body}</div><div style="margin-top:10px"><button class="btn-ghost" onclick="sp2Refresh()">Refresh from option charts ↻</button></div>`;
