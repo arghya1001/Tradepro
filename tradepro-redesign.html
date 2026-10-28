@@ -1696,6 +1696,9 @@
       <div id="sscan-conds"></div>
       <button type="button" class="btn-ghost" onclick="sscanAddCond()">+ Add condition</button>
 
+      <label class="field-label" id="sscan-minprem-label">No entry if combined premium is below (USD, 0 = off)</label>
+      <input class="field-input" id="sscan-minprem" type="number" min="0" step="10" placeholder="e.g. 600" oninput="sscanDraft.minPrem=Math.max(0,parseFloat(this.value)||0)">
+
       <label style="font-size:12.5px; color:var(--text-muted); display:flex; gap:8px; align-items:center; margin-top:12px"><input type="checkbox" id="sscan-fresh" onchange="sscanDraft.fresh=this.checked"> Only flag the first candle where all conditions turn true</label>
     </div>
     <div class="modal-foot">
@@ -2217,7 +2220,7 @@ const SSCAN_KEY = 'tradepro_strat_scans_v1';
 const SSCAN_TFS = ['5m','15m','30m','1h','4h','1d'];
 const SSCAN_REFS = [{ k:'ema', label:'EMA' }, { k:'sma', label:'SMA' }, { k:'st', label:'Supertrend' }];
 let sscans = [
-  { name:'Short straddle — below EMA 10, EMA 20 & Supertrend (10,2)', strat:'Straddle', side:'Sell', und:'BTC,ETH', tf:'15m', fresh:false,
+  { name:'Short straddle — below EMA 10, EMA 20 & Supertrend (10,2)', strat:'Straddle', side:'Sell', und:'BTC,ETH', tf:'15m', fresh:false, minPrem:600,
     conds:[{ op:'below', k:'ema', p:10 },{ op:'below', k:'ema', p:20 },{ op:'below', k:'st', p:10, m:2 }] },
 ];
 try { const v = JSON.parse(localStorage.getItem(SSCAN_KEY) || 'null'); if (Array.isArray(v)) sscans = v; } catch (e) { /* storage unavailable */ }
@@ -2231,6 +2234,8 @@ sscans.forEach(sc => {
     sc.conds = [{ op:'below', k:'ema', p:10 }, { op:'below', k:'ema', p:20 }, { op:'below', k:'st', p:10, m:2 }];
   }
 });
+// One-time: the built-in short straddle scan gets the 600 minimum-premium entry filter (only if it was never set).
+sscans.forEach(sc => { if (sc && sc.strat === 'Straddle' && sc.minPrem == null && /^Short straddle — below EMA 10, EMA 20/.test(sc.name)) sc.minPrem = 600; });
 function persistSScans() { try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ } }
 let sscanResults = {};   // scan index -> { at, rows:[{und, ok, price, details, err}] }
 let sscanDraft = null, sscanEditing = null, sscanAutoTimer = null, sscanBusy = false;
@@ -2239,7 +2244,7 @@ const sscanTime = sec => new Date(sec * 1000 + 19800000).toISOString().slice(5, 
 let scanOverlay = null, scanOverlayTimer = null;   // activation markers drawn on the combined-strategy chart
 const sscanFmt = v => v == null ? '–' : v.toLocaleString('en-US', { maximumFractionDigits: v >= 100 ? 1 : 4 });
 function sscanRefLabel(c) { return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
-function sscanSummary(sc) { return sc.conds.map(c => 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · '); }
+function sscanSummary(sc) { return sc.conds.map(c => 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · ') + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : ''); }
 
 function renderSScans() {
   const el = document.getElementById('sscan-list');
@@ -2309,7 +2314,7 @@ function sscanAddCond() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell'
 function openSScan(idx, stratName) {
   sscanEditing = idx == null ? null : idx;
   sscanDraft = idx == null
-    ? { name: '', strat: stratName || 'Straddle', side: 'Sell', und: 'BTC', tf: '15m', fresh: false, conds: [{ op:'below', k:'ema', p:10 }, { op:'below', k:'ema', p:20 }, { op:'below', k:'st', p:10, m:2 }] }
+    ? { name: '', strat: stratName || 'Straddle', side: 'Sell', und: 'BTC', tf: '15m', fresh: false, minPrem: (stratName || 'Straddle') === 'Straddle' ? 600 : 0, conds: [{ op:'below', k:'ema', p:10 }, { op:'below', k:'ema', p:20 }, { op:'below', k:'st', p:10, m:2 }] }
     : JSON.parse(JSON.stringify(sscans[idx]));
   if (idx == null && stratName && /^Iron/.test(stratName)) sscanDraft.side = 'Sell';
   document.getElementById('sscan-name').value = sscanDraft.name;
@@ -2318,6 +2323,7 @@ function openSScan(idx, stratName) {
   document.getElementById('sscan-tf').innerHTML = SSCAN_TFS.map(t => `<option ${t === sscanDraft.tf ? 'selected' : ''}>${t}</option>`).join('');
   document.getElementById('sscan-tf').onchange = e => { sscanDraft.tf = e.target.value; };
   document.getElementById('sscan-fresh').checked = !!sscanDraft.fresh;
+  document.getElementById('sscan-minprem').value = sscanDraft.minPrem || '';
   setSScanSide(sscanDraft.side);
   renderSScanConds();
   document.getElementById('sscan-overlay').classList.add('open');
@@ -2359,7 +2365,7 @@ function sscanRefLine(candles, c) {
 /* Entry/exit signals as a position cycle: ONE entry when every condition first becomes true, then NO
    further entries until the exit fires (every condition flipped: below -> above, above -> below).
    Sell scan on EMA10/EMA20/Supertrend: SELL when close is below all three, BUY-exit when close is above all three. */
-function sscanSignals(candles, conds, xr) {
+function sscanSignals(candles, conds, xr, minPrem) {
   const n = candles.length, entries = [], exits = [];
   if (!n || !conds || !conds.length) return { entries, exits, inPos: false };
   const lines = conds.map(c => sscanRefLine(candles, c));
@@ -2379,7 +2385,7 @@ function sscanSignals(candles, conds, xr) {
   }
   let inPos = false;
   for (let i = 1; i < n; i++) {
-    if (!inPos) { if (ent[i] && valid[i - 1] && !ent[i - 1]) { entries.push(i); inPos = true; } }
+    if (!inPos) { if (ent[i] && valid[i - 1] && !ent[i - 1] && !(minPrem > 0 && candles[i].c < minPrem)) { entries.push(i); inPos = true; } }  // minPrem: no entry while the combined premium is below the minimum
     else if (ext[i]) { exits.push(i); inPos = false; }
   }
   return { entries, exits, inPos };
@@ -2436,7 +2442,7 @@ function sscanToggleAuto() {
   }
 }
 function sscanOverlayMeta(sc, und) { // the chart evaluates the scan on its OWN candles (what you see), so no data needed here
-  return { times: new Set(), list: [], und, name: sc.name, strat: sc.strat, side: sc.side, conds: JSON.parse(JSON.stringify(sc.conds)) };
+  return { times: new Set(), list: [], und, name: sc.name, strat: sc.strat, side: sc.side, conds: JSON.parse(JSON.stringify(sc.conds)), minPrem: sc.minPrem || 0 };
 }
 // Signals on the chart's own closed candles (the still-forming last candle is ignored: a signal needs a CLOSE).
 function sscanChartSignals(ov) {
@@ -2444,7 +2450,7 @@ function sscanChartSignals(ov) {
   let n = Math.min(replayIndex, replayCandles.length);
   if (n > 0 && secs) { const ts = liveTimeToSec(replayCandles[n - 1].t); if (ts != null && ts + secs > Date.now() / 1000) n--; }
   const cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
-  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr) }, cs, { conds: ov.conds, xr: sscanExitRule(ov) });
+  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr, p.minPrem) }, cs, { conds: ov.conds, xr: sscanExitRule(ov), minPrem: ov.minPrem || 0 });
   return { sig, cs };
 }
 async function openSScanChart(i, und) {
@@ -2649,7 +2655,7 @@ function sp2Save() { try { localStorage.setItem(SP2_KEY, JSON.stringify({ days: 
 const sp2U = ms => new Date(ms).toISOString().slice(11, 16);
 const sp2Dm = ms => { const s = new Date(ms + 19800000).toISOString(); return s.slice(8, 10) + ' ' + LIVE_MONTHS[+s.slice(5, 7) - 1] + ' ' + s.slice(11, 16); };
 function sp2Expiries(n) { const now = Date.now(), d = new Date(now); let e = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); if (e <= now) e += SP2_DAY; const o = []; for (let k = 0; k < n; k++) o.push(e - k * SP2_DAY); return o; }
-function sp2Groups() { const o = []; sscans.forEach(sc => { if (!sperfIsVolStrat(sc.strat)) return; sc.und.split(',').forEach(u => o.push({ key: sc.name + '|' + u + '|' + sc.tf + '|' + JSON.stringify(sc.conds), sc, und: u, label: sc.name + ' · ' + u + ' · ' + sc.tf })); }); return o; }
+function sp2Groups() { const o = []; sscans.forEach(sc => { if (!sperfIsVolStrat(sc.strat)) return; sc.und.split(',').forEach(u => o.push({ key: sc.name + '|' + u + '|' + sc.tf + '|' + JSON.stringify(sc.conds) + '|' + (sc.minPrem || 0), sc, und: u, label: sc.name + ' · ' + u + ' · ' + sc.tf })); }); return o; }
 function sp2Step(und) { const ex = liveExpsFor(und), S = ex.length ? stratStrikes(und, ex[0]) : []; let m = Infinity; for (let i = 1; i < S.length; i++) m = Math.min(m, S[i] - S[i - 1]); return isFinite(m) && m > 0 ? m : (und === 'BTC' ? 200 : und === 'ETH' ? 10 : 1); }
 async function sp2Spots(und, from) {
   const r = liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${und}USD&resolution=1h&start=${Math.floor(from / 1000) - 3600}&end=${Math.floor(Date.now() / 1000)}`), '1h');
@@ -2680,7 +2686,7 @@ async function sp2Session(g, tpl, e, step, spots) {
     });
     if (live && cs.length && liveTimeToSec(cs[cs.length - 1].t) + secs > now / 1000) cs.pop(); // the forming candle never counts
     if (cs.length < 5) throw new Error('too few option candles (' + cs.length + ')');
-    const sig = sscanSignals(cs, g.sc.conds, sscanExitRule(g.sc)), fill = i => cs[i + 1] ? cs[i + 1].o : cs[i].c, close = i => liveTimeToSec(cs[i].t) * 1000 + secs * 1000;
+    const sig = sscanSignals(cs, g.sc.conds, sscanExitRule(g.sc), g.sc.minPrem), fill = i => cs[i + 1] ? cs[i + 1].o : cs[i].c, close = i => liveTimeToSec(cs[i].t) * 1000 + secs * 1000;
     // Trades are executed on the ATM at the moment of the trigger (the signal itself comes from the session chart above),
     // and the exit closes the SAME strikes that were opened.
     const uc = liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${g.und}USD&resolution=${tf}&start=${s}&end=${en}`), tf);
