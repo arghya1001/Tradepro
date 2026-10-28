@@ -186,6 +186,17 @@
   .oc-table td.oc-oi { color: var(--text-faint); }
   .oc-table tr.oc-atm td.oc-k { color: var(--accent); }
   .oc-table td.oc-sel { outline: 2px solid var(--accent); outline-offset: -2px; background: rgba(23,195,178,.12); }
+  .strat-chart-btn { margin-top: 8px; background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 5px 10px; font-size: 12px; font-family: inherit; cursor: pointer; }
+  .cl-head, .cl-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 66px 56px 30px; gap: 6px; align-items: center; }
+  .cl-head { font-size: 11px; color: var(--text-faint); margin-bottom: 4px; }
+  .cl-row { margin-bottom: 2px; }
+  .cl-row .field-input { padding: 8px; min-width: 0; width: 100%; }
+  .cl-hint { grid-column: 1 / -1; font-size: 11px; color: var(--text-faint); margin: 0 2px 8px; font-family: 'IBM Plex Mono', monospace; }
+  .cl-x { background: transparent; border: 1px solid var(--border); color: var(--red); border-radius: 6px; height: 34px; cursor: pointer; font-size: 16px; }
+  .cl-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .cl-actions .field-input { flex: 1; min-width: 120px; padding: 8px; }
+  .cl-msg { font-size: 12px; color: var(--accent); margin-top: 8px; }
+  .saved-chart { margin: 0 6px 0 auto; white-space: nowrap; flex-shrink: 0; }
   .oc-empty { padding: 14px; font-size: 12px; color: var(--text-faint); text-align: center; }
   .panel-action { margin-left: auto; font-size: 12.5px; color: var(--accent); display: flex; align-items: center; gap: 4px; }
 
@@ -1076,6 +1087,7 @@
           <div>
             <div class="strat-title">Replay</div>
             <div class="strat-sub" id="replay-sub">Paper-trade real historical data — step through candles, place trades, track P&amp;L</div>
+            <button type="button" class="strat-chart-btn" id="back-to-strat" style="display:none;margin-top:8px" onclick="showView('strategies')">← Back to Strategies</button>
           </div>
         </div>
 
@@ -1093,7 +1105,12 @@
               <select class="field-input" id="live-kind" onchange="onLiveKindChange()">
                 <option value="perp">Perpetuals</option>
                 <option value="options">Options</option>
+                <option value="strategy">Strategies (combined)</option>
               </select>
+            </div>
+            <div class="rc-field" id="rc-live-strat-wrap" style="display:none">
+              <label class="field-label">Strategy</label>
+              <select class="field-input" id="live-strat" onchange="onLiveStratChange('type')"></select>
             </div>
             <div class="rc-field" id="rc-live-und-wrap" style="display:none">
               <label class="field-label">Underlying</label>
@@ -1113,6 +1130,14 @@
             <div class="rc-field" id="rc-live-strike-wrap" style="display:none">
               <label class="field-label">Strike</label>
               <select class="field-input" id="live-strike" onchange="onLiveOptChange('strike')"></select>
+            </div>
+            <div class="rc-field" id="rc-live-center-wrap" style="display:none">
+              <label class="field-label">Centre strike (ATM ± 5)</label>
+              <select class="field-input" id="live-center" onchange="onLiveStratChange('center')"></select>
+            </div>
+            <div class="rc-field" id="rc-live-sw-wrap" style="display:none">
+              <label class="field-label">Width (strikes)</label>
+              <select class="field-input" id="live-sw" onchange="onLiveStratChange('w')"></select>
             </div>
             <div class="rc-field" id="rc-live-symbol-wrap" style="display:none">
               <label class="field-label">Symbol (Delta)</label>
@@ -1422,9 +1447,19 @@
           </div>
         </div>
 
+        <div class="panel" id="live-custom-panel" style="display:none">
+          <div class="panel-head">
+            <div class="panel-title">Strategy legs — build your own</div>
+            <button class="collapse-btn" aria-label="Collapse strategy builder" onclick="togglePanel(this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </div>
+          <div class="panel-body" id="cl-body"></div>
+        </div>
+
         <div class="panel" id="live-chain-panel" style="display:none">
           <div class="panel-head">
-            <div class="panel-title">Option chain — tap a price to chart it</div>
+            <div class="panel-title" id="oc-panel-title">Option chain — tap a price to chart it</div>
             <button class="collapse-btn" aria-label="Collapse option chain" onclick="togglePanel(this)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
             </button>
@@ -1654,6 +1689,8 @@ function assetChips(ids) {
   }).join('');
 }
 
+// strategy templates that can be charted as live combined candles (see STRAT_DEFS in the live section)
+const STRAT_CHART_MAP = { 'Long straddle': 'straddle', 'Long strangle': 'strangle', 'Bull call spread': 'bullcall', 'Bear put spread': 'bearput', 'Iron condor': 'condor', 'Iron butterfly': 'ironfly' };
 function renderTemplates() {
   ['bullish','bearish','neutral'].forEach(cat => {
     const list = TEMPLATES.filter(t => t.cat === cat);
@@ -1665,6 +1702,7 @@ function renderTemplates() {
         </div>
         <div class="strat-legs">${t.legs}</div>
         <div class="strat-assets">${assetChips(t.assets)}</div>
+        ${stratSpecsChartable(t.defLegs) ? `<button class="strat-chart-btn" onclick="event.stopPropagation();openTemplateCandles(${TEMPLATES.indexOf(t)})">View BTC candles ↗</button>` : ''}
       </div>
     `).join('');
   });
@@ -1676,33 +1714,105 @@ let savedStrategies = [
   { name:'BTC Iron Condor — weekly', asset:'btc', cat:'neutral', legs:[{action:'Sell', type:'Call', strike:'+2%'},{action:'Buy', type:'Call', strike:'+4%'},{action:'Sell', type:'Put', strike:'-2%'},{action:'Buy', type:'Put', strike:'-4%'}] },
 ];
 
+const CUSTOM_KEY = 'tradepro_custom_strats_v1';        // setups saved from the Replay custom builder
+const SAVED_STRATS_KEY = 'tradepro_saved_strats_v1';   // strategies saved from the Strategies tab
+try { const v = JSON.parse(localStorage.getItem(SAVED_STRATS_KEY) || 'null'); if (Array.isArray(v)) savedStrategies = v; } catch (e) { /* no storage — keep the defaults */ }
+function persistSavedStrategies() { try { localStorage.setItem(SAVED_STRATS_KEY, JSON.stringify(savedStrategies)); } catch (e) { /* storage unavailable */ } }
+
+/* ---------- Strategy -> live candles bridge ----------
+   Strategy legs here are written as text ("ATM", "ATM+2%", "-3%", "90000"). To chart them we turn each into
+   "N listed strikes away from the at-the-money strike" using the live spot price and Delta's listed strikes. */
+function stratSpecKind(spec) {
+  const t = String(spec == null ? '' : spec).trim().toUpperCase().replace(/\s+/g, '');
+  if (t === 'ATM') return { k: 'atm' };
+  const m = /^ATM([+-])(\d+(?:\.\d+)?)%$/.exec(t) || /^([+-])(\d+(?:\.\d+)?)%$/.exec(t);
+  if (m) return { k: 'pct', p: (m[1] === '-' ? -1 : 1) * parseFloat(m[2]) };
+  if (/^\d+(?:\.\d+)?$/.test(t)) return { k: 'abs', v: parseFloat(t) };
+  return null;
+}
+function stratSpecsChartable(legs) {
+  return Array.isArray(legs) && legs.length > 0 && legs.every(l => (l.type === 'Call' || l.type === 'Put') && stratSpecKind(l.strike));
+}
+function stratSpecsToOffsets(legs, S, spot) {
+  const atm = liveAtmIndex(S, spot);
+  const merged = {};
+  legs.forEach(l => {
+    const k = stratSpecKind(l.strike);
+    const target = k.k === 'atm' ? spot : k.k === 'pct' ? spot * (1 + k.p / 100) : k.v;
+    let idx = 0;
+    S.forEach((x, i) => { if (Math.abs(x - target) < Math.abs(S[idx] - target)) idx = i; });
+    const t = l.type === 'Put' ? 'P' : 'C', o = idx - atm, w = l.action === 'Sell' ? -1 : 1;
+    const key = t + '|' + o;
+    if (merged[key]) merged[key].w += w; else merged[key] = { t, o, w };
+  });
+  return { legs: Object.values(merged).filter(x => x.w !== 0), center: S[atm] };
+}
+function openTemplateCandles(i) {
+  const t = TEMPLATES[i];
+  if (!t) return;
+  openStrategyFromSpecs(t.name, t.assets.indexOf('btc') !== -1 ? 'BTC' : t.assets.indexOf('eth') !== -1 ? 'ETH' : 'BTC', { specs: t.defLegs });
+}
+function openSavedCandles(i) {
+  const sv = savedStrategies[i];
+  if (!sv) return;
+  openStrategyFromSpecs(sv.name, sv.asset === 'eth' ? 'ETH' : 'BTC', { specs: sv.legs });
+}
+function openReplaySavedCandles(i) {
+  const item = clLoadSaved()[i];
+  if (item) openStrategyFromSpecs(item.name, item.und || 'BTC', { offsets: item.legs });
+}
+function deleteReplaySaved(i) {
+  const list = clLoadSaved();
+  list.splice(i, 1);
+  clStoreSaved(list);
+  renderSaved();
+  if (typeof liveCustomRender === 'function') liveCustomRender();
+}
+
 function catColor(cat) { return cat === 'bullish' ? 'var(--green)' : cat === 'bearish' ? 'var(--red)' : 'var(--accent)'; }
 
 function renderSaved() {
   const el = document.getElementById('saved-list');
-  document.getElementById('saved-count').textContent = savedStrategies.length ? `(${savedStrategies.length})` : '';
-  if (!savedStrategies.length) {
+  const fromReplay = clLoadSaved();
+  const total = savedStrategies.length + fromReplay.length;
+  document.getElementById('saved-count').textContent = total ? `(${total})` : '';
+  if (!total) {
     el.innerHTML = `<div class="saved-empty">No saved strategies yet — build one or use a template below.</div>`;
     return;
   }
-  el.innerHTML = savedStrategies.map((s,i) => {
+  const trash = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-8 0 1 13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-13"/></svg>`;
+  const esc = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const own = savedStrategies.map((s, i) => {
     const asset = ASSETS.find(a => a.id === s.asset);
+    const crypto = s.asset === 'btc' || s.asset === 'eth';
+    const can = crypto && stratSpecsChartable(s.legs);
     return `
     <div class="saved-row">
       <span class="cat-dot" style="background:${catColor(s.cat)}"></span>
       <div class="saved-info">
-        <div class="saved-name">${s.name}</div>
-        <div class="saved-meta">${asset ? asset.name : s.asset} · ${s.legs.length} leg${s.legs.length>1?'s':''} · ${s.cat}</div>
+        <div class="saved-name">${esc(s.name)}</div>
+        <div class="saved-meta">${asset ? asset.name : s.asset} · ${s.legs.length} leg${s.legs.length>1?'s':''} · ${s.cat}${crypto || !s.asset ? '' : ' · live candles: crypto only for now'}</div>
       </div>
-      <button class="saved-remove" aria-label="Remove strategy" onclick="removeSaved(${i})">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-8 0 1 13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-13"/></svg>
-      </button>
+      ${can ? `<button class="strat-chart-btn saved-chart" onclick="openSavedCandles(${i})">View candles</button>` : ''}
+      <button class="saved-remove" aria-label="Remove strategy" onclick="removeSaved(${i})">${trash}</button>
     </div>`;
   }).join('');
+  const rp = fromReplay.map((s, i) => `
+    <div class="saved-row">
+      <span class="cat-dot" style="background:var(--accent)"></span>
+      <div class="saved-info">
+        <div class="saved-name">${esc(s.name)}</div>
+        <div class="saved-meta">${esc(s.und || 'BTC')} · ${s.legs.length} leg${s.legs.length>1?'s':''} · custom (saved from Replay)</div>
+      </div>
+      <button class="strat-chart-btn saved-chart" onclick="openReplaySavedCandles(${i})">View candles</button>
+      <button class="saved-remove" aria-label="Remove strategy" onclick="deleteReplaySaved(${i})">${trash}</button>
+    </div>`).join('');
+  el.innerHTML = own + rp;
 }
 
 function removeSaved(i) {
   savedStrategies.splice(i, 1);
+  persistSavedStrategies();
   renderSaved();
 }
 
@@ -1780,6 +1890,7 @@ function saveStrategy() {
     cat: currentCategory,
     legs: currentLegs.map(l => ({...l})),
   });
+  persistSavedStrategies();
   renderSaved();
   closeBuilder();
 }
@@ -2031,6 +2142,15 @@ const LIVE = {
   optProducts: null,   // parsed live option contracts (loaded once, on demand)
   optSel: { und: 'BTC', exp: '', type: 'C', strike: null },
   chain: { key: null, rows: [], spot: null, at: 0, timer: null, token: 0 },
+  optMap: {},          // 'C|BTC|2026-10-31|95000' -> contract symbol
+  spotByUnd: {},       // 'BTC' -> latest spot price seen in the option tickers
+  legs: [],            // [{symbol, w}] — what the chart is built from (1 leg for perps/options, N for a strategy)
+  legData: {},         // symbol -> that leg's own candles (strategy mode combines them)
+  strat: { type: 'straddle', w: 1, und: 'BTC', exp: '', center: null, legs: [{ t: 'C', o: 0, w: 1 }, { t: 'P', o: 0, w: 1 }] },  // legs = the custom builder's rows (offset is in strikes from the centre)
+  clMsg: '',
+  stratNames: {},      // stratSymbol -> friendly name (e.g. 'Iron condor') when opened from the Strategies tab
+  fromStrategies: false,
+  stratSymbol: null,   // 'S~straddle~BTC~311026~95000~1' for the current strategy selection
   csp: null,   // set when the page's own security policy (e.g. Claude's artifact sandbox) blocked a connection
   diag: null,  // plain-language reason a connection failed, from liveDiagnose()
 };
@@ -5870,7 +5990,7 @@ async function liveLoadProducts() {
 function liveRenderSymbolOptions(list) {
   const sel = document.getElementById('live-symbol');
   if (!sel) return;
-  const syms = list.indexOf(LIVE.symbol) === -1 ? [LIVE.symbol].concat(list) : list;
+  const syms = (list.indexOf(LIVE.symbol) === -1 && !/^[CP]-|^S~/.test(LIVE.symbol)) ? [LIVE.symbol].concat(list) : list;
   sel.innerHTML = syms.map(s => `<option value="${s}">${s}</option>`).join('');
   sel.value = LIVE.symbol;
 }
@@ -5919,6 +6039,8 @@ async function liveLoadOptionProducts() {
   }
   if (!out.length) throw new Error('no live option contracts returned');
   LIVE.optProducts = out;
+  LIVE.optMap = {};
+  out.forEach(o => { LIVE.optMap[o.type + '|' + o.und + '|' + o.exp + '|' + o.strike] = o.symbol; });
   return out;
 }
 function liveFillSelect(id, items, selected) { // items: [{v, label}]
@@ -5953,13 +6075,22 @@ function liveRenderOptionSelectors(prefSymbol) {
 }
 function liveApplyKindUi() {
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
-  const opt = liveMode && LIVE.kind === 'options';
-  show('rc-live-symbol-wrap', liveMode && !opt);
-  ['rc-live-und-wrap', 'rc-live-exp-wrap', 'rc-live-ot-wrap', 'rc-live-strike-wrap'].forEach(id => show(id, opt));
+  const opt = liveMode && LIVE.kind === 'options', strat = liveMode && LIVE.kind === 'strategy';
+  show('rc-live-symbol-wrap', liveMode && LIVE.kind === 'perp');
+  ['rc-live-und-wrap', 'rc-live-exp-wrap'].forEach(id => show(id, opt || strat));
+  ['rc-live-ot-wrap', 'rc-live-strike-wrap'].forEach(id => show(id, opt));
+  ['rc-live-strat-wrap', 'rc-live-center-wrap'].forEach(id => show(id, strat));
+  show('rc-live-sw-wrap', strat && !!STRAT_DEFS[LIVE.strat.type].w);
   const k = document.getElementById('live-kind');
   if (k) k.value = LIVE.kind;
-  show('live-chain-panel', opt);
-  if (opt) liveChainStart(); else liveChainStop();
+  const pt = document.getElementById('oc-panel-title');
+  if (pt) pt.textContent = strat ? 'Strategy ladder — ATM ± 5, tap a row to chart it' : 'Option chain — tap a price to chart it';
+  const back = document.getElementById('back-to-strat');
+  if (back) back.style.display = (strat && LIVE.fromStrategies) ? '' : 'none';
+  show('live-custom-panel', strat);
+  if (strat) liveCustomRender();
+  show('live-chain-panel', opt || strat);
+  if (opt || strat) liveChainStart(); else liveChainStop();
 }
 async function onLiveKindChange() {
   if (!liveMode) return;
@@ -5970,7 +6101,7 @@ async function onLiveKindChange() {
     try {
       await liveLoadOptionProducts();
     } catch (e) {
-      document.getElementById('live-kind').value = 'perp';
+      document.getElementById('live-kind').value = LIVE.kind;
       liveSetStatus('error', 'Could not load options — ' + liveErrText(e));
       return;
     }
@@ -5983,16 +6114,39 @@ async function onLiveKindChange() {
     liveApplyKindUi();
     if (LIVE.optSymbol) liveSwitch('Instrument switched');
     else liveSetStatus('error', 'No option contracts found for that selection');
+  } else if (kind === 'strategy') {
+    liveSetStatus('connecting', 'Loading option contracts…');
+    try {
+      await liveLoadOptionProducts();
+    } catch (e) {
+      document.getElementById('live-kind').value = LIVE.kind;
+      liveSetStatus('error', 'Could not load options — ' + liveErrText(e));
+      return;
+    }
+    const st = LIVE.strat;
+    const wasOpt = LIVE.kind === 'options';
+    LIVE.kind = 'strategy';
+    const und = wasOpt ? LIVE.optSel.und : LIVE.symbol.replace(/USD.*$/, '');
+    if (LIVE.optProducts.some(o => o.und === und)) st.und = und;
+    st.exp = ''; st.center = null;
+    liveRenderStratSelectors(null);
+    try { await liveEnsureSpot(st.und, st.exp); } catch (e) { /* ATM falls back to the middle strike */ }
+    st.center = null;
+    liveRenderStratSelectors(null);
+    if (LIVE.stratSymbol) liveSwitch('Instrument switched');
+    else liveSetStatus('error', 'No strategy could be built for that selection');
   } else {
     LIVE.kind = 'perp';
     liveApplyKindUi();
     liveRenderSymbolOptions(LIVE.products || LIVE_FALLBACK_SYMBOLS);
     const sel = document.getElementById('live-symbol');
-    if (sel && LIVE.lastPerp && Array.from(sel.options).some(o => o.value === LIVE.lastPerp)) sel.value = LIVE.lastPerp;
+    const wantPerp = LIVE.lastPerp || 'BTCUSD';
+    if (sel && Array.from(sel.options).some(o => o.value === wantPerp)) sel.value = wantPerp;
     liveSwitch('Instrument switched');
   }
 }
 function onLiveOptChange(which) {
+  if (LIVE.kind === 'strategy') return onLiveStratChange(which);
   const sel = LIVE.optSel;
   if (which === 'und') { sel.und = document.getElementById('live-und').value; sel.exp = ''; sel.strike = null; }
   else if (which === 'exp') { sel.exp = document.getElementById('live-exp').value; }
@@ -6042,12 +6196,13 @@ function liveChainFmt(v) {
 function liveChainRender(scrollToAtm) {
   const box = document.getElementById('oc-scroll');
   if (!box) return;
-  const ch = LIVE.chain, sel = LIVE.optSel;
+  const ch = LIVE.chain, sel = LIVE.kind === 'strategy' ? LIVE.strat : LIVE.optSel;
   const title = document.getElementById('oc-title');
   if (title) title.textContent = sel.und + ' · ' + (sel.exp ? liveExpLabel(sel.exp) : '') + (ch.spot ? ' · spot ' + ch.spot.toLocaleString('en-US', { maximumFractionDigits: 1 }) : '');
   const upd = document.getElementById('oc-updated');
   if (upd) upd.textContent = ch.at ? 'updated ' + new Date(ch.at).toISOString().slice(11, 19) + ' UTC' : '';
   if (!ch.rows.length) { box.innerHTML = '<div class="oc-empty">No contracts found for this expiry.</div>'; return; }
+  if (LIVE.kind === 'strategy') { liveLadderRender(scrollToAtm); return; }
   let atm = null;
   if (ch.spot) atm = ch.rows.reduce((b, r) => Math.abs(r.strike - ch.spot) < Math.abs(b.strike - ch.spot) ? r : b, ch.rows[0]).strike;
   const body = ch.rows.map(r => {
@@ -6073,8 +6228,8 @@ function liveChainPick(sym) {
   liveSwitch('Contract switched');
 }
 async function liveChainRefresh(force) {
-  const sel = LIVE.optSel;
-  if (!liveMode || LIVE.kind !== 'options' || !sel.und || !sel.exp) return;
+  const sel = LIVE.kind === 'strategy' ? LIVE.strat : LIVE.optSel;
+  if (!liveMode || LIVE.kind === 'perp' || !sel.und || !sel.exp) return;
   const ch = LIVE.chain, key = sel.und + '|' + sel.exp, token = ++ch.token;
   const sameKey = ch.key === key;
   if (!sameKey) { ch.key = key; ch.rows = []; ch.spot = null; ch.at = 0; const b = document.getElementById('oc-scroll'); if (b) b.innerHTML = '<div class="oc-empty">Loading option chain…</div>'; }
@@ -6084,6 +6239,7 @@ async function liveChainRefresh(force) {
     if (token !== ch.token) return;
     const first = !ch.rows.length;
     ch.rows = res.rows; ch.spot = res.spot; ch.at = Date.now();
+    if (res.spot) LIVE.spotByUnd[sel.und] = res.spot;
     liveChainRender(first);
   } catch (e) {
     if (token !== ch.token) return;
@@ -6100,6 +6256,403 @@ function liveChainStop() {
   const ch = LIVE.chain;
   if (ch.timer) { clearInterval(ch.timer); ch.timer = null; }
   ch.token++;
+}
+
+/* ---- strategies: combine several option legs into ONE chart (straddle, strangle, butterfly, ...) ----
+   The chart is the strategy's net premium: sum of (weight x leg price). Open and close are exact.
+   Delta only gives each leg's own candles, so high/low of a multi-leg combo are ESTIMATED from the legs'
+   ranges (halfway between the body and the worst-case bound) — fine for reading structure, not for exact wicks.
+   Trade it like any chart: Buy = go long the structure's premium, Sell = short it. For the credit
+   strategies (iron butterfly / iron condor) the plotted premium is the credit, so Sell is the usual trade. */
+const STRAT_DEFS = {
+  straddle: { label: 'Straddle',                legs: (S, c, w) => [['C', c, 1], ['P', c, 1]] },
+  strangle: { label: 'Strangle',        w: true, legs: (S, c, w) => [['P', c - w, 1], ['C', c + w, 1]] },
+  callfly:  { label: 'Call butterfly',  w: true, legs: (S, c, w) => [['C', c - w, 1], ['C', c, -2], ['C', c + w, 1]] },
+  putfly:   { label: 'Put butterfly',   w: true, legs: (S, c, w) => [['P', c + w, 1], ['P', c, -2], ['P', c - w, 1]] },
+  ironfly:  { label: 'Iron butterfly (credit)', w: true, legs: (S, c, w) => [['C', c, 1], ['P', c, 1], ['C', c + w, -1], ['P', c - w, -1]] },
+  condor:   { label: 'Iron condor (credit)',    w: true, legs: (S, c, w) => [['P', c - w, 1], ['C', c + w, 1], ['P', c - 2 * w, -1], ['C', c + 2 * w, -1]] },
+  bullcall: { label: 'Bull call spread', w: true, legs: (S, c, w) => [['C', c, 1], ['C', c + w, -1]] },
+  bearput:  { label: 'Bear put spread',  w: true, legs: (S, c, w) => [['P', c, 1], ['P', c - w, -1]] },
+  custom:   { label: 'Custom (build your own)', legs: () => [] }, // legs come from the builder panel
+};
+function liveEncodeLegs(legs) { return legs.map(l => l.t + l.o + ':' + l.w).join('_'); }
+function liveDecodeLegs(str) {
+  const out = [];
+  for (const part of (str || '').split('_')) {
+    const m = /^([CP])(-?\d+):(-?\d+(?:\.\d+)?)$/.exec(part);
+    if (!m) return null;
+    out.push({ t: m[1], o: +m[2], w: +m[3] });
+  }
+  return out.length ? out : null;
+}
+function liveParseStratSymbol(sym) {
+  const m = /^S~([a-z]+)~([A-Z0-9]+)~(\d{2})(\d{2})(\d{2})~(\d+(?:\.\d+)?)~(\d+)(?:~([CP0-9:_.\-]+))?$/.exec(sym || '');
+  if (!m || !STRAT_DEFS[m[1]]) return null;
+  const out = { type: m[1], und: m[2], exp: '20' + m[5] + '-' + m[4] + '-' + m[3], center: +m[6], w: +m[7] };
+  if (m[1] === 'custom') { out.legs = liveDecodeLegs(m[8]); if (!out.legs) return null; }
+  return out;
+}
+function liveStratSymbol(type, und, exp, center, w, legs) {
+  const [y, mo, d] = exp.split('-');
+  return 'S~' + type + '~' + und + '~' + d + mo + y.slice(2) + '~' + center + '~' + w + (type === 'custom' && legs ? '~' + liveEncodeLegs(legs) : '');
+}
+function liveStratLabel(p, sym) {
+  const def = STRAT_DEFS[p.type];
+  const name = p.type === 'custom' ? ((sym && LIVE.stratNames[sym]) || 'Custom ' + (p.legs ? p.legs.length : 0) + '-leg') : def.label.replace(' (credit)', '');
+  return name + ' ' + p.center.toLocaleString('en-US') + (def.w ? ' ±' + p.w : '') + ' · ' + liveExpLabel(p.exp) + ' · ' + p.und;
+}
+function stratStrikes(und, exp) { // strikes listed for BOTH the call and the put
+  const c = new Set(), pu = new Set();
+  (LIVE.optProducts || []).forEach(o => { if (o.und === und && o.exp === exp) (o.type === 'C' ? c : pu).add(o.strike); });
+  return Array.from(c).filter(k => pu.has(k)).sort((a, b) => a - b);
+}
+function liveStratLegSpecs(p, S) { // -> [{type, strike, w}] or null when a leg falls off the listed strikes
+  const ci = S.indexOf(p.center);
+  if (ci < 0) return null;
+  const raw = p.type === 'custom' ? (p.legs || []).map(l => [l.t, ci + l.o, l.w]) : STRAT_DEFS[p.type].legs(S, ci, p.w);
+  const merged = [], seen = {};
+  for (const [t, i, w] of raw) {
+    if (i < 0 || i >= S.length) return null;
+    const key = t + '|' + i;
+    if (seen[key] != null) { merged[seen[key]].w += w; continue; }
+    seen[key] = merged.length;
+    merged.push({ type: t, strike: S[i], w });
+  }
+  const out = merged.filter(x => x.w !== 0);
+  return out.length ? out : null;
+}
+function liveStratLegs(p) { // -> [{symbol, w, type, strike}] or null
+  const specs = liveStratLegSpecs(p, stratStrikes(p.und, p.exp));
+  if (!specs) return null;
+  const out = [];
+  for (const sp of specs) {
+    const symbol = LIVE.optMap[sp.type + '|' + p.und + '|' + p.exp + '|' + sp.strike];
+    if (!symbol) return null;
+    out.push({ symbol, w: sp.w, type: sp.type, strike: sp.strike });
+  }
+  return out;
+}
+function liveLegAt(arr, t) { // the leg's candle at t, or a flat bar carried forward from its last trade; null before its first
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const c = arr[i];
+    if (c.t === t) return c;
+    if (c.t < t) return { t, o: c.c, h: c.c, l: c.c, c: c.c, v: 0 };
+  }
+  return null;
+}
+function liveComboCandle(t, legs) {
+  let o = 0, c = 0, ub = 0, lb = 0, v = 0;
+  for (const leg of legs) {
+    const k = liveLegAt(LIVE.legData[leg.symbol] || [], t);
+    if (!k) return null;
+    o += leg.w * k.o; c += leg.w * k.c; v += Math.abs(leg.w) * k.v;
+    ub += leg.w > 0 ? leg.w * k.h : leg.w * k.l;
+    lb += leg.w > 0 ? leg.w * k.l : leg.w * k.h;
+  }
+  const top = Math.max(o, c), bot = Math.min(o, c);
+  const single = legs.length === 1;
+  return { t, o, h: single ? ub : top + 0.5 * Math.max(0, ub - top), l: single ? lb : bot - 0.5 * Math.max(0, bot - lb), c, v };
+}
+function liveBuildComboHistory(legs) {
+  const times = new Set();
+  legs.forEach(l => (LIVE.legData[l.symbol] || []).forEach(c => times.add(c.t)));
+  const out = [];
+  Array.from(times).sort().forEach(t => { const cc = liveComboCandle(t, legs); if (cc) out.push(cc); });
+  return out;
+}
+function liveLegMerge(symbol, cd) {
+  const arr = LIVE.legData[symbol] || (LIVE.legData[symbol] = []);
+  const n = arr.length;
+  if (!n || cd.t > arr[n - 1].t) { arr.push(cd); return; }
+  for (let i = n - 1; i >= 0; i--) {
+    if (arr[i].t === cd.t) { arr[i] = cd; return; }
+    if (arr[i].t < cd.t) { arr.splice(i + 1, 0, cd); return; }
+  }
+  arr.unshift(cd);
+}
+async function liveSyncRecentMulti(gen) {
+  const res = LIVE.res, secs = LIVE_RES[res], legs = LIVE.legs.slice();
+  const end = Math.floor(Date.now() / 1000);
+  let start = end - secs * 6;
+  if (replayCandles.length) {
+    const lastSec = liveTimeToSec(replayCandles[replayCandles.length - 1].t);
+    if (lastSec != null) start = Math.min(start, lastSec - secs * 2);
+  }
+  start = Math.max(start, end - secs * 1900);
+  const jsons = await Promise.all(legs.map(l => liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(l.symbol)}&resolution=${res}&start=${start}&end=${end}`)));
+  if (gen !== LIVE.gen || res !== LIVE.res || LIVE.legs.length !== legs.length) return false;
+  const times = new Set();
+  jsons.forEach((j, i) => liveParseRestCandles(j, res).forEach(c => { liveLegMerge(legs[i].symbol, c); times.add(c.t); }));
+  const out = [];
+  Array.from(times).sort().forEach(t => { const cc = liveComboCandle(t, legs); if (cc) out.push(cc); });
+  liveIngest(out);
+  return true;
+}
+async function liveEnsureSpot(und, exp) {
+  const r = await liveChainFetch(und, exp);
+  if (r.spot) LIVE.spotByUnd[und] = r.spot;
+  return r;
+}
+function liveAtmIndex(S, spot) {
+  if (!S.length) return 0;
+  if (!spot) return Math.floor(S.length / 2);
+  let best = 0;
+  S.forEach((k, i) => { if (Math.abs(k - spot) < Math.abs(S[best] - spot)) best = i; });
+  return best;
+}
+function liveExpsFor(und) {
+  return Array.from(new Set((LIVE.optProducts || []).filter(o => o.und === und).map(o => o.exp))).sort();
+}
+function liveRenderStratSelectors(prefSymbol) {
+  const all = LIVE.optProducts || [];
+  if (!all.length) return;
+  const st = LIVE.strat, pref = liveParseStratSymbol(prefSymbol);
+  if (pref) { st.type = pref.type; st.und = pref.und; st.exp = pref.exp; st.center = pref.center; st.w = pref.w; if (pref.legs) st.legs = pref.legs; }
+  const unds = Array.from(new Set(all.map(o => o.und))).sort((a, b) => (a === 'BTC' ? -1 : b === 'BTC' ? 1 : a < b ? -1 : 1));
+  if (unds.indexOf(st.und) === -1) st.und = unds[0];
+  liveFillSelect('live-und', unds.map(u => ({ v: u, label: u })), st.und);
+  const exps = liveExpsFor(st.und);
+  if (exps.indexOf(st.exp) === -1) { st.exp = exps[0]; st.center = null; }
+  liveFillSelect('live-exp', exps.map(e => ({ v: e, label: liveExpLabel(e) })), st.exp);
+  liveFillSelect('live-strat', Object.keys(STRAT_DEFS).map(k => ({ v: k, label: STRAT_DEFS[k].label })), st.type);
+  liveFillSelect('live-sw', [1, 2, 3, 4, 5, 6, 8, 10].map(n => ({ v: n, label: n + (n > 1 ? ' strikes' : ' strike') })), st.w);
+  const S = stratStrikes(st.und, st.exp);
+  if (!S.length) { liveFillSelect('live-center', [{ v: '', label: 'n/a' }], ''); LIVE.stratSymbol = null; liveApplyKindUi(); return; }
+  const atm = liveAtmIndex(S, LIVE.spotByUnd[st.und]);
+  if (st.center == null || S.indexOf(st.center) < 0) st.center = S[atm];
+  const items = [];
+  for (let off = -5; off <= 5; off++) {
+    const i = atm + off;
+    if (i < 0 || i >= S.length) continue;
+    items.push({ v: S[i], label: (off === 0 ? 'ATM' : 'ATM ' + (off > 0 ? '+' : '−') + Math.abs(off)) + ' · ' + S[i].toLocaleString('en-US') });
+  }
+  if (!items.some(it => it.v === st.center)) items.unshift({ v: st.center, label: 'Strike · ' + st.center.toLocaleString('en-US') });
+  liveFillSelect('live-center', items, st.center);
+  const ok = !!liveStratLegs({ type: st.type, und: st.und, exp: st.exp, center: st.center, w: st.w, legs: st.legs });
+  LIVE.stratSymbol = ok ? liveStratSymbol(st.type, st.und, st.exp, st.center, st.w, st.legs) : null;
+  liveApplyKindUi();
+}
+function onLiveStratChange(which) {
+  const st = LIVE.strat;
+  if (which === 'type') st.type = document.getElementById('live-strat').value;
+  else if (which === 'w') st.w = +document.getElementById('live-sw').value;
+  else if (which === 'center') st.center = +document.getElementById('live-center').value;
+  else if (which === 'und') { st.und = document.getElementById('live-und').value; st.exp = liveExpsFor(st.und)[0] || ''; st.center = null; }
+  else if (which === 'exp') { st.exp = document.getElementById('live-exp').value; st.center = null; }
+  const go = () => {
+    liveRenderStratSelectors(null);
+    if (LIVE.stratSymbol) liveSwitch('Strategy switched');
+    else liveSetStatus('error', 'That strategy needs strikes that are not listed for this expiry — try a smaller width or a different centre');
+  };
+  if ((which === 'und' || which === 'exp') && st.exp) liveEnsureSpot(st.und, st.exp).catch(() => {}).then(go); else go();
+}
+function liveLadderRender(scrollToAtm) {
+  const box = document.getElementById('oc-scroll');
+  const ch = LIVE.chain, st = LIVE.strat, def = STRAT_DEFS[st.type];
+  const S = stratStrikes(st.und, st.exp);
+  if (!S.length) { box.innerHTML = '<div class="oc-empty">No strikes listed for this expiry.</div>'; return; }
+  const ltp = {};
+  ch.rows.forEach(r => { if (r.C) ltp['C|' + r.strike] = r.C.ltp; if (r.P) ltp['P|' + r.strike] = r.P.ltp; });
+  const atm = liveAtmIndex(S, ch.spot || LIVE.spotByUnd[st.und]);
+  let rows = '';
+  for (let off = -5; off <= 5; off++) {
+    const ci = atm + off;
+    if (ci < 0 || ci >= S.length) continue;
+    const legs = liveStratLegSpecs({ type: st.type, und: st.und, exp: st.exp, center: S[ci], w: st.w, legs: st.legs }, S);
+    let price = null;
+    if (legs) {
+      price = 0;
+      for (const l of legs) { const v = ltp[l.type + '|' + l.strike]; if (v == null) { price = null; break; } price += l.w * v; }
+    }
+    const sel = S[ci] === st.center ? ' oc-sel' : '';
+    const cls = price == null ? 'oc-oi' : 'oc-c';
+    rows += `<tr class="${off === 0 ? 'oc-atm' : ''}"><td class="oc-oi">${off === 0 ? 'ATM' : (off > 0 ? '+' : '−') + Math.abs(off)}</td><td class="oc-k">${S[ci].toLocaleString('en-US')}</td><td class="${cls}${sel}" ${price == null ? '' : 'data-center="' + S[ci] + '"'} style="${price == null ? '' : 'cursor:pointer'}">${price == null ? 'n/a' : liveChainFmt(price)}</td></tr>`;
+  }
+  box.innerHTML = `<table class="oc-table"><thead><tr><th>Offset</th><th style="text-align:center">Centre</th><th>${def.label.replace(/ \(.*\)/, '')} premium</th></tr></thead><tbody>${rows}</tbody></table>`;
+  box.querySelectorAll('td[data-center]').forEach(td => td.addEventListener('click', () => {
+    LIVE.strat.center = +td.dataset.center;
+    liveRenderStratSelectors(null);
+    if (LIVE.stratSymbol) liveSwitch('Strategy switched');
+  }));
+  if (scrollToAtm) {
+    const row = box.querySelector('tr.oc-atm');
+    if (row) box.scrollTop = Math.max(0, row.offsetTop - box.clientHeight / 2 + row.offsetHeight / 2);
+  }
+}
+/* ---- custom strategy builder ---- */
+function clLoadSaved() { try { const v = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function clStoreSaved(list) { try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(list)); } catch (e) { /* storage unavailable */ } }
+function liveCustomRender() {
+  const body = document.getElementById('cl-body');
+  if (!body) return;
+  const st = LIVE.strat;
+  const S = stratStrikes(st.und, st.exp);
+  if (st.type !== 'custom') {
+    const legs = liveStratLegs({ type: st.type, und: st.und, exp: st.exp, center: st.center, w: st.w, legs: st.legs });
+    const txt = legs ? legs.map(l => (l.w > 0 ? 'Buy ' : 'Sell ') + (Math.abs(l.w) !== 1 ? Math.abs(l.w) + '× ' : '') + (l.type === 'C' ? 'Call ' : 'Put ') + l.strike.toLocaleString('en-US')).join(' · ') : 'strikes not available';
+    body.innerHTML = `<div class="oc-meta"><span>${STRAT_DEFS[st.type].label}: ${txt}</span></div><button class="strat-chart-btn" onclick="liveCustomFromPreset()">Customise these legs</button>`;
+    return;
+  }
+  const ci = S.indexOf(st.center);
+  const rows = st.legs.map((l, i) => {
+    const k = ci >= 0 ? S[ci + l.o] : null;
+    const hint = k != null ? (l.w > 0 ? 'Buy ' : 'Sell ') + Math.abs(l.w) + '× ' + (l.t === 'C' ? 'Call ' : 'Put ') + k.toLocaleString('en-US') : 'not a listed strike — change the offset';
+    return `<div class="cl-row">
+      <select class="field-input" onchange="clUpd(${i},'side',this.value)"><option value="1" ${l.w > 0 ? 'selected' : ''}>Buy</option><option value="-1" ${l.w < 0 ? 'selected' : ''}>Sell</option></select>
+      <select class="field-input" onchange="clUpd(${i},'type',this.value)"><option value="C" ${l.t === 'C' ? 'selected' : ''}>Call</option><option value="P" ${l.t === 'P' ? 'selected' : ''}>Put</option></select>
+      <input class="field-input" type="number" step="1" min="-15" max="15" value="${l.o}" onchange="clUpd(${i},'off',this.value)">
+      <input class="field-input" type="number" step="1" min="1" max="50" value="${Math.abs(l.w)}" onchange="clUpd(${i},'qty',this.value)">
+      <button class="cl-x" aria-label="Remove leg" onclick="clRemove(${i})">×</button>
+      <div class="cl-hint">${hint}</div></div>`;
+  }).join('');
+  const saved = clLoadSaved();
+  body.innerHTML = `
+    <div class="cl-head"><span>Side</span><span>Type</span><span>Strikes ±</span><span>Qty</span><span></span></div>
+    ${rows}
+    <div class="cl-actions">
+      <button class="strat-chart-btn" style="margin:0" onclick="clAdd()">+ Add leg</button>
+      <button class="strat-chart-btn" style="margin:0;background:var(--accent);color:#06201D" onclick="liveCustomApply()">Apply &amp; chart</button>
+    </div>
+    <div class="oc-meta" style="margin-top:8px"><span>“Strikes ±” counts listed strikes away from the centre strike (0 = centre, −1 = one strike lower).</span></div>
+    <div class="cl-actions">
+      <input class="field-input" id="cl-name" placeholder="Name to save this setup" maxlength="40">
+      <button class="strat-chart-btn" style="margin:0" onclick="clSave()">Save</button>
+    </div>
+    ${saved.length ? `<div class="cl-actions">
+      <select class="field-input" id="cl-saved">${saved.map((x, i) => `<option value="${i}">${x.name.replace(/</g, '&lt;')} (${x.legs.length} legs)</option>`).join('')}</select>
+      <button class="strat-chart-btn" style="margin:0" onclick="clLoad()">Load</button>
+      <button class="cl-x" style="width:auto;padding:0 10px;font-size:12px" onclick="clDelete()">Delete</button>
+    </div>` : ''}
+    ${LIVE.clMsg ? `<div class="cl-msg">${LIVE.clMsg}</div>` : ''}`;
+}
+function clUpd(i, f, v) {
+  const l = LIVE.strat.legs[i];
+  if (!l) return;
+  const sign = l.w < 0 ? -1 : 1;
+  if (f === 'side') l.w = (+v < 0 ? -1 : 1) * Math.abs(l.w);
+  else if (f === 'type') l.t = v === 'P' ? 'P' : 'C';
+  else if (f === 'off') l.o = Math.max(-15, Math.min(15, Math.round(+v) || 0));
+  else if (f === 'qty') l.w = sign * Math.max(1, Math.min(50, Math.round(+v) || 1));
+  LIVE.clMsg = '';
+  liveCustomRender();
+}
+function clAdd() {
+  const st = LIVE.strat;
+  if (st.legs.length >= 8) { LIVE.clMsg = 'A strategy can have up to 8 legs.'; liveCustomRender(); return; }
+  st.legs.push({ t: 'C', o: 0, w: 1 });
+  LIVE.clMsg = '';
+  liveCustomRender();
+}
+function clRemove(i) {
+  const st = LIVE.strat;
+  if (st.legs.length <= 1) { LIVE.clMsg = 'Keep at least one leg.'; liveCustomRender(); return; }
+  st.legs.splice(i, 1);
+  LIVE.clMsg = '';
+  liveCustomRender();
+}
+function liveCustomFromPreset() {
+  const st = LIVE.strat, def = STRAT_DEFS[st.type];
+  if (!def || st.type === 'custom') return;
+  const dummy = Array.from({ length: 101 }, (_, i) => i); // legs() only needs indexes, so offsets come out relative to the centre
+  st.legs = def.legs(dummy, 50, st.w).map(([t, i, w]) => ({ t, o: i - 50, w }));
+  st.type = 'custom';
+  LIVE.clMsg = 'Legs copied from the preset — edit them, then tap Apply & chart.';
+  liveRenderStratSelectors(null);
+}
+function liveCustomApply() {
+  const st = LIVE.strat;
+  const S = stratStrikes(st.und, st.exp);
+  const specs = liveStratLegSpecs({ type: 'custom', und: st.und, exp: st.exp, center: st.center, w: 1, legs: st.legs }, S);
+  if (!specs) { LIVE.clMsg = 'A leg falls outside the listed strikes (or the legs cancel out). Adjust the offsets or the centre strike.'; liveCustomRender(); return; }
+  const ltp = {};
+  if (LIVE.chain.key === st.und + '|' + st.exp) LIVE.chain.rows.forEach(r => { if (r.C) ltp['C|' + r.strike] = r.C.ltp; if (r.P) ltp['P|' + r.strike] = r.P.ltp; });
+  let net = 0, known = true;
+  specs.forEach(sp => { const v = ltp[sp.type + '|' + sp.strike]; if (v == null) known = false; else net += sp.w * v; });
+  LIVE.clMsg = '';
+  if (known && net < 0) { // a net credit: chart it as a positive premium so the ticket and indicators behave
+    st.legs = st.legs.map(l => ({ t: l.t, o: l.o, w: -l.w }));
+    LIVE.clMsg = 'This setup is a net credit, so it is charted as a positive premium (Buy/Sell on each leg flipped). Sell it to take the usual trade.';
+  }
+  liveRenderStratSelectors(null);
+  if (LIVE.stratSymbol) liveSwitch('Strategy switched');
+  else { LIVE.clMsg = 'Could not build that strategy from the listed strikes.'; liveCustomRender(); }
+}
+function clSave() {
+  const el = document.getElementById('cl-name');
+  const name = (el && el.value || '').trim();
+  if (!name) { LIVE.clMsg = 'Type a name first.'; liveCustomRender(); return; }
+  const list = clLoadSaved().filter(x => x.name !== name);
+  list.push({ name, und: LIVE.strat.und, legs: LIVE.strat.legs.map(l => ({ t: l.t, o: l.o, w: l.w })) });
+  clStoreSaved(list);
+  renderSaved();
+  LIVE.clMsg = 'Saved “' + name.replace(/</g, '&lt;') + '”.';
+  liveCustomRender();
+}
+function clLoad() {
+  const sel = document.getElementById('cl-saved');
+  const item = clLoadSaved()[sel ? +sel.value : -1];
+  if (!item) return;
+  LIVE.strat.legs = item.legs.map(l => ({ t: l.t, o: l.o, w: l.w }));
+  LIVE.clMsg = 'Loaded — tap Apply & chart.';
+  liveCustomRender();
+}
+function clDelete() {
+  const sel = document.getElementById('cl-saved');
+  const list = clLoadSaved();
+  if (!sel || !list[+sel.value]) return;
+  list.splice(+sel.value, 1);
+  clStoreSaved(list);
+  renderSaved();
+  LIVE.clMsg = 'Deleted.';
+  liveCustomRender();
+}
+
+async function openStrategyFromSpecs(name, und, input) { // from a Strategies-tab card: input = {specs:[{action,type,strike}]} or {offsets:[{t,o,w}]}
+  showView('replay');
+  LIVE.fromStrategies = true;
+  if (!liveMode) setDataMode('live');
+  liveSetStatus('connecting', 'Loading option contracts…');
+  try { await liveLoadOptionProducts(); } catch (e) { liveSetStatus('error', 'Could not load options — ' + liveErrText(e)); return; }
+  const st = LIVE.strat;
+  if (!LIVE.optProducts.some(o => o.und === und)) { liveSetStatus('error', 'No ' + und + ' options are listed on Delta right now'); return; }
+  const today = new Date().toISOString().slice(0, 10), exps = liveExpsFor(und);
+  st.und = und; st.exp = exps.find(e => e > today) || exps[0];
+  let rows = [], spot = null;
+  try { const r = await liveEnsureSpot(und, st.exp); rows = r.rows; spot = r.spot; } catch (e) { liveSetStatus('error', 'Could not load prices — ' + liveErrText(e)); return; }
+  const S = stratStrikes(und, st.exp);
+  if (!S.length) { liveSetStatus('error', 'No strikes listed for that expiry'); return; }
+  let legs, center;
+  if (input.specs) {
+    if (!spot) { liveSetStatus('error', 'Spot price unavailable, so ATM could not be worked out — try again'); return; }
+    const tr = stratSpecsToOffsets(input.specs, S, spot);
+    legs = tr.legs; center = tr.center;
+  } else {
+    legs = input.offsets.map(l => ({ t: l.t, o: l.o, w: l.w }));
+    center = S[liveAtmIndex(S, spot)];
+  }
+  const specs = liveStratLegSpecs({ type: 'custom', und, exp: st.exp, center, w: 1, legs }, S);
+  if (!specs) { liveSetStatus('error', 'Some legs fall outside the strikes Delta lists right now'); return; }
+  const ltp = {};
+  rows.forEach(r => { if (r.C) ltp['C|' + r.strike] = r.C.ltp; if (r.P) ltp['P|' + r.strike] = r.P.ltp; });
+  let net = 0, known = true;
+  specs.forEach(sp => { const v = ltp[sp.type + '|' + sp.strike]; if (v == null) known = false; else net += sp.w * v; });
+  LIVE.clMsg = '';
+  if (known && net < 0) { legs = legs.map(l => ({ t: l.t, o: l.o, w: -l.w })); LIVE.clMsg = 'This is a net credit strategy, so it is charted as a positive premium (Buy/Sell on each leg flipped). Sell it to take the usual trade.'; }
+  st.type = 'custom'; st.legs = legs; st.center = center;
+  LIVE.kind = 'strategy';
+  liveRenderStratSelectors(null);
+  if (!LIVE.stratSymbol) { liveSetStatus('error', 'Could not build that strategy from the listed strikes'); return; }
+  LIVE.stratNames[LIVE.stratSymbol] = name;
+  liveSwitch('Opened from Strategies');
+}
+async function openStrategyChart(type) { // from the Strategies tab
+  if (!STRAT_DEFS[type]) return;
+  showView('replay');
+  if (!liveMode) setDataMode('live');
+  LIVE.strat.type = type;
+  if (LIVE.kind === 'strategy') { liveRenderStratSelectors(null); if (LIVE.stratSymbol) liveSwitch('Strategy switched'); return; }
+  document.getElementById('live-kind').value = 'strategy';
+  await onLiveKindChange();
 }
 
 /* ---- mode switch ---- */
@@ -6148,7 +6701,7 @@ function onLiveSymbolChange() { liveSwitch('Instrument switched'); }
 function onLiveTimeframeChange() { liveSwitch('Timeframe switched'); }
 function liveSwitch(reason) {
   if (!liveMode) return;
-  const sym = LIVE.kind === 'options' ? (LIVE.optSymbol || LIVE.symbol) : document.getElementById('live-symbol').value;
+  const sym = LIVE.kind === 'options' ? (LIVE.optSymbol || LIVE.symbol) : LIVE.kind === 'strategy' ? (LIVE.stratSymbol || LIVE.symbol) : document.getElementById('live-symbol').value;
   const res = document.getElementById('live-timeframe').value;
   if (sym === LIVE.symbol && res === LIVE.res) return;
   saveDrawingsForCurrentDataset();
@@ -6183,18 +6736,28 @@ function liveStart() {
   LIVE.retry = 0; LIVE.lastTickAt = 0; LIVE.csp = null; LIVE.diag = null; liveRenderLastTick();
   const symSel = document.getElementById('live-symbol');
   if (symSel) {
-    if (!Array.from(symSel.options).some(o => o.value === LIVE.symbol)) liveRenderSymbolOptions(LIVE.products || LIVE_FALLBACK_SYMBOLS);
-    symSel.value = LIVE.symbol;
+    if (!/^[CP]-|^S~/.test(LIVE.symbol)) {
+      LIVE.lastPerp = LIVE.symbol;
+      if (!Array.from(symSel.options).some(o => o.value === LIVE.symbol)) liveRenderSymbolOptions(LIVE.products || LIVE_FALLBACK_SYMBOLS);
+      symSel.value = LIVE.symbol;
+    }
   }
   const tfSel = document.getElementById('live-timeframe');
   if (tfSel) tfSel.value = LIVE.res;
-  LIVE.kind = /^[CP]-/.test(LIVE.symbol) ? 'options' : 'perp';
-  currentInstrument = { id: 'live-' + LIVE.symbol, label: LIVE.symbol, assetClass: 'Crypto', type: LIVE.kind === 'options' ? 'options' : 'futures', months: [], live: true };
+  LIVE.kind = /^S~/.test(LIVE.symbol) ? 'strategy' : /^[CP]-/.test(LIVE.symbol) ? 'options' : 'perp';
+  LIVE.legs = LIVE.kind === 'strategy' ? [] : [{ symbol: LIVE.symbol, w: 1 }];
+  LIVE.legData = {};
+  const stratInfo = LIVE.kind === 'strategy' ? liveParseStratSymbol(LIVE.symbol) : null;
+  const liveName = stratInfo ? liveStratLabel(stratInfo, LIVE.symbol) : LIVE.symbol;
+  currentInstrument = { id: 'live-' + LIVE.symbol, label: liveName, assetClass: 'Crypto', type: LIVE.kind === 'perp' ? 'futures' : 'options', months: [], live: true };
   liveApplyKindUi();
-  if (LIVE.kind === 'options') liveLoadOptionProducts().then(() => { if (gen === LIVE.gen) liveRenderOptionSelectors(LIVE.symbol); }).catch(() => {});
+  if (LIVE.kind !== 'perp') liveLoadOptionProducts().then(() => {
+    if (gen !== LIVE.gen) return;
+    if (LIVE.kind === 'options') liveRenderOptionSelectors(LIVE.symbol); else liveRenderStratSelectors(LIVE.symbol);
+  }).catch(() => {});
   currentMonth = null;
   replayCandles = []; replayIndex = 1;
-  document.getElementById('replay-symbol-label').textContent = LIVE.symbol + ' — live · ' + LIVE.res;
+  document.getElementById('replay-symbol-label').textContent = liveName + ' — live · ' + LIVE.res;
   document.getElementById('replay-nodata').style.display = 'none';
   const canvas = document.getElementById('chart-canvas');
   if (canvas) canvas.style.display = '';
@@ -6210,10 +6773,25 @@ async function liveLoadAndConnect(gen) {
   try {
     const secs = LIVE_RES[res];
     const end = Math.floor(Date.now() / 1000);
-    const json = await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(symbol)}&resolution=${res}&start=${end - secs * LIVE_HISTORY_BARS}&end=${end}`);
-    if (gen !== LIVE.gen) return;
-    const candles = liveParseRestCandles(json, res);
-    if (candles.length < 2) throw new Error('no candles returned for ' + symbol);
+    let candles;
+    if (LIVE.kind === 'strategy') {
+      await liveLoadOptionProducts();
+      const parsed = liveParseStratSymbol(symbol);
+      const legs = parsed && liveStratLegs(parsed);
+      if (!legs) throw new Error('those strikes are not listed for this expiry');
+      if (gen !== LIVE.gen) return;
+      const jsons = await Promise.all(legs.map(l => liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(l.symbol)}&resolution=${res}&start=${end - secs * LIVE_HISTORY_BARS}&end=${end}`)));
+      if (gen !== LIVE.gen) return;
+      LIVE.legs = legs; LIVE.legData = {};
+      jsons.forEach((j, i) => { LIVE.legData[legs[i].symbol] = liveParseRestCandles(j, res); });
+      candles = liveBuildComboHistory(legs);
+      if (candles.length < 2) throw new Error('not enough overlapping trades across the legs — try a nearer strike or a longer timeframe');
+    } else {
+      const json = await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(symbol)}&resolution=${res}&start=${end - secs * LIVE_HISTORY_BARS}&end=${end}`);
+      if (gen !== LIVE.gen) return;
+      candles = liveParseRestCandles(json, res);
+      if (candles.length < 2) throw new Error('no candles returned for ' + symbol);
+    }
     liveInstallCandles(candles);
     liveConnectWs(gen);
   } catch (e) {
@@ -6316,7 +6894,7 @@ function liveConnectWs(gen) {
     if (gen !== LIVE.gen) return;
     LIVE.lastMsgAt = LIVE.lastCandleAt = Date.now();
     try {
-      ws.send(JSON.stringify({ type: 'subscribe', payload: { channels: [{ name: 'candlestick_' + res, symbols: [symbol] }] } }));
+      ws.send(JSON.stringify({ type: 'subscribe', payload: { channels: [{ name: 'candlestick_' + res, symbols: LIVE.legs.map(l => l.symbol) }] } }));
       ws.send(JSON.stringify({ type: 'enable_heartbeat' }));
     } catch (e) { /* socket closed mid-send — onclose handles it */ }
     liveStartWatchdog(gen);
@@ -6336,7 +6914,8 @@ function liveHandleWsMessage(m, gen, symbol, res) {
   if (!m || typeof m.type !== 'string') return;
   if (m.type === 'error') { liveStartPolling(gen); if (LIVE.state !== 'error') liveSetStatus('polling', 'Stream rejected the subscription — polling every 5s'); return; }
   if (m.type.indexOf('candlestick_') !== 0) return; // heartbeats, subscription acks, etc.
-  if (m.symbol && m.symbol !== symbol) return;
+  const multi = LIVE.kind === 'strategy';
+  if (multi ? !LIVE.legs.some(l => l.symbol === m.symbol) : (m.symbol && m.symbol !== symbol)) return;
   if (m.resolution && m.resolution !== res) return;
   const cd = liveMakeCandle(liveEpochSeconds(m.candle_start_time), res, +m.open, +m.high, +m.low, +m.close, +m.volume);
   if (!cd) return;
@@ -6344,6 +6923,12 @@ function liveHandleWsMessage(m, gen, symbol, res) {
   LIVE.retry = 0;
   liveStopPolling();
   if (LIVE.state !== 'live') liveSetStatus('live', 'Live');
+  if (multi) {
+    liveLegMerge(m.symbol, cd);
+    const cc = liveComboCandle(cd.t, LIVE.legs);
+    if (cc) liveIngest([cc]);
+    return;
+  }
   liveIngest([cd]);
 }
 function liveWsFailed(gen) {
@@ -6385,6 +6970,7 @@ async function livePollOnce(gen) {
   }
 }
 async function liveSyncRecent(gen) {
+  if (LIVE.kind === 'strategy') return LIVE.legs.length ? liveSyncRecentMulti(gen) : false;
   const symbol = LIVE.symbol, res = LIVE.res, secs = LIVE_RES[res];
   const end = Math.floor(Date.now() / 1000);
   let start = end - secs * 3;
