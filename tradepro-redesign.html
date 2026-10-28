@@ -2354,10 +2354,11 @@ function sscanRefLine(candles, c) {
 /* Entry/exit signals as a position cycle: ONE entry when every condition first becomes true, then NO
    further entries until the exit fires (every condition flipped: below -> above, above -> below).
    Sell scan on EMA10/EMA20/Supertrend: SELL when close is below all three, BUY-exit when close is above all three. */
-function sscanSignals(candles, conds) {
+function sscanSignals(candles, conds, xr) {
   const n = candles.length, entries = [], exits = [];
   if (!n || !conds || !conds.length) return { entries, exits, inPos: false };
   const lines = conds.map(c => sscanRefLine(candles, c));
+  const xl = xr ? sscanRefLine(candles, { k: 'ema', p: xr.p }) : null; // optional custom exit: close vs EMA
   const valid = new Array(n).fill(false), ent = new Array(n).fill(false), ext = new Array(n).fill(false);
   for (let i = 0; i < n; i++) {
     let v = true, e = true, x = true;
@@ -2369,6 +2370,7 @@ function sscanSignals(candles, conds) {
       if (wantBelow ? !(px > l) : !(px < l)) x = false;
     }
     valid[i] = v; ent[i] = v && e; ext[i] = v && x;
+    if (xl) ext[i] = xl[i] != null && (xr.op === 'above' ? candles[i].c > xl[i] : candles[i].c < xl[i]);
   }
   let inPos = false;
   for (let i = 1; i < n; i++) {
@@ -2384,7 +2386,7 @@ function sscanAllSeries(candles, conds) { // boolean per candle: are ALL conditi
     return v != null && (c.op === 'below' ? cd.c < v : cd.c > v);
   }));
 }
-function sscanEval(candles, conds) {
+function sscanEval(candles, conds, xr) {
   const lines = conds.map(c => sscanRefLine(candles, c));
   const at = i => conds.map((c, j) => {
     const px = candles[i].c, v = lines[j][i];
@@ -2394,7 +2396,7 @@ function sscanEval(candles, conds) {
   });
   const n = candles.length - 1;
   const now = at(n), prev = n > 0 ? at(n - 1) : null;
-  const acts = sscanSignals(candles, conds).entries;   // one entry per cycle (exit must fire before the next)
+  const acts = sscanSignals(candles, conds, xr).entries;   // one entry per cycle (exit must fire before the next)
   const lastIdx = acts.length ? acts[acts.length - 1] : -1;
   return { details: now, allNow: now.every(d => d.ok), allPrev: prev ? prev.every(d => d.ok) : false, price: candles[n].c,
            lastActSec: lastIdx >= 0 ? liveTimeToSec(candles[lastIdx].t) : null, barsSince: lastIdx >= 0 ? n - lastIdx : null, actCount: acts.length };
@@ -2409,7 +2411,7 @@ async function runSScan(i) {
     try {
       const candles = await sscanCandles(und, sc.tf);
       if (candles.length < 5) throw new Error('not enough candles returned');
-      const ev = sscanEval(candles, sc.conds);
+      const ev = sscanEval(candles, sc.conds, sscanExitRule(sc));
       rows.push({ und, price: ev.price, details: ev.details, ok: sc.fresh ? ev.allNow && !ev.allPrev : ev.allNow, lastActSec: ev.lastActSec, barsSince: ev.barsSince, actCount: ev.actCount });
     } catch (e) { rows.push({ und, err: liveErrText(e) }); }
   }
@@ -2437,7 +2439,7 @@ function sscanChartSignals(ov) {
   let n = Math.min(replayIndex, replayCandles.length);
   if (n > 0 && secs) { const ts = liveTimeToSec(replayCandles[n - 1].t); if (ts != null && ts + secs > Date.now() / 1000) n--; }
   const cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
-  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds) }, cs, { conds: ov.conds });
+  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr) }, cs, { conds: ov.conds, xr: sscanExitRule(ov) });
   return { sig, cs };
 }
 async function openSScanChart(i, und) {
@@ -2672,7 +2674,7 @@ async function sp2Session(g, tpl, e, step, spots) {
     });
     if (live && cs.length && liveTimeToSec(cs[cs.length - 1].t) + secs > now / 1000) cs.pop(); // the forming candle never counts
     if (cs.length < 5) throw new Error('too few option candles (' + cs.length + ')');
-    const sig = sscanSignals(cs, g.sc.conds), fill = i => cs[i + 1] ? cs[i + 1].o : cs[i].c, close = i => liveTimeToSec(cs[i].t) * 1000 + secs * 1000;
+    const sig = sscanSignals(cs, g.sc.conds, sscanExitRule(g.sc)), fill = i => cs[i + 1] ? cs[i + 1].o : cs[i].c, close = i => liveTimeToSec(cs[i].t) * 1000 + secs * 1000;
     // Trades are executed on the ATM at the moment of the trigger (the signal itself comes from the session chart above),
     // and the exit closes the SAME strikes that were opened.
     const uc = liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${g.und}USD&resolution=${tf}&start=${s}&end=${en}`), tf);
@@ -2778,10 +2780,84 @@ function renderSPerf() {
       <div class="sp-card"><div class="sp-k">Avg win / avg loss</div><div class="sp-v" style="font-size:13px"><span class="sp-pos">${usd(st.avgW)}</span> / <span class="sp-neg">${usd(st.avgL)}</span></div><div class="sp-sub">profit factor ${pf}</div></div>
       <div class="sp-card"><div class="sp-k">Expectancy · Max drawdown</div><div class="sp-v" style="font-size:13px"><span class="${cls(st.exp)}">${usd(st.exp)}</span> · <span class="sp-neg">${st.n ? usd(-st.dd) : '–'}</span></div><div class="sp-sub">profitable days ${st.good} / ${st.trig}</div></div>
     </div>${days}
-    <div class="sp-note">Each session is one daily expiry (17:30 IST → 17:30 IST). Signals run on the session's real combined call+put premium chart (strikes picked at session start). Each trigger is then traded on the ATM strikes at that moment (strangle: ATM ±12 strikes) at the next candle's open, and the exit closes those same strikes. A trade still open at 17:30 IST is closed at the last expiry candle. Fees: the paper account's slippage + taker fee. Past results do not guarantee future ones.</div>`;
+    <div class="sp-note">Each session is one daily expiry (17:30 IST → 17:30 IST). Straddle exit: close above EMA 20 (Sell scans). Signals run on the session's real combined call+put premium chart (strikes picked at session start). Each trigger is then traded on the ATM strikes at that moment (strangle: ATM ±12 strikes) at the next candle's open, and the exit closes those same strikes. A trade still open at 17:30 IST is closed at the last expiry candle. Fees: the paper account's slippage + taker fee. Past results do not guarantee future ones.</div>`;
   }
   el.innerHTML = `<div class="sp-chips">${chips}</div>${ctl}<div style="margin-top:8px">${body}</div><div style="margin-top:10px"><button class="btn-ghost" onclick="sp2Refresh()">Refresh from option charts ↻</button></div>`;
 }
+
+/* ---------- OI profile on the underlying chart: where option sellers are building up ----------
+   Red = call sellers (call OI), green = put sellers (put OI), one bar pair per strike, drawn from the price axis.
+   Solid = OI that was already there at the session start (17:30 IST) · diagonal stripes = OI ADDED since · dotted outline = OI REMOVED. */
+const OI_KEY = 'tradepro_oi_v1';
+let oi = { on: true, exp: 'ALL', raw: null, base: null, und: null, at: 0, busy: false, err: null };
+try { const v = JSON.parse(localStorage.getItem(OI_KEY) || 'null'); if (v) { oi.on = v.on !== false; oi.exp = v.exp || 'ALL'; } } catch (e) { /* ignore */ }
+function oiSave() { try { localStorage.setItem(OI_KEY, JSON.stringify({ on: oi.on, exp: oi.exp })); } catch (e) { /* ignore */ } }
+function oiUnd() { const m = /^(BTC|ETH)USD/.exec((typeof LIVE !== 'undefined' && LIVE.symbol) || ''); return m ? m[1] : null; }
+function oiToggle() { oi.on = !oi.on; oiSave(); oiRender(); }
+function oiSetExp(v) { oi.exp = v; oiSave(); oiRender(); }
+async function oiFetch() {
+  const und = oiUnd(); if (oi.busy || !und) return;
+  oi.busy = true;
+  try {
+    const json = await liveFetchJson('/v2/tickers?contract_types=call_options,put_options&underlying_asset_symbols=' + und), raw = {};
+    (json.result || []).forEach(t => { const o = liveParseOptSymbol(t && t.symbol); if (!o || o.und !== und) return; const v = liveNum(t.oi_contracts != null ? t.oi_contracts : t.oi); if (v) raw[o.exp + '|' + o.strike + '|' + o.type] = v; });
+    const now = Date.now(), d = new Date(now); let ss = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); if (ss > now) ss -= 86400000;
+    let b = null; try { b = JSON.parse(localStorage.getItem(OI_KEY + '_base_' + und) || 'null'); } catch (e) { /* ignore */ }
+    if (!b || b.ss !== ss) { b = { ss, at: now, raw }; try { localStorage.setItem(OI_KEY + '_base_' + und, JSON.stringify(b)); } catch (e) { /* ignore */ } }
+    oi.und = und; oi.raw = raw; oi.base = b; oi.err = null;
+  } catch (e) { oi.err = liveErrText(e); }
+  oi.at = Date.now(); oi.busy = false; oiRender();
+}
+function oiRows() {
+  const rows = {}, exps = new Set(Object.keys(oi.raw).map(k => k.split('|')[0]));
+  const add = (m, pre) => { for (const k in m) { const [e, s, t] = k.split('|'); if (oi.exp !== 'ALL' && e !== oi.exp) continue; if (pre && !exps.has(e)) continue; const r = rows[s] || (rows[s] = { k: +s, C: 0, P: 0, bC: 0, bP: 0 }); r[pre + t] += m[k]; } };
+  add(oi.raw, ''); add(oi.base.raw, 'b');
+  return Object.values(rows).sort((a, b) => a.k - b.k);
+}
+function oiRender() {
+  const canvas = document.getElementById('chart-canvas'); if (!canvas) return;
+  let lay = document.getElementById('oi-layer'), ctl = document.getElementById('oi-ctl');
+  if (!lay) {
+    lay = document.createElement('div'); lay.id = 'oi-layer'; lay.style.cssText = 'position:absolute;top:0;right:62px;pointer-events:none;z-index:4';
+    ctl = document.createElement('div'); ctl.id = 'oi-ctl'; ctl.style.cssText = 'position:absolute;bottom:24px;left:6px;z-index:7;display:flex;gap:6px;align-items:center;font-size:11px';
+    canvas.appendChild(lay); canvas.appendChild(ctl);
+  }
+  const und = oiUnd(), show = !!(liveMode && LIVE.kind === 'perp' && und);
+  ctl.style.display = show ? 'flex' : 'none'; lay.style.display = show && oi.on ? '' : 'none';
+  if (!show) return;
+  if (!oi.busy && (oi.und !== und || Date.now() - oi.at > 60000)) oiFetch();
+  const ready = oi.raw && oi.und === und && oi.base;
+  const exps = ready ? [...new Set(Object.keys(oi.raw).map(k => k.split('|')[0]))].sort() : [];
+  const sig = oi.on + '|' + oi.exp + '|' + exps.join(',');
+  if (ctl.dataset.sig !== sig) {
+    ctl.dataset.sig = sig;
+    ctl.innerHTML = `<button onclick="oiToggle()" style="all:unset;cursor:pointer;padding:3px 9px;border-radius:999px;font-weight:700;border:1px solid ${oi.on ? '#FFD43B' : 'var(--border)'};color:${oi.on ? '#FFD43B' : 'var(--text-muted)'}">OI ${oi.on ? 'on' : 'off'}</button>` +
+      (oi.on && exps.length ? `<select onchange="oiSetExp(this.value)" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;padding:2px 4px"><option value="ALL" ${oi.exp === 'ALL' ? 'selected' : ''}>All expiries</option>${exps.map(e => `<option value="${e}" ${e === oi.exp ? 'selected' : ''}>${liveExpLabel(e)}</option>`).join('')}</select>` : '');
+  }
+  if (!oi.on) return;
+  if (!ready || !chartGeom) { lay.innerHTML = oi.err ? `<div style="font-size:10px;color:var(--red);padding:2px 4px">OI: ${sscanEsc(oi.err)}</div>` : ''; return; }
+  const g = chartGeom, axis = document.getElementById('price-axis'), H = parseFloat(axis && axis.style.height) || 340, W = Math.round(Math.min(170, canvas.clientWidth * 0.42));
+  const yAt = v => g.GAP + g.priceAreaH * (1 - (v - g.yMin) / (g.yMax - g.yMin));
+  const rows = oiRows().filter(r => r.k >= g.yMin && r.k <= g.yMax);
+  let maxV = 0; rows.forEach(r => { maxV = Math.max(maxV, r.C, r.P, r.bC, r.bP); });
+  if (!rows.length || !maxV) { lay.innerHTML = ''; return; }
+  let gap = Infinity; for (let i = 1; i < rows.length; i++) gap = Math.min(gap, yAt(rows[i - 1].k) - yAt(rows[i].k));
+  const rh = Math.max(4, Math.min(16, (isFinite(gap) ? gap : 14) - 1.5)), bh = rh / 2 - 0.4, sc = (W - 8) / maxV, RED = '#F6465D', GRN = '#2EBD85';
+  const pat = (id, col) => `<pattern id="oi-h${id}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="${col}" fill-opacity=".22"/><line x1="0" y1="0" x2="0" y2="5" stroke="${col}" stroke-width="2.6"/></pattern><pattern id="oi-d${id}" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.15" fill="${col}"/></pattern>`;
+  let svg = '';
+  const bar = (y, cur, base, col, id) => {
+    const solid = Math.min(cur, base) * sc, inc = Math.max(0, cur - base) * sc, dec = Math.max(0, base - cur) * sc;
+    if (solid > 0) svg += `<rect x="${(W - solid).toFixed(1)}" y="${y.toFixed(1)}" width="${solid.toFixed(1)}" height="${bh.toFixed(1)}" fill="${col}" fill-opacity=".62"/>`;
+    if (inc > 0.4) svg += `<rect x="${(W - solid - inc).toFixed(1)}" y="${y.toFixed(1)}" width="${inc.toFixed(1)}" height="${bh.toFixed(1)}" fill="url(#oi-h${id})" stroke="${col}" stroke-width="1"/>`;
+    if (dec > 0.4) svg += `<rect x="${(W - solid - dec).toFixed(1)}" y="${y.toFixed(1)}" width="${dec.toFixed(1)}" height="${bh.toFixed(1)}" fill="url(#oi-d${id})" stroke="${col}" stroke-width="1" stroke-dasharray="2,2"/>`;
+  };
+  rows.forEach(r => { const y = yAt(r.k) - rh / 2; bar(y, r.C, r.bC, RED, 'r'); bar(y + bh + 0.8, r.P, r.bP, GRN, 'g'); });
+  const since = new Date(oi.base.at + 19800000).toISOString().slice(11, 16);
+  const lg = `<rect x="${W - 150}" y="2" width="10" height="7" fill="#999" fill-opacity=".62"/><text x="${W - 137}" y="9" font-size="8.5" fill="var(--text-muted)">OI</text><rect x="${W - 118}" y="2" width="10" height="7" fill="url(#oi-hr)" stroke="#999"/><text x="${W - 105}" y="9" font-size="8.5" fill="var(--text-muted)">added</text><rect x="${W - 72}" y="2" width="10" height="7" fill="url(#oi-dr)" stroke="#999" stroke-dasharray="2,2"/><text x="${W - 59}" y="9" font-size="8.5" fill="var(--text-muted)">removed</text><text x="${W - 150}" y="19" font-size="8.5" fill="${RED}">call sellers</text><text x="${W - 88}" y="19" font-size="8.5" fill="${GRN}">put sellers</text><text x="${W - 150}" y="29" font-size="8" fill="#FFD43B">since ${since} IST</text>`;
+  lay.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block"><defs>${pat('r', RED)}${pat('g', GRN)}</defs>${svg}${lg}</svg>`;
+}
+/* Straddle exit: a Sell straddle is bought back when the premium closes above EMA 20 (a Buy straddle: closes below EMA 20). */
+function sscanExitRule(sc) { return sc && /^straddle$/i.test(sc.strat) ? { p: 20, op: sc.side === 'Sell' ? 'above' : 'below' } : null; }
 
 renderSScans();
 
@@ -5976,6 +6052,7 @@ function renderChart(forceEnd) {
   });
 
   chartGeom = { PAD, CANDLE_PX, GAP, priceAreaH: BASE_H - GAP - VOLH - PAD, yMin, yMax };
+  try { oiRender(); } catch (e) { /* OI overlay must never break the chart */ }
   chartDisplayCandles = chartType === 'renko' ? renkoBricks : (chartType === 'heikinashi' ? haCandles : replayCandles);
   const readoutIdx = chartType === 'renko' ? chartDisplayCandles.length - 1 : replayIndex - 1;
   updateOhlcReadout(chartDisplayCandles[readoutIdx], readoutIdx);
@@ -7971,6 +8048,14 @@ function liveIndexForTime(t) {
   return idx;
 }
 function liveInstallCandles(candles) {
+  // Straddle / strangle charts show ONE session only: first candle at 17:30 IST (12:00 UTC) the day before expiry -> 17:30 IST on expiry day (24 h)
+  if (liveMode && LIVE.kind === 'strategy') {
+    const sp = liveParseStratSymbol(LIVE.symbol), e = sp && sp.exp ? Date.parse(sp.exp + 'T12:00:00Z') : NaN;
+    if (!isNaN(e) && e - 86400000 <= Date.now()) {
+      const a0 = new Date(e - 86400000).toISOString().slice(0, 16), b0 = new Date(e).toISOString().slice(0, 16), f = candles.filter(c => c.t >= a0 && c.t < b0);
+      if (f.length >= 2) candles = f;
+    }
+  }
   replayCandles = candles;
   replayIndex = candles.length;
   drawings = []; selectedDrawingIndex = null; pendingDrawPoint = null;
