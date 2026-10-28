@@ -174,6 +174,19 @@
   }
   .panel-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
   .panel-title svg { width: 15px; height: 15px; color: var(--text-faint); }
+  .oc-meta { font-size: 12px; color: var(--text-faint); margin-bottom: 8px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .oc-scroll { max-height: 340px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .oc-table { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  .oc-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-faint); font-weight: 500; padding: 6px 8px; text-align: right; z-index: 1; }
+  .oc-table td { padding: 7px 8px; text-align: right; border-top: 1px solid var(--border); }
+  .oc-table td.oc-k { text-align: center; font-weight: 600; background: var(--surface-2); }
+  .oc-table td.oc-c, .oc-table td.oc-p { cursor: pointer; }
+  .oc-table td.oc-c { color: var(--green); }
+  .oc-table td.oc-p { color: var(--red); }
+  .oc-table td.oc-oi { color: var(--text-faint); }
+  .oc-table tr.oc-atm td.oc-k { color: var(--accent); }
+  .oc-table td.oc-sel { outline: 2px solid var(--accent); outline-offset: -2px; background: rgba(23,195,178,.12); }
+  .oc-empty { padding: 14px; font-size: 12px; color: var(--text-faint); text-align: center; }
   .panel-action { margin-left: auto; font-size: 12.5px; color: var(--accent); display: flex; align-items: center; gap: 4px; }
 
   table { width: 100%; border-collapse: collapse; }
@@ -1075,6 +1088,32 @@
                 <button type="button" class="seg-btn" data-dmode="live" onclick="setDataMode('live')">Live · Delta</button>
               </div>
             </div>
+            <div class="rc-field" id="rc-live-kind-wrap" style="display:none">
+              <label class="field-label">Product</label>
+              <select class="field-input" id="live-kind" onchange="onLiveKindChange()">
+                <option value="perp">Perpetuals</option>
+                <option value="options">Options</option>
+              </select>
+            </div>
+            <div class="rc-field" id="rc-live-und-wrap" style="display:none">
+              <label class="field-label">Underlying</label>
+              <select class="field-input" id="live-und" onchange="onLiveOptChange('und')"></select>
+            </div>
+            <div class="rc-field" id="rc-live-exp-wrap" style="display:none">
+              <label class="field-label">Expiry</label>
+              <select class="field-input" id="live-exp" onchange="onLiveOptChange('exp')"></select>
+            </div>
+            <div class="rc-field" id="rc-live-ot-wrap" style="display:none">
+              <label class="field-label">Call / Put</label>
+              <select class="field-input" id="live-optype" onchange="onLiveOptChange('type')">
+                <option value="C">Call (CE)</option>
+                <option value="P">Put (PE)</option>
+              </select>
+            </div>
+            <div class="rc-field" id="rc-live-strike-wrap" style="display:none">
+              <label class="field-label">Strike</label>
+              <select class="field-input" id="live-strike" onchange="onLiveOptChange('strike')"></select>
+            </div>
             <div class="rc-field" id="rc-live-symbol-wrap" style="display:none">
               <label class="field-label">Symbol (Delta)</label>
               <select class="field-input" id="live-symbol" onchange="onLiveSymbolChange()"></select>
@@ -1380,6 +1419,19 @@
               <div class="an-chart-label">Insights — why, not just what</div>
               <div id="analytics-insights" class="an-insights"></div>
             </div>
+          </div>
+        </div>
+
+        <div class="panel" id="live-chain-panel" style="display:none">
+          <div class="panel-head">
+            <div class="panel-title">Option chain — tap a price to chart it</div>
+            <button class="collapse-btn" aria-label="Collapse option chain" onclick="togglePanel(this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </div>
+          <div class="panel-body">
+            <div class="oc-meta"><span id="oc-title"></span><span id="oc-updated"></span></div>
+            <div class="oc-scroll" id="oc-scroll"><div class="oc-empty">Loading option chain…</div></div>
           </div>
         </div>
 
@@ -1975,6 +2027,10 @@ const LIVE = {
   retry: 0, retryTimer: null, pollTimer: null, watchdog: null, loadRetryTimer: null, renderTimer: null,
   lastMsgAt: 0, lastCandleAt: 0, lastTickAt: 0,
   products: null,
+  kind: 'perp',        // 'perp' | 'options' — which kind of Delta product the chart is showing
+  optProducts: null,   // parsed live option contracts (loaded once, on demand)
+  optSel: { und: 'BTC', exp: '', type: 'C', strike: null },
+  chain: { key: null, rows: [], spot: null, at: 0, timer: null, token: 0 },
   csp: null,   // set when the page's own security policy (e.g. Claude's artifact sandbox) blocked a connection
   diag: null,  // plain-language reason a connection failed, from liveDiagnose()
 };
@@ -5835,11 +5891,223 @@ function liveRenderLastTick() {
   if (el) el.textContent = LIVE.lastTickAt ? 'updated ' + new Date(LIVE.lastTickAt).toISOString().slice(11, 19) + ' UTC' : '';
 }
 
+/* ---- options (Delta call/put contracts, e.g. C-BTC-95000-311026) ---- */
+const LIVE_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function liveParseOptSymbol(sym) {
+  const m = /^([CP])-([A-Z0-9]+)-(\d+(?:\.\d+)?)-(\d{2})(\d{2})(\d{2})$/.exec(sym || '');
+  if (!m) return null;
+  const exp = '20' + m[6] + '-' + m[5] + '-' + m[4]; // sortable YYYY-MM-DD
+  return { symbol: sym, type: m[1], und: m[2], strike: +m[3], exp };
+}
+function liveExpLabel(exp) { // 2026-10-31 -> 31 Oct 26
+  const [y, mo, d] = exp.split('-');
+  return d + ' ' + LIVE_MONTHS[+mo - 1] + ' ' + y.slice(2);
+}
+async function liveLoadOptionProducts() {
+  if (LIVE.optProducts) return LIVE.optProducts;
+  const out = [];
+  let after = null;
+  for (let page = 0; page < 12; page++) {
+    const json = await liveFetchJson('/v2/products?contract_types=call_options,put_options&page_size=500' + (after ? '&after=' + encodeURIComponent(after) : ''));
+    (json.result || []).forEach(p => {
+      if (!p || !p.symbol || (p.state && p.state !== 'live')) return;
+      const o = liveParseOptSymbol(p.symbol);
+      if (o) out.push(o);
+    });
+    after = json.meta && json.meta.after;
+    if (!after) break;
+  }
+  if (!out.length) throw new Error('no live option contracts returned');
+  LIVE.optProducts = out;
+  return out;
+}
+function liveFillSelect(id, items, selected) { // items: [{v, label}]
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = items.map(i => `<option value="${i.v}">${i.label}</option>`).join('');
+  if (selected != null && items.some(i => String(i.v) === String(selected))) el.value = selected;
+}
+function liveRenderOptionSelectors(prefSymbol) {
+  const all = LIVE.optProducts || [];
+  if (!all.length) return;
+  const pref = liveParseOptSymbol(prefSymbol);
+  const sel = LIVE.optSel;
+  if (pref) { sel.und = pref.und; sel.exp = pref.exp; sel.type = pref.type; sel.strike = pref.strike; }
+  const unds = Array.from(new Set(all.map(o => o.und))).sort((a, b) => (a === 'BTC' ? -1 : b === 'BTC' ? 1 : a < b ? -1 : 1));
+  if (unds.indexOf(sel.und) === -1) sel.und = unds[0];
+  liveFillSelect('live-und', unds.map(u => ({ v: u, label: u })), sel.und);
+  const exps = Array.from(new Set(all.filter(o => o.und === sel.und).map(o => o.exp))).sort();
+  if (exps.indexOf(sel.exp) === -1) sel.exp = exps[0];
+  liveFillSelect('live-exp', exps.map(e => ({ v: e, label: liveExpLabel(e) })), sel.exp);
+  document.getElementById('live-optype').value = sel.type;
+  const strikes = all.filter(o => o.und === sel.und && o.exp === sel.exp && o.type === sel.type).map(o => o.strike).sort((a, b) => a - b);
+  if (!strikes.length) { liveFillSelect('live-strike', [{ v: '', label: 'n/a' }], ''); LIVE.optSymbol = null; return; }
+  if (sel.strike == null || strikes.indexOf(sel.strike) === -1) {
+    // nearest listed strike to the one previously viewed; otherwise the middle of the chain
+    const target = sel.strike != null ? sel.strike : strikes[Math.floor(strikes.length / 2)];
+    sel.strike = strikes.reduce((best, k) => Math.abs(k - target) < Math.abs(best - target) ? k : best, strikes[0]);
+  }
+  liveFillSelect('live-strike', strikes.map(k => ({ v: k, label: k.toLocaleString('en-US') })), sel.strike);
+  const hit = all.find(o => o.und === sel.und && o.exp === sel.exp && o.type === sel.type && o.strike === sel.strike);
+  LIVE.optSymbol = hit ? hit.symbol : null;
+}
+function liveApplyKindUi() {
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  const opt = liveMode && LIVE.kind === 'options';
+  show('rc-live-symbol-wrap', liveMode && !opt);
+  ['rc-live-und-wrap', 'rc-live-exp-wrap', 'rc-live-ot-wrap', 'rc-live-strike-wrap'].forEach(id => show(id, opt));
+  const k = document.getElementById('live-kind');
+  if (k) k.value = LIVE.kind;
+  show('live-chain-panel', opt);
+  if (opt) liveChainStart(); else liveChainStop();
+}
+async function onLiveKindChange() {
+  if (!liveMode) return;
+  const kind = document.getElementById('live-kind').value;
+  if (kind === LIVE.kind) return;
+  if (kind === 'options') {
+    liveSetStatus('connecting', 'Loading option contracts…');
+    try {
+      await liveLoadOptionProducts();
+    } catch (e) {
+      document.getElementById('live-kind').value = 'perp';
+      liveSetStatus('error', 'Could not load options — ' + liveErrText(e));
+      return;
+    }
+    LIVE.kind = 'options';
+    // start from the underlying of the perpetual being viewed (BTCUSD -> BTC) when it has options
+    const und = LIVE.symbol.replace(/USD.*$/, '');
+    if (LIVE.optProducts.some(o => o.und === und)) LIVE.optSel.und = und;
+    LIVE.optSel.strike = null;
+    liveRenderOptionSelectors(null);
+    liveApplyKindUi();
+    if (LIVE.optSymbol) liveSwitch('Instrument switched');
+    else liveSetStatus('error', 'No option contracts found for that selection');
+  } else {
+    LIVE.kind = 'perp';
+    liveApplyKindUi();
+    liveRenderSymbolOptions(LIVE.products || LIVE_FALLBACK_SYMBOLS);
+    const sel = document.getElementById('live-symbol');
+    if (sel && LIVE.lastPerp && Array.from(sel.options).some(o => o.value === LIVE.lastPerp)) sel.value = LIVE.lastPerp;
+    liveSwitch('Instrument switched');
+  }
+}
+function onLiveOptChange(which) {
+  const sel = LIVE.optSel;
+  if (which === 'und') { sel.und = document.getElementById('live-und').value; sel.exp = ''; sel.strike = null; }
+  else if (which === 'exp') { sel.exp = document.getElementById('live-exp').value; }
+  else if (which === 'type') { sel.type = document.getElementById('live-optype').value; }
+  else if (which === 'strike') { sel.strike = +document.getElementById('live-strike').value; }
+  liveRenderOptionSelectors(null);
+  if (LIVE.optSymbol) liveSwitch('Contract switched');
+}
+
+/* ---- option chain (all strikes for the chosen underlying + expiry) ---- */
+function liveNum(v) { const n = parseFloat(v); return isFinite(n) ? n : null; }
+function liveChainCell(t) {
+  const q = t.quotes || {};
+  const close = liveNum(t.close), mark = liveNum(t.mark_price);
+  return {
+    symbol: t.symbol,
+    ltp: close && close > 0 ? close : mark,
+    bid: liveNum(q.best_bid), ask: liveNum(q.best_ask),
+    oi: liveNum(t.oi_contracts != null ? t.oi_contracts : t.oi),
+  };
+}
+async function liveChainFetch(und, exp) {
+  const [y, m, d] = exp.split('-');
+  const base = '/v2/tickers?contract_types=call_options,put_options&underlying_asset_symbols=' + encodeURIComponent(und);
+  const pick = json => (json && Array.isArray(json.result) ? json.result : []).filter(t => {
+    const o = liveParseOptSymbol(t && t.symbol);
+    return o && o.und === und && o.exp === exp;
+  });
+  let list = [];
+  try { list = pick(await liveFetchJson(base + '&expiry_date=' + d + '-' + m + '-' + y)); } catch (e) { /* fall back below */ }
+  if (!list.length) list = pick(await liveFetchJson(base)); // some deployments ignore the expiry filter
+  const byStrike = {};
+  let spot = null;
+  list.forEach(t => {
+    const o = liveParseOptSymbol(t.symbol);
+    const row = byStrike[o.strike] || (byStrike[o.strike] = { strike: o.strike, C: null, P: null });
+    row[o.type] = liveChainCell(t);
+    const sp = liveNum(t.spot_price);
+    if (sp) spot = sp;
+  });
+  return { rows: Object.values(byStrike).sort((a, b) => a.strike - b.strike), spot };
+}
+function liveChainFmt(v) {
+  if (v == null) return '–';
+  return v >= 100 ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v.toFixed(v >= 1 ? 2 : 3);
+}
+function liveChainRender(scrollToAtm) {
+  const box = document.getElementById('oc-scroll');
+  if (!box) return;
+  const ch = LIVE.chain, sel = LIVE.optSel;
+  const title = document.getElementById('oc-title');
+  if (title) title.textContent = sel.und + ' · ' + (sel.exp ? liveExpLabel(sel.exp) : '') + (ch.spot ? ' · spot ' + ch.spot.toLocaleString('en-US', { maximumFractionDigits: 1 }) : '');
+  const upd = document.getElementById('oc-updated');
+  if (upd) upd.textContent = ch.at ? 'updated ' + new Date(ch.at).toISOString().slice(11, 19) + ' UTC' : '';
+  if (!ch.rows.length) { box.innerHTML = '<div class="oc-empty">No contracts found for this expiry.</div>'; return; }
+  let atm = null;
+  if (ch.spot) atm = ch.rows.reduce((b, r) => Math.abs(r.strike - ch.spot) < Math.abs(b.strike - ch.spot) ? r : b, ch.rows[0]).strike;
+  const body = ch.rows.map(r => {
+    const cs = r.C && r.C.symbol === LIVE.symbol ? ' oc-sel' : '';
+    const ps = r.P && r.P.symbol === LIVE.symbol ? ' oc-sel' : '';
+    const callTd = r.C ? `<td class="oc-c${cs}" data-sym="${r.C.symbol}">${liveChainFmt(r.C.ltp)}</td>` : '<td>–</td>';
+    const putTd = r.P ? `<td class="oc-p${ps}" data-sym="${r.P.symbol}">${liveChainFmt(r.P.ltp)}</td>` : '<td>–</td>';
+    return `<tr class="${r.strike === atm ? 'oc-atm' : ''}">${callTd}<td class="oc-oi">${r.C && r.C.oi != null ? liveChainFmt(r.C.oi) : '–'}</td><td class="oc-k">${r.strike.toLocaleString('en-US')}</td><td class="oc-oi">${r.P && r.P.oi != null ? liveChainFmt(r.P.oi) : '–'}</td>${putTd}</tr>`;
+  }).join('');
+  const prevTop = box.scrollTop;
+  box.innerHTML = `<table class="oc-table"><thead><tr><th>Call LTP</th><th>OI</th><th style="text-align:center">Strike</th><th>OI</th><th>Put LTP</th></tr></thead><tbody>${body}</tbody></table>`;
+  box.querySelectorAll('td[data-sym]').forEach(td => td.addEventListener('click', () => liveChainPick(td.dataset.sym)));
+  if (scrollToAtm) {
+    const row = box.querySelector('tr.oc-atm');
+    if (row) box.scrollTop = Math.max(0, row.offsetTop - box.clientHeight / 2 + row.offsetHeight / 2);
+  } else box.scrollTop = prevTop;
+}
+function liveChainPick(sym) {
+  const o = liveParseOptSymbol(sym);
+  if (!o || !liveMode) return;
+  LIVE.optSel = { und: o.und, exp: o.exp, type: o.type, strike: o.strike };
+  liveRenderOptionSelectors(sym);
+  liveSwitch('Contract switched');
+}
+async function liveChainRefresh(force) {
+  const sel = LIVE.optSel;
+  if (!liveMode || LIVE.kind !== 'options' || !sel.und || !sel.exp) return;
+  const ch = LIVE.chain, key = sel.und + '|' + sel.exp, token = ++ch.token;
+  const sameKey = ch.key === key;
+  if (!sameKey) { ch.key = key; ch.rows = []; ch.spot = null; ch.at = 0; const b = document.getElementById('oc-scroll'); if (b) b.innerHTML = '<div class="oc-empty">Loading option chain…</div>'; }
+  else if (!force && Date.now() - ch.at < 8000) { liveChainRender(false); return; }
+  try {
+    const res = await liveChainFetch(sel.und, sel.exp);
+    if (token !== ch.token) return;
+    const first = !ch.rows.length;
+    ch.rows = res.rows; ch.spot = res.spot; ch.at = Date.now();
+    liveChainRender(first);
+  } catch (e) {
+    if (token !== ch.token) return;
+    const b = document.getElementById('oc-scroll');
+    if (b && !ch.rows.length) b.innerHTML = '<div class="oc-empty">Could not load the option chain — ' + liveErrText(e) + '. Retrying…</div>';
+  }
+}
+function liveChainStart() {
+  const ch = LIVE.chain;
+  if (!ch.timer) ch.timer = setInterval(() => liveChainRefresh(true), 10000);
+  liveChainRefresh(false);
+}
+function liveChainStop() {
+  const ch = LIVE.chain;
+  if (ch.timer) { clearInterval(ch.timer); ch.timer = null; }
+  ch.token++;
+}
+
 /* ---- mode switch ---- */
 function applyDataModeUi() {
   document.querySelectorAll('#data-mode-seg .seg-btn').forEach(b => b.classList.toggle('active', (b.dataset.dmode === 'live') === liveMode));
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
-  ['rc-live-symbol-wrap', 'rc-live-tf-wrap', 'rc-live-status-wrap'].forEach(id => show(id, liveMode));
+  ['rc-live-tf-wrap', 'rc-live-status-wrap', 'rc-live-kind-wrap'].forEach(id => show(id, liveMode));
+  liveApplyKindUi();
   if (liveMode) {
     ['rc-instrument-wrap', 'rc-month-wrap', 'rc-jumpdate-wrap', 'rc-timeframe-wrap', 'rc-contract-wrap', 'options-flow-panel', 'replay-playback'].forEach(id => show(id, false));
   } else {
@@ -5880,13 +6148,14 @@ function onLiveSymbolChange() { liveSwitch('Instrument switched'); }
 function onLiveTimeframeChange() { liveSwitch('Timeframe switched'); }
 function liveSwitch(reason) {
   if (!liveMode) return;
-  const sym = document.getElementById('live-symbol').value;
+  const sym = LIVE.kind === 'options' ? (LIVE.optSymbol || LIVE.symbol) : document.getElementById('live-symbol').value;
   const res = document.getElementById('live-timeframe').value;
   if (sym === LIVE.symbol && res === LIVE.res) return;
   saveDrawingsForCurrentDataset();
   if (position) closePosition(reason);
   if (pendingOrder) cancelPendingOrder();
   LIVE.symbol = sym; LIVE.res = res;
+  if (!/^[CP]-/.test(sym)) LIVE.lastPerp = sym;
   scheduleSave();
   liveStart();
 }
@@ -5894,6 +6163,7 @@ function liveReconnect() { if (liveMode) liveStart(); }
 
 /* ---- lifecycle ---- */
 function liveTeardownTransport() {
+  liveChainStop();
   clearTimeout(LIVE.retryTimer); LIVE.retryTimer = null;
   clearTimeout(LIVE.loadRetryTimer); LIVE.loadRetryTimer = null;
   clearInterval(LIVE.pollTimer); LIVE.pollTimer = null;
@@ -5918,7 +6188,10 @@ function liveStart() {
   }
   const tfSel = document.getElementById('live-timeframe');
   if (tfSel) tfSel.value = LIVE.res;
-  currentInstrument = { id: 'live-' + LIVE.symbol, label: LIVE.symbol, assetClass: 'Crypto', type: 'futures', months: [], live: true };
+  LIVE.kind = /^[CP]-/.test(LIVE.symbol) ? 'options' : 'perp';
+  currentInstrument = { id: 'live-' + LIVE.symbol, label: LIVE.symbol, assetClass: 'Crypto', type: LIVE.kind === 'options' ? 'options' : 'futures', months: [], live: true };
+  liveApplyKindUi();
+  if (LIVE.kind === 'options') liveLoadOptionProducts().then(() => { if (gen === LIVE.gen) liveRenderOptionSelectors(LIVE.symbol); }).catch(() => {});
   currentMonth = null;
   replayCandles = []; replayIndex = 1;
   document.getElementById('replay-symbol-label').textContent = LIVE.symbol + ' — live · ' + LIVE.res;
