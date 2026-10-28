@@ -2707,6 +2707,7 @@ async function sp2Session(g, tpl, e, step, spots) {
       const ls = await pickAtm(T.et); if (!ls) { out.skipped = (out.skipped || 0) + 1; continue; }
       T.ep = px(ls, iso16(T.et), 'o'); T.sk = ls.map(l => l.t + l.k).join(' + ');
       if (T.ep == null || !(T.ep > 0)) { out.skipped = (out.skipped || 0) + 1; continue; }
+      if (g.sc.minPrem > 0 && T.ep < g.sc.minPrem) { out.minSkip = (out.minSkip || 0) + 1; continue; }   // actual fill premium (ATM at trigger time) below the minimum -> no entry
       if (xi != null) { T.xt = close(xi); T.xc = close(xi) - secs * 1000; T.xp = px(ls, iso16(T.xt), 'o'); }
       else if (!live) { T.xt = e; T.xp = px(ls, lastT, 'c'); T.expd = true; }
       else T.mark = px(ls, lastT, 'c');
