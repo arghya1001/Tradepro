@@ -754,6 +754,22 @@
     .chart-ohlc-readout { gap: 6px; font-size: 10.5px; line-height: 1.35; max-width: calc(100% - 64px); }
     .chart-ohlc-readout .ohlc-sym { flex: 0 0 100%; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   }
+  /* Scanner performance */
+  .sp-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; }
+  .sp-chip { all: unset; cursor: pointer; flex: 0 0 auto; max-width: 78vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); font-size: 12px; color: var(--text-muted); }
+  .sp-chip.active { border-color: var(--accent); color: var(--accent); }
+  .sp-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0; }
+  .sp-card { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 10px 12px; }
+  .sp-k { font-size: 11px; color: var(--text-faint); margin-bottom: 3px; }
+  .sp-v { font-size: 16px; font-weight: 600; font-family: var(--mono); }
+  .sp-sub { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+  .sp-pos { color: var(--green); } .sp-neg { color: var(--red); }
+  .sp-tbl { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--mono); }
+  .sp-tbl th { text-align: right; font-weight: 500; color: var(--text-faint); padding: 5px 4px; font-size: 11px; }
+  .sp-tbl td { text-align: right; padding: 6px 4px; border-top: 1px solid var(--border-soft); }
+  .sp-tbl th:first-child, .sp-tbl td:first-child { text-align: left; }
+  .sp-note { font-size: 11px; color: var(--text-faint); line-height: 1.45; margin-top: 8px; }
   .price-tag.last { background: var(--surface-2); border: 1px solid var(--text-faint); color: var(--text); }
 
   .playback-bar { display: flex; align-items: center; gap: 8px; padding: 14px 20px 20px; }
@@ -1092,6 +1108,21 @@
               <label style="font-size:12px; color:var(--text-muted); display:flex; gap:6px; align-items:center"><input type="checkbox" id="sscan-auto" onchange="sscanToggleAuto()"> Auto-scan every minute</label>
             </div>
             <div id="sscan-list"></div>
+          </div>
+        </div>
+
+        <div class="panel" id="sperf-panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-7"/></svg>
+              Scanner performance
+            </div>
+            <button class="collapse-btn" aria-label="Collapse scanner performance" onclick="togglePanel(this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </div>
+          <div class="panel-body" style="padding:12px 14px 16px">
+            <div id="sperf-body"></div>
           </div>
         </div>
 
@@ -1744,6 +1775,7 @@ function showView(name) {
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.toggle('active', id === name || (!['strategies','scanner','replay'].includes(name) && id === 'home'));
   });
+  if (name === 'scanner') { try { renderSPerf(); } catch (e) { /* not ready */ } }
   if (name === 'replay' && !replayInited) { initReplay(); replayInited = true; }
   renderQuickTradeBar();
 }
@@ -2171,10 +2203,20 @@ const SSCAN_KEY = 'tradepro_strat_scans_v1';
 const SSCAN_TFS = ['5m','15m','30m','1h','4h','1d'];
 const SSCAN_REFS = [{ k:'ema', label:'EMA' }, { k:'sma', label:'SMA' }, { k:'st', label:'Supertrend' }];
 let sscans = [
-  { name:'Short straddle — below EMA 9, EMA 20 & Supertrend', strat:'Straddle', side:'Sell', und:'BTC,ETH', tf:'15m', fresh:false,
-    conds:[{ op:'below', k:'ema', p:9 },{ op:'below', k:'ema', p:20 },{ op:'below', k:'st', p:10, m:3 }] },
+  { name:'Short straddle — below EMA 10, EMA 20 & Supertrend (10,2)', strat:'Straddle', side:'Sell', und:'BTC,ETH', tf:'15m', fresh:false,
+    conds:[{ op:'below', k:'ema', p:10 },{ op:'below', k:'ema', p:20 },{ op:'below', k:'st', p:10, m:2 }] },
 ];
 try { const v = JSON.parse(localStorage.getItem(SSCAN_KEY) || 'null'); if (Array.isArray(v)) sscans = v; } catch (e) { /* storage unavailable */ }
+// One-time upgrade of the old built-in seed (EMA 9 / EMA 20 / Supertrend 10,3) to the current rule.
+// Only touches a scan that is still exactly the old seed, so anything you customised is left alone.
+sscans.forEach(sc => {
+  const c = sc && sc.conds;
+  if (sc && sc.name === 'Short straddle — below EMA 9, EMA 20 & Supertrend' && c && c.length === 3 &&
+      c[0].k === 'ema' && c[0].p === 9 && c[1].k === 'ema' && c[1].p === 20 && c[2].k === 'st' && c[2].p === 10 && c[2].m === 3) {
+    sc.name = 'Short straddle — below EMA 10, EMA 20 & Supertrend (10,2)';
+    sc.conds = [{ op:'below', k:'ema', p:10 }, { op:'below', k:'ema', p:20 }, { op:'below', k:'st', p:10, m:2 }];
+  }
+});
 function persistSScans() { try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ } }
 let sscanResults = {};   // scan index -> { at, rows:[{und, ok, price, details, err}] }
 let sscanDraft = null, sscanEditing = null, sscanAutoTimer = null, sscanBusy = false;
@@ -2253,7 +2295,7 @@ function sscanAddCond() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell'
 function openSScan(idx, stratName) {
   sscanEditing = idx == null ? null : idx;
   sscanDraft = idx == null
-    ? { name: '', strat: stratName || 'Straddle', side: 'Sell', und: 'BTC', tf: '15m', fresh: false, conds: [{ op:'below', k:'ema', p:9 }, { op:'below', k:'ema', p:20 }, { op:'below', k:'st', p:10, m:3 }] }
+    ? { name: '', strat: stratName || 'Straddle', side: 'Sell', und: 'BTC', tf: '15m', fresh: false, conds: [{ op:'below', k:'ema', p:10 }, { op:'below', k:'ema', p:20 }, { op:'below', k:'st', p:10, m:2 }] }
     : JSON.parse(JSON.stringify(sscans[idx]));
   if (idx == null && stratName && /^Iron/.test(stratName)) sscanDraft.side = 'Sell';
   document.getElementById('sscan-name').value = sscanDraft.name;
@@ -2300,6 +2342,32 @@ function sscanRefLine(candles, c) {
   if (c.k === 'sma') return smaSeries(closes, c.p);
   return supertrendSeries(candles, c.p, c.m).line;
 }
+/* Entry/exit signals as a position cycle: ONE entry when every condition first becomes true, then NO
+   further entries until the exit fires (every condition flipped: below -> above, above -> below).
+   Sell scan on EMA10/EMA20/Supertrend: SELL when close is below all three, BUY-exit when close is above all three. */
+function sscanSignals(candles, conds) {
+  const n = candles.length, entries = [], exits = [];
+  if (!n || !conds || !conds.length) return { entries, exits, inPos: false };
+  const lines = conds.map(c => sscanRefLine(candles, c));
+  const valid = new Array(n).fill(false), ent = new Array(n).fill(false), ext = new Array(n).fill(false);
+  for (let i = 0; i < n; i++) {
+    let v = true, e = true, x = true;
+    for (let j = 0; j < conds.length; j++) {
+      const l = lines[j][i];
+      if (l == null) { v = false; e = false; x = false; break; }
+      const px = candles[i].c, wantBelow = conds[j].op === 'below';
+      if (wantBelow ? !(px < l) : !(px > l)) e = false;
+      if (wantBelow ? !(px > l) : !(px < l)) x = false;
+    }
+    valid[i] = v; ent[i] = v && e; ext[i] = v && x;
+  }
+  let inPos = false;
+  for (let i = 1; i < n; i++) {
+    if (!inPos) { if (ent[i] && valid[i - 1] && !ent[i - 1]) { entries.push(i); inPos = true; } }
+    else if (ext[i]) { exits.push(i); inPos = false; }
+  }
+  return { entries, exits, inPos };
+}
 function sscanAllSeries(candles, conds) { // boolean per candle: are ALL conditions true on that candle's close?
   const lines = conds.map(c => sscanRefLine(candles, c));
   return candles.map((cd, i) => conds.every((c, j) => {
@@ -2317,9 +2385,7 @@ function sscanEval(candles, conds) {
   });
   const n = candles.length - 1;
   const now = at(n), prev = n > 0 ? at(n - 1) : null;
-  const all = sscanAllSeries(candles, conds);
-  const acts = [];                       // candles where the conditions FIRST turned true
-  all.forEach((a, i) => { if (a && (i === 0 || !all[i - 1])) acts.push(i); });
+  const acts = sscanSignals(candles, conds).entries;   // one entry per cycle (exit must fire before the next)
   const lastIdx = acts.length ? acts[acts.length - 1] : -1;
   return { details: now, allNow: now.every(d => d.ok), allPrev: prev ? prev.every(d => d.ok) : false, price: candles[n].c,
            lastActSec: lastIdx >= 0 ? liveTimeToSec(candles[lastIdx].t) : null, barsSince: lastIdx >= 0 ? n - lastIdx : null, actCount: acts.length };
@@ -2353,22 +2419,24 @@ function sscanToggleAuto() {
     sscanAutoTimer = setInterval(() => { const v = document.getElementById('view-scanner'); if (v && v.style.display !== 'none') runAllSScans(); }, 60000);
   }
 }
-async function sscanBuildOverlay(sc, und) { // every candle (up to ~1000 bars) where the scan's conditions first turned true
-  const res = sc.tf, secs = LIVE_RES[res], end = Math.floor(Date.now() / 1000);
-  const json = await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(und + 'USD')}&resolution=${res}&start=${end - secs * LIVE_HISTORY_BARS}&end=${end}`);
-  let candles = liveParseRestCandles(json, res);
-  const last = candles[candles.length - 1];
-  if (last) { const ts = liveTimeToSec(last.t); if (ts != null && ts + secs > end) candles = candles.slice(0, -1); }
-  const all = sscanAllSeries(candles, sc.conds), times = [];
-  all.forEach((a, i) => { if (a && (i === 0 || !all[i - 1])) times.push(liveTimeToSec(candles[i].t)); });
-  return { times: new Set(times), list: times, und, name: sc.name, side: sc.side };
+function sscanOverlayMeta(sc, und) { // the chart evaluates the scan on its OWN candles (what you see), so no data needed here
+  return { times: new Set(), list: [], und, name: sc.name, strat: sc.strat, side: sc.side, conds: JSON.parse(JSON.stringify(sc.conds)) };
+}
+// Signals on the chart's own closed candles (the still-forming last candle is ignored: a signal needs a CLOSE).
+function sscanChartSignals(ov) {
+  const secs = LIVE_RES[LIVE.res];
+  let n = Math.min(replayIndex, replayCandles.length);
+  if (n > 0 && secs) { const ts = liveTimeToSec(replayCandles[n - 1].t); if (ts != null && ts + secs > Date.now() / 1000) n--; }
+  const cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
+  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds) }, cs, { conds: ov.conds });
+  return { sig, cs };
 }
 async function openSScanChart(i, und) {
   const sc = sscans[i];
   const t = sc && TEMPLATES.find(x => x.name === sc.strat);
   if (!t) return;
   let overlay = null;
-  try { overlay = await sscanBuildOverlay(sc, und); } catch (e) { overlay = null; }
+  try { overlay = sscanOverlayMeta(sc, und); } catch (e) { overlay = null; }
   await openStrategyFromSpecs((sc.side === 'Sell' ? 'Short ' : 'Long ') + sc.strat.toLowerCase(), und, { specs: t.defLegs }, sc.side, { tf: sc.tf, overlay });
 }
 /* ---- apply a scan straight onto the open strategy chart (uses the chart's own timeframe) ---- */
@@ -2400,30 +2468,157 @@ async function sscanApplyRefresh() {
   if (!liveMode || LIVE.kind !== 'strategy' || !LIVE.stratSymbol) return;
   const sc = sscans.find(x => x.name === sscanApplied);
   if (!sc) { sscanApplied = null; scanOverlay = null; sscanFillApply(); if (info) info.textContent = ''; draw(); return; }
-  const und = LIVE.strat.und, res = LIVE.res, symbol = LIVE.stratSymbol;
-  if (info) info.textContent = `Scanning ${und} on ${res}…`;
-  try {
-    const ov = await sscanBuildOverlay(Object.assign({}, sc, { tf: res }), und);
-    if (token !== sscanApplyToken || sscanApplied !== sc.name) return;
-    scanOverlay = Object.assign({}, ov, { symbol });
-    const n = ov.list.length;
-    if (info) info.textContent = n ? `${sc.side === 'Sell' ? 'SELL' : 'BUY'} signals: ${n} on ${und} ${res} · latest ${sscanTime(ov.list[n - 1])}` : `No ${sc.side === 'Sell' ? 'SELL' : 'BUY'} signals on ${und} ${res} in this range`;
-    sscanOverlayWatch();
-    draw();
-  } catch (e) {
-    if (token === sscanApplyToken && info) info.textContent = 'Could not scan — ' + liveErrText(e);
-  }
+  const und = LIVE.strat.und, symbol = LIVE.stratSymbol;
+  scanOverlay = Object.assign({}, sscanOverlayMeta(sc, und), { symbol });
+  draw();   // renderChart fills the info line from the chart's own signals
 }
-function sscanOverlayWatch() { // keep the markers current while that strategy chart stays open
+function sscanOverlayWatch() { // markers are recomputed from the chart's own candles on every render, so nothing to poll
   clearInterval(scanOverlayTimer); scanOverlayTimer = null;
-  if (!scanOverlay) return;
-  scanOverlayTimer = setInterval(async () => {
-    const ov = scanOverlay;
-    if (!ov || !liveMode || LIVE.kind !== 'strategy' || LIVE.stratSymbol !== ov.symbol) { clearInterval(scanOverlayTimer); scanOverlayTimer = null; return; }
-    const sc = sscans.find(x => x.name === ov.name);
-    if (!sc) return;
-    try { const fresh = await sscanBuildOverlay(Object.assign({}, sc, { tf: LIVE.res }), ov.und); scanOverlay = Object.assign({}, ov, { times: fresh.times, list: fresh.list }); renderChart(); } catch (e) { /* try again next minute */ }
-  }, 60000);
+}
+/* ---------- Scanner performance: every sell -> buy-exit cycle is logged, then scored ---------- */
+const SPERF_KEY = 'tradepro_scan_perf_v1';
+let sperf = { trades: [], qty: 0.1, net: true, sel: null };
+try { const v = JSON.parse(localStorage.getItem(SPERF_KEY) || 'null'); if (v && Array.isArray(v.trades)) sperf = Object.assign(sperf, v); } catch (e) { /* storage unavailable */ }
+let _sperfSaveT = null, _sperfRenderT = null, _sperfLastSig = null, _sperfGroups = [];
+function sperfSave() {
+  clearTimeout(_sperfSaveT);
+  _sperfSaveT = setTimeout(() => {
+    try {
+      if (sperf.trades.length > 4000) sperf.trades = sperf.trades.slice(-4000);
+      localStorage.setItem(SPERF_KEY, JSON.stringify({ trades: sperf.trades, qty: sperf.qty, net: sperf.net, sel: sperf.sel }));
+    } catch (e) { /* ignore */ }
+  }, 500);
+}
+const sperfGroup = t => t.sc + ' · ' + t.tf;
+// Performance tracking is for options STRADDLE and STRANGLE scans only (premium of a short/long volatility structure).
+const sperfIsVolStrat = n => /^(straddle|strangle)$/i.test(String(n || '').trim());
+// The chart counts too if it's a Straddle/Strangle, or a Custom build that is exactly one call + one put on the same side (that IS a straddle/strangle).
+function sperfChartIsVolStrat() {
+  const st = LIVE.strat;
+  if (!st) return false;
+  if (sperfIsVolStrat(st.type)) return true;
+  const L = st.type === 'custom' && Array.isArray(st.legs) ? st.legs : null;
+  return !!L && L.length === 2 && L[0].t !== L[1].t && L[0].w && L[1].w && Math.sign(L[0].w) === Math.sign(L[1].w);
+}
+const sperfEligible = t => sperfIsVolStrat(t.st || ((sscans.find(x => x.name === t.sc) || {}).strat));
+// Called from the chart on every render that has a scan applied. Fills are assumed at the NEXT candle's open
+// (a signal is only known once its candle has closed), so results don't look better than they could have been.
+function sperfLogFromChart(ov, sig, cs) {
+  // only when BOTH the scan and the chart it's applied to are a straddle / strangle
+  if (!sperfIsVolStrat(ov.strat) || !sperfChartIsVolStrat()) return;
+  if (_sperfLastSig === sig) return;
+  _sperfLastSig = sig;
+  const full = replayCandles, tf = LIVE.res, sym = currentSymbolLabel();
+  const fill = i => (full[i + 1] ? full[i + 1].o : full[i].c);
+  const idx = new Map(sperf.trades.map((t, k) => [t.k, k]));
+  let changed = false;
+  sig.entries.forEach((ei, n) => {
+    const xi = sig.exits[n];                       // entries and exits alternate, so the nth exit closes the nth entry
+    const rec = { k: ov.name + '|' + tf + '|' + LIVE.stratSymbol + '|' + cs[ei].t, sc: ov.name, st: ov.strat, tf, sym, side: ov.side,
+                  et: cs[ei].t, xt: xi != null ? cs[xi].t : null, ep: fill(ei), xp: xi != null ? fill(xi) : null };
+    const at = idx.get(rec.k);
+    if (at == null) { sperf.trades.push(rec); idx.set(rec.k, sperf.trades.length - 1); changed = true; }
+    else { const o = sperf.trades[at]; if (o.xt !== rec.xt || o.xp !== rec.xp || o.ep !== rec.ep || o.st !== rec.st) { sperf.trades[at] = rec; changed = true; } }
+  });
+  if (changed) { sperfSave(); sperfRenderSoon(); }
+}
+function sperfRenderSoon() {
+  clearTimeout(_sperfRenderT);
+  _sperfRenderT = setTimeout(() => { const v = document.getElementById('view-scanner'); if (v && v.style.display !== 'none') renderSPerf(); }, 300);
+}
+// Result of one closed trade in USD for `qty` units. "After costs" reuses the paper account's own slippage + taker fee.
+function sperfTradeUsd(t) {
+  const gross = t.side === 'Sell' ? t.ep - t.xp : t.xp - t.ep;
+  const cost = sperf.net ? (t.ep + t.xp) * ((costs.slippageBps || 0) / 10000 + (costs.takerPct || 0) / 100) : 0;
+  return (gross - cost) * sperf.qty;
+}
+function sperfStats(list) {
+  const closed = list.filter(t => t.xp != null).sort((a, b) => (a.xt < b.xt ? -1 : a.xt > b.xt ? 1 : 0));
+  let wins = 0, sumW = 0, sumL = 0, cum = 0, peak = 0, mdd = 0, streak = 0, maxStreak = 0, best = null, worst = null;
+  const days = new Map();
+  closed.forEach(t => {
+    const r = sperfTradeUsd(t), d = String(t.xt).slice(0, 10);
+    if (r > 0) { wins++; sumW += r; streak = 0; } else { sumL += r; streak++; maxStreak = Math.max(maxStreak, streak); }
+    cum += r; peak = Math.max(peak, cum); mdd = Math.max(mdd, peak - cum);
+    best = best == null ? r : Math.max(best, r); worst = worst == null ? r : Math.min(worst, r);
+    const dd = days.get(d) || { d, n: 0, w: 0, pnl: 0 };
+    dd.n++; if (r > 0) dd.w++; dd.pnl += r; days.set(d, dd);
+  });
+  const n = closed.length, losses = n - wins, daily = [...days.values()].sort((a, b) => (a.d < b.d ? 1 : -1));
+  return { n, wins, winRate: n ? wins / n * 100 : null, total: cum, avgW: wins ? sumW / wins : null, avgL: losses ? sumL / losses : null,
+           pf: sumL < 0 ? sumW / -sumL : (sumW > 0 ? Infinity : null), exp: n ? cum / n : null, mdd, best, worst, maxStreak,
+           open: list.filter(t => t.xp == null), daily, goodDays: daily.filter(x => x.pnl > 0).length };
+}
+function sperfSelect(i) { sperf.sel = _sperfGroups[i]; sperfSave(); renderSPerf(); }
+function sperfSetQty(v) { const q = parseFloat(v); if (q > 0) { sperf.qty = q; sperfSave(); renderSPerf(); } }
+function sperfSetNet(on) { sperf.net = !!on; sperfSave(); renderSPerf(); }
+function sperfReset() {
+  if (!sperf.sel || !confirm('Delete the logged trades for "' + sperf.sel + '"? This cannot be undone.')) return;
+  sperf.trades = sperf.trades.filter(t => sperfGroup(t) !== sperf.sel); sperf.sel = null; sperfSave(); renderSPerf();
+}
+function sperfOpenChart() {
+  const g = sperf.sel, t = sperf.trades.find(x => sperfGroup(x) === g);
+  const i = t ? sscans.findIndex(sc => sc.name === t.sc) : -1;
+  if (i < 0) { alert('That scan no longer exists, so its chart can’t be reopened.'); return; }
+  openSScanChart(i, sscans[i].und.split(',')[0]);
+}
+function sperfExport() {
+  const list = sperf.trades.filter(t => sperfGroup(t) === sperf.sel);
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const rows = [['scan', 'timeframe', 'symbol', 'side', 'entry_time', 'exit_time', 'entry_fill', 'exit_fill', 'result_usd_for_qty_' + sperf.qty + (sperf.net ? '_after_costs' : '_gross')]]
+    .concat(list.map(t => [t.sc, t.tf, t.sym, t.side, t.et, t.xt, t.ep, t.xp, t.xp != null ? sperfTradeUsd(t).toFixed(4) : '']));
+  const blob = new Blob([rows.map(r => r.map(q).join(',')).join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'scanner-performance.csv';
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function renderSPerf() {
+  const el = document.getElementById('sperf-body');
+  if (!el) return;
+  _sperfGroups = [...new Set(sperf.trades.filter(sperfEligible).map(sperfGroup))];
+  if (!_sperfGroups.length) {
+    el.innerHTML = '<div class="saved-empty">No trades logged yet. Applies to options <b>straddle and strangle</b> scans only. Apply one of them on its live strategy chart (or tap “Show chart” on the scan above) and its past sell → buy-exit cycles are recorded here automatically.</div>';
+    return;
+  }
+  if (!_sperfGroups.includes(sperf.sel)) sperf.sel = _sperfGroups[0];
+  const st = sperfStats(sperf.trades.filter(t => sperfEligible(t) && sperfGroup(t) === sperf.sel));
+  const usd = v => v == null ? '–' : fmtMoney(v * USD_INR_RATE);
+  const cls = v => v == null ? '' : (v > 0 ? 'sp-pos' : v < 0 ? 'sp-neg' : '');
+  const pf = st.pf == null ? '–' : (st.pf === Infinity ? '∞' : st.pf.toFixed(2));
+  const rel = st.n < 20 ? ['Early data', 'only ' + st.n + ' closed trade' + (st.n === 1 ? '' : 's') + ' — treat it as a hint, not proof (aim for 30+ across several days)']
+            : st.n < 50 ? ['Building', st.n + ' closed trades — getting meaningful; keep it running']
+            : ['Meaningful sample', st.n + ' closed trades'];
+  const chips = _sperfGroups.map((g, i) => `<button class="sp-chip ${g === sperf.sel ? 'active' : ''}" onclick="sperfSelect(${i})">${sscanEsc(g)}</button>`).join('');
+  // daily P/L bars (last 14 days, oldest -> newest)
+  const dl = st.daily.slice(0, 14).reverse(), mx = Math.max(1e-9, ...dl.map(x => Math.abs(x.pnl)));
+  const bw = 300 / Math.max(dl.length, 1);
+  const bars = dl.map((x, i) => { const h = Math.max(1.5, Math.abs(x.pnl) / mx * 30);
+    return `<rect x="${(i * bw + bw * 0.18).toFixed(1)}" y="${(x.pnl >= 0 ? 36 - h : 36).toFixed(1)}" width="${(bw * 0.64).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${x.pnl >= 0 ? 'var(--green)' : 'var(--red)'}"/>`; }).join('');
+  const rows = st.daily.slice(0, 14).map(x => `<tr><td>${x.d.slice(5)}</td><td>${x.n}</td><td>${(x.w / x.n * 100).toFixed(0)}%</td><td class="${cls(x.pnl)}">${usd(x.pnl)}</td></tr>`).join('');
+  const openTxt = st.open.length ? `<div class="sp-note">Open now: ${st.open.map(t => (t.side === 'Sell' ? 'SELL' : 'BUY') + ' since ' + sscanEsc(String(t.et).replace('T', ' ')) + ' UTC @ ' + sscanFmt(t.ep)).join(' · ')} (not counted until its exit fires)</div>` : '';
+  el.innerHTML = `
+    <div class="sp-chips">${chips}</div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12px; color:var(--text-muted)">
+      <label style="display:flex; gap:6px; align-items:center">Qty <input class="field-input" style="width:72px; padding:5px 8px" type="number" min="0.001" step="0.1" value="${sperf.qty}" onchange="sperfSetQty(this.value)"></label>
+      <label style="display:flex; gap:6px; align-items:center"><input type="checkbox" ${sperf.net ? 'checked' : ''} onchange="sperfSetNet(this.checked)"> After costs (${costs.slippageBps} bps slippage + ${costs.takerPct}% fee)</label>
+    </div>
+    <div class="sp-note" style="margin-top:8px"><b>${rel[0]}</b> — ${rel[1]}.</div>
+    <div class="sp-grid">
+      <div class="sp-card"><div class="sp-k">Accuracy (win rate)</div><div class="sp-v ${st.winRate == null ? '' : st.winRate >= 50 ? 'sp-pos' : 'sp-neg'}">${st.winRate == null ? '–' : st.winRate.toFixed(0) + '%'}</div><div class="sp-sub">${st.wins} won · ${st.n - st.wins} lost</div></div>
+      <div class="sp-card"><div class="sp-k">Total P/L</div><div class="sp-v ${cls(st.total)}">${usd(st.n ? st.total : null)}</div><div class="sp-sub">${st.n} closed trades</div></div>
+      <div class="sp-card"><div class="sp-k">Avg win / avg loss</div><div class="sp-v" style="font-size:13px"><span class="sp-pos">${usd(st.avgW)}</span> / <span class="sp-neg">${usd(st.avgL)}</span></div><div class="sp-sub">profit factor ${pf}</div></div>
+      <div class="sp-card"><div class="sp-k">Expectancy / trade</div><div class="sp-v ${cls(st.exp)}">${usd(st.exp)}</div><div class="sp-sub">avg result per trade</div></div>
+      <div class="sp-card"><div class="sp-k">Max drawdown</div><div class="sp-v sp-neg">${st.n ? usd(-st.mdd) : '–'}</div><div class="sp-sub">longest losing streak ${st.maxStreak}</div></div>
+      <div class="sp-card"><div class="sp-k">Profitable days</div><div class="sp-v">${st.goodDays} / ${st.daily.length}</div><div class="sp-sub">best ${usd(st.best)} · worst ${usd(st.worst)}</div></div>
+    </div>
+    ${dl.length ? `<div class="sp-k" style="margin-top:4px">Daily P/L (UTC days, last ${dl.length})</div><svg viewBox="0 0 300 72" width="100%" height="72" preserveAspectRatio="none" style="display:block"><line x1="0" y1="36" x2="300" y2="36" stroke="var(--border)" stroke-width="0.6"/>${bars}</svg>` : ''}
+    ${rows ? `<table class="sp-tbl"><thead><tr><th>Day</th><th>Trades</th><th>Win %</th><th>P/L</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+    ${openTxt}
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px">
+      <button class="btn-ghost" onclick="sperfOpenChart()">Update from chart ↗</button>
+      <button class="btn-ghost" onclick="sperfExport()">Export CSV</button>
+      <button class="btn-ghost" onclick="sperfReset()">Reset this scan</button>
+    </div>
+    <div class="sp-note">Straddle and strangle scans only. Trades are read from the strategy chart's own candles. Fills are assumed at the next candle's open after the signal closes. History fills in from the chart's loaded candles (about 1,000 bars) and keeps growing while the app is open; day totals use UTC dates. Past results do not guarantee future ones.</div>`;
 }
 renderSScans();
 
@@ -5230,15 +5425,30 @@ function renderChart(forceEnd) {
     }
   });
 
-  // scanner activations: a diamond on every candle where a Strategy-scanner scan first turned true
-  if (typeof scanOverlay !== 'undefined' && scanOverlay && liveMode && LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol) {
-    const col = scanOverlay.side === 'Sell' ? '#F6465D' : '#2EBD85', tag = scanOverlay.side === 'Sell' ? 'SELL' : 'BUY';
-    for (let i = 0; i < replayIndex; i++) {
-      const sec = liveTimeToSec(replayCandles[i].t);
-      if (sec == null || !scanOverlay.times.has(sec)) continue;
-      const x = xAt(i), y = clampY(yAt(replayCandles[i].h) - 16);
-      signalMarkers += `<path d="M${x.toFixed(2)},${(y-7).toFixed(2)} L${(x+6).toFixed(2)},${y.toFixed(2)} L${x.toFixed(2)},${(y+7).toFixed(2)} L${(x-6).toFixed(2)},${y.toFixed(2)} Z" fill="${col}" stroke="var(--bg, #000)" stroke-width="1"/>`;
-      signalMarkers += `<text x="${x.toFixed(2)}" y="${(y-11).toFixed(2)}" font-size="9" font-weight="700" text-anchor="middle" fill="${col}" font-family="var(--mono)">${tag}</text>`;
+  // scanner signals, evaluated on THIS chart's candles: one entry per cycle, then an exit when every condition flips
+  if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && liveMode && LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol) {
+    const isSell = scanOverlay.side === 'Sell';
+    const entCol = isSell ? '#F6465D' : '#2EBD85', exCol = isSell ? '#2EBD85' : '#F6465D';
+    const entTag = isSell ? 'SELL' : 'BUY', exTag = isSell ? 'BUY EXIT' : 'SELL EXIT';
+    const { sig, cs } = sscanChartSignals(scanOverlay);
+    try { sperfLogFromChart(scanOverlay, sig, cs); } catch (e) { /* logging must never break the chart */ }
+    const dia = (x, y, col) => `<path d="M${x.toFixed(2)},${(y-7).toFixed(2)} L${(x+6).toFixed(2)},${y.toFixed(2)} L${x.toFixed(2)},${(y+7).toFixed(2)} L${(x-6).toFixed(2)},${y.toFixed(2)} Z" fill="${col}" stroke="var(--bg, #000)" stroke-width="1"/>`;
+    sig.entries.forEach(i => {
+      if (i < drawLo || i > drawHi) return;
+      const x = xAt(i), y = clampY(yAt(cs[i].h) - 16);
+      signalMarkers += dia(x, y, entCol) + `<text x="${x.toFixed(2)}" y="${(y-11).toFixed(2)}" font-size="9" font-weight="700" text-anchor="middle" fill="${entCol}" font-family="var(--mono)">${entTag}</text>`;
+    });
+    sig.exits.forEach(i => {
+      if (i < drawLo || i > drawHi) return;
+      const x = xAt(i), y = clampY(yAt(cs[i].l) + 16);
+      signalMarkers += dia(x, y, exCol) + `<text x="${x.toFixed(2)}" y="${(y+19).toFixed(2)}" font-size="9" font-weight="700" text-anchor="middle" fill="${exCol}" font-family="var(--mono)">${exTag}</text>`;
+    });
+    const info = document.getElementById('live-scan-info');
+    if (info) {
+      const ne = sig.entries.length, nx = sig.exits.length, lastE = ne ? sig.entries[ne - 1] : -1;
+      const when = lastE >= 0 ? sscanTime(liveTimeToSec(cs[lastE].t)) : '';
+      info.textContent = ne ? `${entTag} entries: ${ne} · ${exTag.toLowerCase()}s: ${nx} · ${sig.inPos ? 'now IN ' + entTag + ' since ' + when : 'now flat · last ' + entTag + ' ' + when}`
+                            : `No ${entTag} signals on this chart in range`;
     }
   }
 
