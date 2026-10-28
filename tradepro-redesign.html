@@ -700,6 +700,7 @@
        two-finger gesture here as a page-zoom pinch — that was swallowing the touch events
        our own pinch-to-zoom handler needs to see. */
     touch-action: pan-x;
+    overscroll-behavior: contain;
   }
   .chart-scroll:active { cursor: grabbing; }
   .chart-scroll svg { display: block; }
@@ -1036,6 +1037,27 @@
           <button class="btn-primary" onclick="openScanBuilder()">+ Build scanner</button>
         </div>
 
+        <div class="panel" id="sscan-panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6M11 8v6"/></svg>
+              Strategy scanner <span id="sscan-count" style="color:var(--text-faint); font-weight:400;"></span>
+            </div>
+            <button class="collapse-btn" aria-label="Collapse strategy scanner" onclick="togglePanel(this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </div>
+          <div class="panel-body">
+            <div class="strat-legs" style="margin-bottom:8px">Pick a combined options strategy (buy or sell) and the price conditions that should trigger it. The scan checks the underlying's last closed candle on live Delta data (BTC / ETH).</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px">
+              <button class="btn-primary" onclick="openSScan()">+ New strategy scan</button>
+              <button class="btn-ghost" onclick="runAllSScans()">Scan all now</button>
+              <label style="font-size:12px; color:var(--text-muted); display:flex; gap:6px; align-items:center"><input type="checkbox" id="sscan-auto" onchange="sscanToggleAuto()"> Auto-scan every minute</label>
+            </div>
+            <div id="sscan-list"></div>
+          </div>
+        </div>
+
         <div class="panel" id="saved-scan-panel">
           <div class="panel-head">
             <div class="panel-title">
@@ -1156,6 +1178,11 @@
                 <option value="4h">4 hour</option>
                 <option value="1d">1 day</option>
               </select>
+            </div>
+            <div class="rc-field" id="rc-live-scan-wrap" style="display:none">
+              <label class="field-label">Scanner signals on this chart</label>
+              <select class="field-input" id="live-scan-apply" onchange="sscanApplyChange(this.value)"></select>
+              <div id="live-scan-info" style="font-size:11.5px; color:var(--text-muted); margin-top:4px"></div>
             </div>
             <div class="rc-field" id="rc-live-status-wrap" style="display:none">
               <label class="field-label">Connection</label>
@@ -1554,6 +1581,48 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="sscan-overlay" onclick="if(event.target===this) closeSScan()">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Strategy scan</div>
+      <button class="collapse-btn" aria-label="Close" onclick="closeSScan()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Scan name</label>
+      <input class="field-input" id="sscan-name" type="text" placeholder="e.g. Short straddle — downtrend">
+
+      <label class="field-label">Strategy</label>
+      <select class="field-input" id="sscan-strat" onchange="sscanDraft.strat=this.value"></select>
+
+      <label class="field-label">Trade it as</label>
+      <div class="seg" id="sscan-side">
+        <button type="button" class="seg-btn" data-side="Buy" onclick="setSScanSide('Buy')">Buy (long)</button>
+        <button type="button" class="seg-btn" data-side="Sell" onclick="setSScanSide('Sell')">Sell (short)</button>
+      </div>
+
+      <label class="field-label">Underlying</label>
+      <select class="field-input" id="sscan-und" onchange="sscanDraft.und=this.value">
+        <option value="BTC">BTC</option><option value="ETH">ETH</option><option value="BTC,ETH">BTC + ETH</option>
+      </select>
+
+      <label class="field-label">Timeframe</label>
+      <select class="field-input" id="sscan-tf" onchange="sscanDraft.tf=this.value"></select>
+
+      <label class="field-label">Entry conditions — all must be true on the last closed candle</label>
+      <div id="sscan-conds"></div>
+      <button type="button" class="btn-ghost" onclick="sscanAddCond()">+ Add condition</button>
+
+      <label style="font-size:12.5px; color:var(--text-muted); display:flex; gap:8px; align-items:center; margin-top:12px"><input type="checkbox" id="sscan-fresh" onchange="sscanDraft.fresh=this.checked"> Only flag the first candle where all conditions turn true</label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="closeSScan()">Cancel</button>
+      <button class="btn-primary" onclick="saveSScan()">Save &amp; scan</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="scan-builder-overlay" onclick="if(event.target===this) closeScanBuilder()">
   <div class="modal">
     <div class="modal-head">
@@ -1670,9 +1739,9 @@ const TEMPLATES = [
   { cat:'bearish', name:'Protective put', legs:'Hold underlying, buy put (OTM)', assets:['equity','btc','eth'],
     defLegs:[{action:'Buy', type:'Spot', strike:'—'},{action:'Buy', type:'Put', strike:'ATM-3%'}] },
 
-  { cat:'neutral', name:'Long straddle', legs:'Buy call + buy put, same strike (ATM)', assets:['nifty','banknifty','btc','eth'],
+  { cat:'neutral', name:'Straddle', legs:'Call + put at the same strike (ATM) — buy for a big move, sell to collect decay', assets:['nifty','banknifty','btc','eth'],
     defLegs:[{action:'Buy', type:'Call', strike:'ATM'},{action:'Buy', type:'Put', strike:'ATM'}] },
-  { cat:'neutral', name:'Long strangle', legs:'Buy call (OTM) + buy put (OTM)', assets:['nifty','banknifty','btc','eth'],
+  { cat:'neutral', name:'Strangle', legs:'Call (OTM) + put (OTM) — buy for a big move, sell to collect decay', assets:['nifty','banknifty','btc','eth'],
     defLegs:[{action:'Buy', type:'Call', strike:'ATM+2%'},{action:'Buy', type:'Put', strike:'ATM-2%'}] },
   { cat:'neutral', name:'Iron condor', legs:'Sell call spread + sell put spread', assets:['nifty','banknifty','sensex'],
     defLegs:[{action:'Sell', type:'Call', strike:'ATM+2%'},{action:'Buy', type:'Call', strike:'ATM+4%'},{action:'Sell', type:'Put', strike:'ATM-2%'},{action:'Buy', type:'Put', strike:'ATM-4%'}] },
@@ -1690,7 +1759,8 @@ function assetChips(ids) {
 }
 
 // strategy templates that can be charted as live combined candles (see STRAT_DEFS in the live section)
-const STRAT_CHART_MAP = { 'Long straddle': 'straddle', 'Long strangle': 'strangle', 'Bull call spread': 'bullcall', 'Bear put spread': 'bearput', 'Iron condor': 'condor', 'Iron butterfly': 'ironfly' };
+const SSCAN_STRATS = ['Straddle','Strangle','Iron butterfly','Iron condor','Bull call spread','Bear put spread'];
+const STRAT_CHART_MAP = { 'Straddle': 'straddle', 'Strangle': 'strangle', 'Bull call spread': 'bullcall', 'Bear put spread': 'bearput', 'Iron condor': 'condor', 'Iron butterfly': 'ironfly' };
 function renderTemplates() {
   ['bullish','bearish','neutral'].forEach(cat => {
     const list = TEMPLATES.filter(t => t.cat === cat);
@@ -1703,6 +1773,7 @@ function renderTemplates() {
         <div class="strat-legs">${t.legs}</div>
         <div class="strat-assets">${assetChips(t.assets)}</div>
         ${stratSpecsChartable(t.defLegs) ? `<button class="strat-chart-btn" onclick="event.stopPropagation();openTemplateCandles(${TEMPLATES.indexOf(t)})">View BTC candles ↗</button>` : ''}
+        ${SSCAN_STRATS.indexOf(t.name) !== -1 ? `<button class="strat-chart-btn" style="margin-left:6px" onclick="event.stopPropagation();openSScan(null,'${t.name}')">Scan for entry ↗</button>` : ''}
       </div>
     `).join('');
   });
@@ -2054,6 +2125,267 @@ function saveScanner() {
 populateScanAssetSelect();
 renderScanTemplates();
 renderSavedScanners();
+
+/* ---------- Strategy scanner (combined options strategies, entry conditions on the underlying) ---------- */
+const SSCAN_KEY = 'tradepro_strat_scans_v1';
+const SSCAN_TFS = ['5m','15m','30m','1h','4h','1d'];
+const SSCAN_REFS = [{ k:'ema', label:'EMA' }, { k:'sma', label:'SMA' }, { k:'st', label:'Supertrend' }];
+let sscans = [
+  { name:'Short straddle — below EMA 9, EMA 20 & Supertrend', strat:'Straddle', side:'Sell', und:'BTC,ETH', tf:'15m', fresh:false,
+    conds:[{ op:'below', k:'ema', p:9 },{ op:'below', k:'ema', p:20 },{ op:'below', k:'st', p:10, m:3 }] },
+];
+try { const v = JSON.parse(localStorage.getItem(SSCAN_KEY) || 'null'); if (Array.isArray(v)) sscans = v; } catch (e) { /* storage unavailable */ }
+function persistSScans() { try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ } }
+let sscanResults = {};   // scan index -> { at, rows:[{und, ok, price, details, err}] }
+let sscanDraft = null, sscanEditing = null, sscanAutoTimer = null, sscanBusy = false;
+const sscanEsc = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+const sscanTime = sec => new Date(sec * 1000).toISOString().slice(5, 16).replace('T', ' ') + ' UTC';
+let scanOverlay = null, scanOverlayTimer = null;   // activation markers drawn on the combined-strategy chart
+const sscanFmt = v => v == null ? '–' : v.toLocaleString('en-US', { maximumFractionDigits: v >= 100 ? 1 : 4 });
+function sscanRefLabel(c) { return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
+function sscanSummary(sc) { return sc.conds.map(c => 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · '); }
+
+function renderSScans() {
+  const el = document.getElementById('sscan-list');
+  if (!el) return;
+  document.getElementById('sscan-count').textContent = sscans.length ? `(${sscans.length})` : '';
+  if (!sscans.length) { el.innerHTML = '<div class="saved-empty">No strategy scans yet — tap “New strategy scan”.</div>'; return; }
+  el.innerHTML = sscans.map((sc, i) => {
+    const r = sscanResults[i];
+    const sideCol = sc.side === 'Sell' ? 'var(--red)' : 'var(--green)';
+    let res = '';
+    if (r) {
+      res = r.rows.map(row => {
+        if (row.err) return `<div class="strat-legs" style="margin-top:6px"><b>${row.und}</b> — could not scan: ${sscanEsc(row.err)}</div>`;
+        const chip = row.ok ? `<span style="color:var(--green); font-weight:700">MATCH</span>` : `<span style="color:var(--text-faint); font-weight:600">no match</span>`;
+        const lines = row.details.map(d => `<div style="font-size:11.5px; color:${d.ok ? 'var(--green)' : 'var(--text-muted)'}">${d.ok ? '✓' : '✗'} ${sscanEsc(d.text)}</div>`).join('');
+        const when = row.lastActSec ? `<div style="font-size:11.5px; margin-top:4px; color:var(--text-muted)">${row.ok ? 'Active since' : 'Last activated'} <b>${sscanTime(row.lastActSec)}</b> · ${row.barsSince === 0 ? 'this candle' : row.barsSince + ' candle' + (row.barsSince > 1 ? 's' : '') + ' ago'} · ${row.actCount} activation${row.actCount > 1 ? 's' : ''} in the last ~400 candles</div>` : `<div style="font-size:11.5px; margin-top:4px; color:var(--text-faint)">Not activated in the last ~400 candles</div>`;
+        const open = row.actCount || row.ok ? `<button class="strat-chart-btn" onclick="openSScanChart(${i},'${row.und}')">Show ${sscanEsc(sc.side)} ${sscanEsc(sc.strat)} chart with activations ↗</button>` : '';
+        return `<div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border)">
+          <div style="display:flex; justify-content:space-between; font-size:13px"><span><b>${row.und}</b> · close ${sscanFmt(row.price)}</span>${chip}</div>
+          ${lines}${when}${open}</div>`;
+      }).join('') + `<div style="font-size:10.5px; color:var(--text-faint); margin-top:6px">scanned ${new Date(r.at).toISOString().slice(11,19)} UTC</div>`;
+    }
+    return `<div class="strat-card" style="cursor:default">
+      <div class="strat-card-top">
+        <div class="strat-name">${sscanEsc(sc.name)}</div>
+        <div style="display:flex; gap:6px">
+          <button class="strat-chart-btn" style="margin:0" onclick="runSScan(${i})">Scan</button>
+          <button class="strat-chart-btn" style="margin:0" onclick="openSScan(${i})">Edit</button>
+          <button class="saved-remove" aria-label="Remove scan" onclick="removeSScan(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-8 0 1 13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-13"/></svg></button>
+        </div>
+      </div>
+      <div class="strat-legs"><b style="color:${sideCol}">${sc.side === 'Sell' ? 'Sell' : 'Buy'}</b> ${sscanEsc(sc.strat)} · ${sc.und.replace(',', ' + ')} · ${sc.tf}${sc.fresh ? ' · first signal only' : ''}</div>
+      <div class="strat-legs">${sscanEsc(sscanSummary(sc))}</div>
+      ${res}
+    </div>`;
+  }).join('');
+}
+function removeSScan(i) { const gone = sscans[i]; sscans.splice(i, 1); sscanResults = {}; persistSScans(); if (gone && gone.name === sscanApplied) { sscanApplied = null; sscanApplyRefresh(); } renderSScans(); sscanFillApply(); }
+
+/* ---- builder modal ---- */
+function setSScanSide(side) {
+  sscanDraft.side = side;
+  document.querySelectorAll('#sscan-side .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.side === side));
+}
+function renderSScanConds() {
+  document.getElementById('sscan-conds').innerHTML = sscanDraft.conds.map((c, i) => `
+    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px">
+      <span style="font-size:13px; color:var(--text-muted)">Close</span>
+      <select class="field-input" style="width:84px" onchange="sscanDraft.conds[${i}].op=this.value">
+        <option value="below" ${c.op==='below'?'selected':''}>below</option><option value="above" ${c.op==='above'?'selected':''}>above</option>
+      </select>
+      <select class="field-input" style="width:112px" onchange="sscanSetRef(${i},this.value)">
+        ${SSCAN_REFS.map(r => `<option value="${r.k}" ${c.k===r.k?'selected':''}>${r.label}</option>`).join('')}
+      </select>
+      <input class="field-input" style="width:58px" type="number" min="1" value="${c.p}" title="${c.k==='st'?'ATR period':'Period'}" oninput="sscanDraft.conds[${i}].p=Math.max(1,parseInt(this.value)||1)">
+      ${c.k === 'st' ? `<input class="field-input" style="width:58px" type="number" min="0.1" step="0.1" value="${c.m}" title="Multiplier" oninput="sscanDraft.conds[${i}].m=Math.max(0.1,parseFloat(this.value)||3)">` : ''}
+      <button class="leg-remove" aria-label="Remove condition" onclick="sscanDraft.conds.splice(${i},1);renderSScanConds()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>`).join('');
+}
+function sscanSetRef(i, k) {
+  const c = sscanDraft.conds[i];
+  c.k = k;
+  if (k === 'st') { c.p = 10; c.m = 3; } else { delete c.m; if (c.p === 10 && c.m == null) c.p = 20; }
+  renderSScanConds();
+}
+function sscanAddCond() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell' ? 'below' : 'above', k: 'ema', p: 20 }); renderSScanConds(); }
+function openSScan(idx, stratName) {
+  sscanEditing = idx == null ? null : idx;
+  sscanDraft = idx == null
+    ? { name: '', strat: stratName || 'Straddle', side: 'Sell', und: 'BTC', tf: '15m', fresh: false, conds: [{ op:'below', k:'ema', p:9 }, { op:'below', k:'ema', p:20 }, { op:'below', k:'st', p:10, m:3 }] }
+    : JSON.parse(JSON.stringify(sscans[idx]));
+  if (idx == null && stratName && /^Iron/.test(stratName)) sscanDraft.side = 'Sell';
+  document.getElementById('sscan-name').value = sscanDraft.name;
+  document.getElementById('sscan-strat').innerHTML = SSCAN_STRATS.map(n => `<option ${n === sscanDraft.strat ? 'selected' : ''}>${n}</option>`).join('');
+  document.getElementById('sscan-und').value = sscanDraft.und;
+  document.getElementById('sscan-tf').innerHTML = SSCAN_TFS.map(t => `<option ${t === sscanDraft.tf ? 'selected' : ''}>${t}</option>`).join('');
+  document.getElementById('sscan-tf').onchange = e => { sscanDraft.tf = e.target.value; };
+  document.getElementById('sscan-fresh').checked = !!sscanDraft.fresh;
+  setSScanSide(sscanDraft.side);
+  renderSScanConds();
+  document.getElementById('sscan-overlay').classList.add('open');
+}
+function closeSScan() { document.getElementById('sscan-overlay').classList.remove('open'); if (sscanFromChart) { sscanFromChart = false; sscanFillApply(); } }
+function saveSScan() {
+  const d = sscanDraft;
+  d.name = document.getElementById('sscan-name').value.trim() || (d.side === 'Sell' ? 'Short ' : 'Long ') + d.strat.toLowerCase() + ' scan';
+  if (!d.conds.length) { alert('Add at least one condition.'); return; }
+  if (sscanEditing == null) { sscans.unshift(d); sscanEditing = 0; } else sscans[sscanEditing] = d;
+  const idx = sscanEditing, applyToChart = sscanFromChart || sscanApplied === d.name;
+  sscanFromChart = false;
+  sscanResults = {};
+  persistSScans(); renderSScans(); closeSScan();
+  if (applyToChart) { sscanApplied = d.name; sscanApplyRefresh(); }
+  sscanFillApply();
+  runSScan(idx);
+}
+
+/* ---- scanning ---- */
+const sscanCache = {};   // 'BTCUSD|15m' -> { at, candles } so several scans share one fetch
+async function sscanCandles(und, res) {
+  const key = und + 'USD|' + res, hit = sscanCache[key];
+  if (hit && Date.now() - hit.at < 20000) return hit.candles;
+  const secs = LIVE_RES[res], end = Math.floor(Date.now() / 1000);
+  const json = await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(und + 'USD')}&resolution=${res}&start=${end - secs * 400}&end=${end}`);
+  let candles = liveParseRestCandles(json, res);
+  const last = candles[candles.length - 1];
+  if (last) { const ts = liveTimeToSec(last.t); if (ts != null && ts + secs > end) candles = candles.slice(0, -1); } // drop the still-forming candle
+  sscanCache[key] = { at: Date.now(), candles };
+  return candles;
+}
+function sscanRefLine(candles, c) {
+  const closes = candles.map(x => x.c);
+  if (c.k === 'ema') return emaSeries(closes, c.p);
+  if (c.k === 'sma') return smaSeries(closes, c.p);
+  return supertrendSeries(candles, c.p, c.m).line;
+}
+function sscanAllSeries(candles, conds) { // boolean per candle: are ALL conditions true on that candle's close?
+  const lines = conds.map(c => sscanRefLine(candles, c));
+  return candles.map((cd, i) => conds.every((c, j) => {
+    const v = lines[j][i];
+    return v != null && (c.op === 'below' ? cd.c < v : cd.c > v);
+  }));
+}
+function sscanEval(candles, conds) {
+  const lines = conds.map(c => sscanRefLine(candles, c));
+  const at = i => conds.map((c, j) => {
+    const px = candles[i].c, v = lines[j][i];
+    if (v == null) return { ok: false, text: 'Close vs ' + sscanRefLabel(c) + ' — not enough candles' };
+    const ok = c.op === 'below' ? px < v : px > v;
+    return { ok, text: `Close ${sscanFmt(px)} ${c.op === 'below' ? '<' : '>'} ${sscanRefLabel(c)} ${sscanFmt(v)}` };
+  });
+  const n = candles.length - 1;
+  const now = at(n), prev = n > 0 ? at(n - 1) : null;
+  const all = sscanAllSeries(candles, conds);
+  const acts = [];                       // candles where the conditions FIRST turned true
+  all.forEach((a, i) => { if (a && (i === 0 || !all[i - 1])) acts.push(i); });
+  const lastIdx = acts.length ? acts[acts.length - 1] : -1;
+  return { details: now, allNow: now.every(d => d.ok), allPrev: prev ? prev.every(d => d.ok) : false, price: candles[n].c,
+           lastActSec: lastIdx >= 0 ? liveTimeToSec(candles[lastIdx].t) : null, barsSince: lastIdx >= 0 ? n - lastIdx : null, actCount: acts.length };
+}
+async function runSScan(i) {
+  const sc = sscans[i];
+  if (!sc) return;
+  sscanResults[i] = { at: Date.now(), rows: sc.und.split(',').map(u => ({ und: u, ok: false, price: null, details: [{ ok: false, text: 'scanning…' }] })) };
+  renderSScans();
+  const rows = [];
+  for (const und of sc.und.split(',')) {
+    try {
+      const candles = await sscanCandles(und, sc.tf);
+      if (candles.length < 5) throw new Error('not enough candles returned');
+      const ev = sscanEval(candles, sc.conds);
+      rows.push({ und, price: ev.price, details: ev.details, ok: sc.fresh ? ev.allNow && !ev.allPrev : ev.allNow, lastActSec: ev.lastActSec, barsSince: ev.barsSince, actCount: ev.actCount });
+    } catch (e) { rows.push({ und, err: liveErrText(e) }); }
+  }
+  sscanResults[i] = { at: Date.now(), rows };
+  renderSScans();
+}
+async function runAllSScans() {
+  if (sscanBusy) return;
+  sscanBusy = true;
+  try { for (let i = 0; i < sscans.length; i++) await runSScan(i); } finally { sscanBusy = false; }
+}
+function sscanToggleAuto() {
+  if (sscanAutoTimer) { clearInterval(sscanAutoTimer); sscanAutoTimer = null; }
+  if (document.getElementById('sscan-auto').checked) {
+    runAllSScans();
+    sscanAutoTimer = setInterval(() => { const v = document.getElementById('view-scanner'); if (v && v.style.display !== 'none') runAllSScans(); }, 60000);
+  }
+}
+async function sscanBuildOverlay(sc, und) { // every candle (up to ~1000 bars) where the scan's conditions first turned true
+  const res = sc.tf, secs = LIVE_RES[res], end = Math.floor(Date.now() / 1000);
+  const json = await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(und + 'USD')}&resolution=${res}&start=${end - secs * LIVE_HISTORY_BARS}&end=${end}`);
+  let candles = liveParseRestCandles(json, res);
+  const last = candles[candles.length - 1];
+  if (last) { const ts = liveTimeToSec(last.t); if (ts != null && ts + secs > end) candles = candles.slice(0, -1); }
+  const all = sscanAllSeries(candles, sc.conds), times = [];
+  all.forEach((a, i) => { if (a && (i === 0 || !all[i - 1])) times.push(liveTimeToSec(candles[i].t)); });
+  return { times: new Set(times), list: times, und, name: sc.name, side: sc.side };
+}
+async function openSScanChart(i, und) {
+  const sc = sscans[i];
+  const t = sc && TEMPLATES.find(x => x.name === sc.strat);
+  if (!t) return;
+  let overlay = null;
+  try { overlay = await sscanBuildOverlay(sc, und); } catch (e) { overlay = null; }
+  await openStrategyFromSpecs((sc.side === 'Sell' ? 'Short ' : 'Long ') + sc.strat.toLowerCase(), und, { specs: t.defLegs }, sc.side, { tf: sc.tf, overlay });
+}
+/* ---- apply a scan straight onto the open strategy chart (uses the chart's own timeframe) ---- */
+let sscanApplied = null, sscanApplyToken = 0, sscanFromChart = false;
+const SSCAN_TYPE_NAMES = { straddle: 'Straddle', strangle: 'Strangle', ironfly: 'Iron butterfly', condor: 'Iron condor', bullcall: 'Bull call spread', bearput: 'Bear put spread' };
+function sscanFillApply() {
+  const sel = document.getElementById('live-scan-apply');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Off</option>' +
+    sscans.map(sc => `<option value="${sscanEsc(sc.name)}" ${sc.name === sscanApplied ? 'selected' : ''}>${sscanEsc(sc.name)} · ${sc.side}</option>`).join('') +
+    '<option value="__new">+ New scan for this chart…</option>';
+  if (!sscanApplied) sel.value = '';
+}
+function sscanApplyChange(v) {
+  if (v === '__new') {
+    sscanFromChart = true;
+    sscanFillApply();
+    openSScan(null, SSCAN_TYPE_NAMES[LIVE.strat.type] || 'Straddle');
+    return;
+  }
+  sscanApplied = v || null;
+  sscanApplyRefresh();
+}
+async function sscanApplyRefresh() {
+  const info = document.getElementById('live-scan-info');
+  const token = ++sscanApplyToken;
+  const draw = () => { try { renderChart(); } catch (e) { /* chart not ready yet */ } };
+  if (!sscanApplied) { scanOverlay = null; if (info) info.textContent = ''; draw(); return; }
+  if (!liveMode || LIVE.kind !== 'strategy' || !LIVE.stratSymbol) return;
+  const sc = sscans.find(x => x.name === sscanApplied);
+  if (!sc) { sscanApplied = null; scanOverlay = null; sscanFillApply(); if (info) info.textContent = ''; draw(); return; }
+  const und = LIVE.strat.und, res = LIVE.res, symbol = LIVE.stratSymbol;
+  if (info) info.textContent = `Scanning ${und} on ${res}…`;
+  try {
+    const ov = await sscanBuildOverlay(Object.assign({}, sc, { tf: res }), und);
+    if (token !== sscanApplyToken || sscanApplied !== sc.name) return;
+    scanOverlay = Object.assign({}, ov, { symbol });
+    const n = ov.list.length;
+    if (info) info.textContent = n ? `${sc.side === 'Sell' ? 'SELL' : 'BUY'} signals: ${n} on ${und} ${res} · latest ${sscanTime(ov.list[n - 1])}` : `No ${sc.side === 'Sell' ? 'SELL' : 'BUY'} signals on ${und} ${res} in this range`;
+    sscanOverlayWatch();
+    draw();
+  } catch (e) {
+    if (token === sscanApplyToken && info) info.textContent = 'Could not scan — ' + liveErrText(e);
+  }
+}
+function sscanOverlayWatch() { // keep the markers current while that strategy chart stays open
+  clearInterval(scanOverlayTimer); scanOverlayTimer = null;
+  if (!scanOverlay) return;
+  scanOverlayTimer = setInterval(async () => {
+    const ov = scanOverlay;
+    if (!ov || !liveMode || LIVE.kind !== 'strategy' || LIVE.stratSymbol !== ov.symbol) { clearInterval(scanOverlayTimer); scanOverlayTimer = null; return; }
+    const sc = sscans.find(x => x.name === ov.name);
+    if (!sc) return;
+    try { const fresh = await sscanBuildOverlay(Object.assign({}, sc, { tf: LIVE.res }), ov.und); scanOverlay = Object.assign({}, ov, { times: fresh.times, list: fresh.list }); renderChart(); } catch (e) { /* try again next minute */ }
+  }, 60000);
+}
+renderSScans();
 
 function spark(points, color) {
   const w = 64, h = 24;
@@ -4586,6 +4918,18 @@ function renderChart(forceEnd) {
     }
   });
 
+  // scanner activations: a diamond on every candle where a Strategy-scanner scan first turned true
+  if (typeof scanOverlay !== 'undefined' && scanOverlay && liveMode && LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol) {
+    const col = scanOverlay.side === 'Sell' ? '#F6465D' : '#2EBD85', tag = scanOverlay.side === 'Sell' ? 'SELL' : 'BUY';
+    for (let i = 0; i < replayIndex; i++) {
+      const sec = liveTimeToSec(replayCandles[i].t);
+      if (sec == null || !scanOverlay.times.has(sec)) continue;
+      const x = xAt(i), y = clampY(yAt(replayCandles[i].h) - 16);
+      signalMarkers += `<path d="M${x.toFixed(2)},${(y-7).toFixed(2)} L${(x+6).toFixed(2)},${y.toFixed(2)} L${x.toFixed(2)},${(y+7).toFixed(2)} L${(x-6).toFixed(2)},${y.toFixed(2)} Z" fill="${col}" stroke="var(--bg, #000)" stroke-width="1"/>`;
+      signalMarkers += `<text x="${x.toFixed(2)}" y="${(y-11).toFixed(2)}" font-size="9" font-weight="700" text-anchor="middle" fill="${col}" font-family="var(--mono)">${tag}</text>`;
+    }
+  }
+
   /* ---- Oscillator panes: each instance gets its OWN stacked pane, so RSI + MACD +
      Stochastic can all coexist without fighting over one shared 0-100 scale. ---- */
   oscInstances.forEach((inst, pi) => {
@@ -5087,24 +5431,56 @@ function initChartDrag() {
   // capturing the gesture (or fighting our handler for it) before our JS ever got a clean
   // read on it. touch-action: pan-x on .chart-scroll (above) plus preventDefault() here stop
   // the browser from treating this as a page zoom, so the two-finger gesture reaches us.
-  let pinchStartDist = null, pinchStartPx = null;
+  // NOTE: renderChart() replaces the SVG via innerHTML on every zoom step, which detaches the
+  // element the fingers first touched. Browsers keep sending touch events to that ORIGINAL
+  // target, and once it's detached they no longer bubble up to `wrap` — so listeners on `wrap`
+  // died after the first frame. We therefore bind the move/end listeners to the original
+  // touch target for the life of the gesture, and anchor the zoom on the pinch midpoint.
+  let pinchStartDist = null, pinchStartPx = null, pinchAnchor = null, pinchRaf = 0, pinchTarget = null;
+  const pinchDist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const pinchMove = e => {
+    if (!pinchStartDist || e.touches.length < 2) return;
+    if (e.cancelable) e.preventDefault();
+    const ratio = pinchDist(e.touches) / pinchStartDist;
+    const next = Math.round(Math.max(CANDLE_PX_MIN, Math.min(CANDLE_PX_MAX, pinchStartPx * ratio)));
+    if (next === candlePx) return;
+    candlePx = next;
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    if (pinchRaf) return;
+    pinchRaf = requestAnimationFrame(() => {
+      pinchRaf = 0;
+      const rect = wrap.getBoundingClientRect();
+      const px = midX - rect.left;
+      const pad = chartGeom ? chartGeom.PAD : 0;
+      const oldPx = chartGeom ? chartGeom.CANDLE_PX : candlePx;
+      const candleAtMid = (wrap.scrollLeft + px - pad) / oldPx; // candle index under the fingers
+      renderChart();
+      // renderChart restores the old scrollLeft in its own rAF; override it right after, so the
+      // candles under your fingers stay put while zooming
+      requestAnimationFrame(() => { wrap.scrollLeft = pad + candleAtMid * candlePx - px; });
+    });
+  };
+  const pinchEnd = e => {
+    if (e.touches && e.touches.length >= 2) return;
+    pinchStartDist = null;
+    if (pinchTarget) {
+      pinchTarget.removeEventListener('touchmove', pinchMove);
+      pinchTarget.removeEventListener('touchend', pinchEnd);
+      pinchTarget.removeEventListener('touchcancel', pinchEnd);
+      pinchTarget = null;
+    }
+  };
   wrap.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      pinchStartDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      pinchStartPx = candlePx;
-    }
+    if (e.touches.length !== 2) return;
+    if (e.cancelable) e.preventDefault();
+    pinchStartDist = pinchDist(e.touches);
+    pinchStartPx = candlePx;
+    if (pinchTarget) pinchEnd({ touches: [] });
+    pinchTarget = e.target;
+    pinchTarget.addEventListener('touchmove', pinchMove, { passive: false });
+    pinchTarget.addEventListener('touchend', pinchEnd);
+    pinchTarget.addEventListener('touchcancel', pinchEnd);
   }, { passive: false });
-  wrap.addEventListener('touchmove', e => {
-    if (e.touches.length === 2 && pinchStartDist) {
-      e.preventDefault();
-      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      const ratio = dist / pinchStartDist;
-      candlePx = Math.round(Math.max(CANDLE_PX_MIN, Math.min(CANDLE_PX_MAX, pinchStartPx * ratio)));
-      renderChart(); // keep current scroll position instead of snapping to the latest candle every frame
-    }
-  }, { passive: false });
-  wrap.addEventListener('touchend', e => { if (e.touches.length < 2) pinchStartDist = null; });
 }
 
 /* ---------- Drawing handle drag (reposition existing drawings) ---------- */
@@ -6081,6 +6457,8 @@ function liveApplyKindUi() {
   ['rc-live-ot-wrap', 'rc-live-strike-wrap'].forEach(id => show(id, opt));
   ['rc-live-strat-wrap', 'rc-live-center-wrap'].forEach(id => show(id, strat));
   show('rc-live-sw-wrap', strat && !!STRAT_DEFS[LIVE.strat.type].w);
+  show('rc-live-scan-wrap', strat);
+  if (strat && typeof sscanFillApply === 'function') sscanFillApply();
   const k = document.getElementById('live-kind');
   if (k) k.value = LIVE.kind;
   const pt = document.getElementById('oc-panel-title');
@@ -6607,7 +6985,8 @@ function clDelete() {
   liveCustomRender();
 }
 
-async function openStrategyFromSpecs(name, und, input) { // from a Strategies-tab card: input = {specs:[{action,type,strike}]} or {offsets:[{t,o,w}]}
+async function openStrategyFromSpecs(name, und, input, side, opts) { // from a Strategies-tab card: input = {specs:[{action,type,strike}]} or {offsets:[{t,o,w}]}
+  if (!(opts && opts.overlay)) scanOverlay = null;
   showView('replay');
   LIVE.fromStrategies = true;
   if (!liveMode) setDataMode('live');
@@ -6639,11 +7018,20 @@ async function openStrategyFromSpecs(name, und, input) { // from a Strategies-ta
   LIVE.clMsg = '';
   if (known && net < 0) { legs = legs.map(l => ({ t: l.t, o: l.o, w: -l.w })); LIVE.clMsg = 'This is a net credit strategy, so it is charted as a positive premium (Buy/Sell on each leg flipped). Sell it to take the usual trade.'; }
   st.type = 'custom'; st.legs = legs; st.center = center;
+  if (side === 'Sell' && !LIVE.clMsg) LIVE.clMsg = 'Charted as the structure\'s premium — use Sell to short it.';
   LIVE.kind = 'strategy';
   liveRenderStratSelectors(null);
   if (!LIVE.stratSymbol) { liveSetStatus('error', 'Could not build that strategy from the listed strikes'); return; }
   LIVE.stratNames[LIVE.stratSymbol] = name;
+  if (opts && opts.tf) { const tfSel = document.getElementById('live-timeframe'); if (tfSel) tfSel.value = opts.tf; }
+  if (opts && opts.overlay) {
+    scanOverlay = Object.assign({}, opts.overlay, { symbol: LIVE.stratSymbol });
+    sscanApplied = opts.overlay.name; sscanFillApply();
+    const n = opts.overlay.list.length, lastSec = n ? opts.overlay.list[n - 1] : null;
+    LIVE.clMsg = (LIVE.clMsg ? LIVE.clMsg + ' ' : '') + (n ? `Scan “${opts.overlay.name}” activated ${n} time${n > 1 ? 's' : ''} in this range — marked ◆ on the chart (latest ${sscanTime(lastSec)}).` : `Scan “${opts.overlay.name}” has not activated in this range.`);
+  }
   liveSwitch('Opened from Strategies');
+  if (opts && opts.overlay) { sscanOverlayWatch(); try { renderChart(); } catch (e) { /* chart not ready yet */ } }
 }
 async function openStrategyChart(type) { // from the Strategies tab
   if (!STRAT_DEFS[type]) return;
@@ -6710,6 +7098,7 @@ function liveSwitch(reason) {
   LIVE.symbol = sym; LIVE.res = res;
   if (!/^[CP]-/.test(sym)) LIVE.lastPerp = sym;
   scheduleSave();
+  if (typeof sscanApplyRefresh === 'function') sscanApplyRefresh();
   liveStart();
 }
 function liveReconnect() { if (liveMode) liveStart(); }
