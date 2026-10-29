@@ -1338,6 +1338,17 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg>
               </button>
             </div>
+            <div class="zoom-cluster" title="Price (vertical) zoom — widen the range to see far strikes' OI">
+              <button class="zoom-btn" aria-label="Price range wider (zoom out vertically)" onclick="priceZoomChart(-1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/></svg>
+              </button>
+              <button class="zoom-btn" aria-label="Price range tighter (zoom in vertically)" onclick="priceZoomChart(1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v7M8 6l4 4 4-4M12 21v-7M8 18l4-4 4 4"/></svg>
+              </button>
+              <button class="zoom-btn" aria-label="Scroll price up" onclick="priceShiftChart(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 15l6-6 6 6"/></svg></button>
+              <button class="zoom-btn" aria-label="Scroll price down" onclick="priceShiftChart(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+              <button class="zoom-btn" id="pz-fit" aria-label="Reset price scale to auto-fit" onclick="priceFit()" style="width:auto;padding:0 7px;font-size:11px;font-weight:700">Fit</button>
+            </div>
           </div>
           <div class="panel-body">
             <div class="chart-body-row">
@@ -3538,6 +3549,16 @@ let replayTimer = null;
 let replaySpeed = 1;
 let candlePx = 12; // current zoom level — px per candle, adjustable via zoomChart()
 const CANDLE_PX_MIN = 3, CANDLE_PX_MAX = 36;
+// Vertical (price-axis) zoom: 1 = auto-fit to the visible candles; >1 widens the price range so far-away strikes (and their OI bars) come into view.
+let priceZoom = 1, priceShift = 0;   // priceShift = range fraction the view is moved up (+) / down (-)
+const PRICE_ZOOM_MIN = 0.25, PRICE_ZOOM_MAX = 40;
+function priceZoomChart(dir) { // dir < 0 = zoom out (wider range), > 0 = zoom in
+  priceZoom = Math.max(PRICE_ZOOM_MIN, Math.min(PRICE_ZOOM_MAX, dir < 0 ? priceZoom * 1.6 : priceZoom / 1.6));
+  renderChart(true); pzLabel();
+}
+function priceShiftChart(dir) { priceShift += dir * 0.3 * Math.min(priceZoom, 3); renderChart(true); pzLabel(); }
+function priceFit() { priceZoom = 1; priceShift = 0; renderChart(true); pzLabel(); }
+function pzLabel() { const b = document.getElementById('pz-fit'); if (b) b.textContent = priceZoom === 1 && !priceShift ? 'Fit' : (priceZoom >= 10 ? Math.round(priceZoom) : priceZoom.toFixed(1)) + '×'; }
 let chartType = 'candles'; // 'candles' | 'heikinashi' | 'renko' — which style renderChart draws
 let renkoBrickSize = null; // null = auto-sized from recent volatility; set once the user edits it
 let chartDisplayCandles = []; // whatever renderChart actually drew (real candles, HA candles, or Renko bricks) — what the crosshair/readout read against
@@ -5764,7 +5785,11 @@ function renderChart(forceEnd) {
   // the visible candles only; any marker that falls outside it still draws (see priceLines
   // below), just pinned to the chart's top/bottom edge via clampY, same as its price tag.
   const padY = (winHigh - winLow) * 0.1 || Math.max(winHigh * 0.01, 1);
-  const yMax = winHigh + padY, yMin = winLow - padY;
+  let yMax = winHigh + padY, yMin = winLow - padY;
+  if (priceZoom !== 1 || priceShift) {   // manual vertical zoom / scroll around the visible candles' midpoint
+    const rng = yMax - yMin, mid = (yMax + yMin) / 2 + priceShift * rng, half = rng / 2 * priceZoom;
+    yMax = mid + half; yMin = mid - half;
+  }
   const maxVol = Math.max(...yCandles.map(c => c.v), 1);
 
   const RIGHT_MARGIN_CANDLES = 3; // breathing room so the last candle never sits flush under the price tag
@@ -6036,21 +6061,28 @@ function renderChart(forceEnd) {
   // scanner signals, evaluated on THIS chart's candles: one entry per cycle, then an exit when every condition flips
   if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && liveMode && (scanOverlay.perp ? LIVE.kind === 'perp' : scanOverlay.opt ? (LIVE.kind === 'options' && LIVE.symbol === scanOverlay.symbol) : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
     const isSell = scanOverlay.side === 'Sell';
-    const entCol = isSell ? '#F6465D' : '#2EBD85', exCol = isSell ? '#2EBD85' : '#F6465D';
+    // Direction decides the look, not entry/exit: every BUY-type signal (BUY entry, BUY EXIT) sits BELOW the candle as a blue
+    // up-arrow, every SELL-type signal (SELL entry, SELL EXIT) sits ABOVE the candle as a yellow down-arrow, so they never blend with the green/red candles.
     const entTag = isSell ? 'SELL' : 'BUY', exTag = isSell ? 'BUY EXIT' : 'SELL EXIT';
+    const BUY_COL = '#2F9BFF', SELL_COL = '#FFD60A';
     const { sig, cs } = sscanChartSignals(scanOverlay);
     if (!scanOverlay.perp && !scanOverlay.opt) try { sperfLogFromChart(scanOverlay, sig, cs); } catch (e) { /* logging must never break the chart */ }
-    const dia = (x, y, col) => `<path d="M${x.toFixed(2)},${(y-7).toFixed(2)} L${(x+6).toFixed(2)},${y.toFixed(2)} L${x.toFixed(2)},${(y+7).toFixed(2)} L${(x-6).toFixed(2)},${y.toFixed(2)} Z" fill="${col}" stroke="var(--bg, #000)" stroke-width="1"/>`;
-    sig.entries.forEach(i => {
-      if (i < drawLo || i > drawHi) return;
-      const x = xAt(i), y = clampY(yAt(cs[i].h) - 16);
-      signalMarkers += dia(x, y, entCol) + `<text x="${x.toFixed(2)}" y="${(y-11).toFixed(2)}" font-size="9" font-weight="700" text-anchor="middle" fill="${entCol}" font-family="var(--mono)">${entTag}</text>`;
-    });
-    sig.exits.forEach(i => {
-      if (i < drawLo || i > drawHi) return;
-      const x = xAt(i), y = clampY(yAt(cs[i].l) + 16);
-      signalMarkers += dia(x, y, exCol) + `<text x="${x.toFixed(2)}" y="${(y+19).toFixed(2)}" font-size="9" font-weight="700" text-anchor="middle" fill="${exCol}" font-family="var(--mono)">${exTag}</text>`;
-    });
+    const arrow = (i, tag) => {
+      const isBuy = tag.indexOf('BUY') === 0, col = isBuy ? BUY_COL : SELL_COL, x = xAt(i), exit = /EXIT/.test(tag);
+      const top = GAP, bot = GAP + (BASE_H - GAP - VOLH - PAD);
+      const y = isBuy ? clampY(yAt(cs[i].l) + 22) : clampY(yAt(cs[i].h) - 22);            // arrow tip side
+      const pts = isBuy ? `${x.toFixed(2)},${(y - 11).toFixed(2)} ${(x - 10).toFixed(2)},${(y + 8).toFixed(2)} ${(x + 10).toFixed(2)},${(y + 8).toFixed(2)}`
+                        : `${x.toFixed(2)},${(y + 11).toFixed(2)} ${(x - 10).toFixed(2)},${(y - 8).toFixed(2)} ${(x + 10).toFixed(2)},${(y - 8).toFixed(2)}`;
+      const pw = tag.length * 6.6 + 12, ph = 17, py = isBuy ? y + 11 : y - 11 - ph;       // solid label pill beyond the arrow
+      const bw = Math.max(candlePx, 6);
+      return `<rect x="${(x - bw / 2).toFixed(2)}" y="${top.toFixed(1)}" width="${bw.toFixed(2)}" height="${(bot - top).toFixed(1)}" fill="${col}" fill-opacity="${exit ? .10 : .16}"/>` +   // full-height highlight column
+        `<line x1="${x.toFixed(2)}" y1="${top.toFixed(1)}" x2="${x.toFixed(2)}" y2="${bot.toFixed(1)}" stroke="${col}" stroke-width="1" stroke-dasharray="${exit ? '2,4' : '5,3'}" stroke-opacity=".75"/>` +
+        `<polygon points="${pts}" fill="${col}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>` +
+        `<rect x="${(x - pw / 2).toFixed(2)}" y="${py.toFixed(2)}" width="${pw.toFixed(2)}" height="${ph}" rx="4" fill="${col}" stroke="#fff" stroke-width="1.2"/>` +
+        `<text x="${x.toFixed(2)}" y="${(py + 12.2).toFixed(2)}" font-size="11" font-weight="900" text-anchor="middle" fill="${isBuy ? '#fff' : '#161200'}" font-family="var(--mono)">${tag}</text>`;
+    };
+    sig.entries.forEach(i => { if (i >= drawLo && i <= drawHi) signalMarkers += arrow(i, entTag); });
+    sig.exits.forEach(i => { if (i >= drawLo && i <= drawHi) signalMarkers += arrow(i, exTag); });
     const info = document.getElementById('live-scan-info');
     if (info) {
       const ne = sig.entries.length, nx = sig.exits.length, lastE = ne ? sig.entries[ne - 1] : -1;
