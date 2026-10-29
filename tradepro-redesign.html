@@ -1738,7 +1738,7 @@
       <button type="button" class="btn-ghost" onclick="sscanAddCond()">+ Add condition</button>
       <button type="button" class="btn-ghost" onclick="sscanAddGuppy()">+ Guppy condition</button>
       <button type="button" class="btn-ghost" onclick="sscanAddSqueeze()">+ EMA squeeze condition</button>
-      <button type="button" class="btn-ghost" onclick="sscanPresetSqueeze()" title="Ribbon squeezed, then close below the whole ribbon + below Supertrend (10,2), first signal only">★ EMA squeeze breakdown preset</button>
+      <button type="button" class="btn-ghost" onclick="sscanPresetSqueeze()" title="Ribbon squeezed then broken down + Guppy short EMAs below long EMAs + close below Supertrend (10,2), first signal only">★ Squeeze + Guppy + Supertrend preset</button>
       <button type="button" class="btn-ghost" onclick="sscanPresetGuppy()" title="Short EMAs 10,12,15 below long EMAs 30,35,40 + close below Supertrend (10,2), first signal only">★ Bearish Guppy + Supertrend preset</button>
 
       <label class="field-label" id="sscan-minprem-label">No entry if combined premium is below (USD, 0 = off)</label>
@@ -2158,6 +2158,7 @@ function renderScanTemplates() {
 let savedScanners = [
   { name:'Nifty golden cross watch', asset:'nifty', cat:'bullish', conds:[{ind:'MA 50', op:'crosses above', val:'MA 200'}] },
   { name:'BTC RSI overbought fade', asset:'btc', cat:'bearish', conds:[{ind:'RSI (14)', op:'crosses below', val:'70'}] },
+  { name:'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)', asset:'btc', cat:'bearish', note:'runs in Strategy scanner', conds:[{ind:'Guppy EMA ribbon',op:'squeezed, then breaks down',val:'ribbon low'},{ind:'Guppy short EMAs',op:'below',val:'long EMAs'},{ind:'Price',op:'less than',val:'Supertrend (10,2)'}] },
 ];
 
 function renderSavedScanners() {
@@ -2174,7 +2175,7 @@ function renderSavedScanners() {
       <span class="cat-dot" style="background:${s.cat === 'bullish' ? 'var(--green)' : 'var(--red)'}"></span>
       <div class="saved-info">
         <div class="saved-name">${s.name}</div>
-        <div class="saved-meta">${asset ? asset.name : s.asset} · ${s.conds.length} condition${s.conds.length>1?'s':''} · ${s.cat}</div>
+        <div class="saved-meta">${asset ? asset.name : s.asset} · ${s.conds.length} condition${s.conds.length>1?'s':''} · ${s.cat}${s.note ? ' · ' + s.note : ''}</div>
       </div>
       <button class="saved-remove" aria-label="Remove scanner" onclick="removeSavedScanner(${i})">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-8 0 1 13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-13"/></svg>
@@ -2291,6 +2292,17 @@ sscans.forEach(sc => {
 });
 // One-time: the built-in short straddle scan gets the 600 minimum-premium entry filter (only if it was never set).
 sscans.forEach(sc => { if (sc && sc.strat === 'Straddle' && sc.minPrem == null) sc.minPrem = 600; });
+// One-time: add the combined bearish scan (EMA squeeze -> breakdown + Guppy bearish crossover + below Supertrend). A flag stops it coming back if you delete it.
+try {
+  if (!localStorage.getItem('tradepro_seed_guppy_v2')) {
+    const old = ['Bearish Guppy crossover + below Supertrend (10,2)', 'EMA squeeze breakdown + below Supertrend (10,2)'];   // earlier separate seeds, replaced by the combined scan
+    sscans = sscans.filter(x => !(x && old.indexOf(x.name) !== -1));
+    const sc = { name:'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)', strat:'Straddle', side:'Sell', und:'BTC', tf:'5m', fresh:true, minPrem:600, sl:{ on:true, n:4, buf:2, mode:'fixed' },
+      conds:[{ op:'below', k:'gsq', a:1.0, n:10, m:3 }, { op:'below', k:'gmma', s:[10,12,15], l:[30,35,40], mode:'avg' }, { op:'below', k:'st', p:10, m:2 }] };
+    if (!sscans.some(x => x && x.name === sc.name)) sscans.push(sc);
+    localStorage.setItem('tradepro_seed_guppy_v2', '1');
+  }
+} catch (e) { /* storage unavailable */ }
 try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ }
 function persistSScans() { try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ } }
 let sscanResults = {};   // scan index -> { at, rows:[{und, ok, price, details, err}] }
@@ -2410,10 +2422,10 @@ function sscanAddGuppy() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell
 function sscanAddSqueeze() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell' ? 'below' : 'above', k: 'gsq', a: SSCAN_SQ.a, n: SSCAN_SQ.n, m: SSCAN_SQ.m }); renderSScanConds(); }
 function sscanPresetSqueeze() {   // EMA ribbon squeeze, then a close below the whole ribbon + below Supertrend (10,2); first signal only
   const d = sscanDraft, nm = document.getElementById('sscan-name');
-  d.conds = [{ op: 'below', k: 'gsq', a: SSCAN_SQ.a, n: SSCAN_SQ.n, m: SSCAN_SQ.m }, { op: 'below', k: 'st', p: 10, m: 2 }];
+  d.conds = [{ op: 'below', k: 'gsq', a: SSCAN_SQ.a, n: SSCAN_SQ.n, m: SSCAN_SQ.m }, { op: 'below', k: 'gmma', s: SSCAN_GMMA.s.slice(), l: SSCAN_GMMA.l.slice(), mode: 'avg' }, { op: 'below', k: 'st', p: 10, m: 2 }];
   d.fresh = true; document.getElementById('sscan-fresh').checked = true;
   setSScanSide('Sell');
-  if (!nm.value.trim()) nm.value = 'EMA squeeze breakdown + below Supertrend (10,2)';
+  if (!nm.value.trim()) nm.value = 'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)';
   renderSScanConds();
 }
 function sscanPresetGuppy() {   // Bearish Guppy crossover + close below Supertrend (10,2); fires on the first candle both are true
