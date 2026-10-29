@@ -1447,6 +1447,32 @@
               </div>
               <div class="ticket-row">
                 <div class="ticket-field">
+                  <label class="field-label">Stop-loss type</label>
+                  <select class="field-input" id="sla-mode" onchange="slaChange()">
+                    <option value="manual">Manual price</option>
+                    <option value="candles">Auto · high / low of last N candles</option>
+                  </select>
+                </div>
+              </div>
+              <div id="sla-cfg" style="display:none">
+                <div class="ticket-row">
+                  <div class="ticket-field">
+                    <label class="field-label">Candles (N)</label>
+                    <input class="field-input" id="sla-n" type="number" min="1" max="50" step="1" value="4" oninput="slaChange()">
+                  </div>
+                  <div class="ticket-field">
+                    <label class="field-label">Buffer</label>
+                    <input class="field-input" id="sla-buf" type="number" min="0" step="0.01" value="0.05" oninput="slaChange()">
+                  </div>
+                  <div class="ticket-field">
+                    <label class="field-label">Buffer unit</label>
+                    <select class="field-input" id="sla-unit" onchange="slaChange()"><option value="pct">% of level</option><option value="pts">price points</option></select>
+                  </div>
+                </div>
+                <div class="ticket-estimate" id="sla-preview" style="margin-top:6px"></div>
+              </div>
+              <div class="ticket-row">
+                <div class="ticket-field">
                   <label class="field-label">Stop loss <span style="color:var(--text-faint);font-weight:400;">(optional)</span></label>
                   <input class="field-input" id="ticket-sl" type="number" placeholder="Price">
                 </div>
@@ -1712,6 +1738,16 @@
 
       <label class="field-label" id="sscan-minprem-label">No entry if combined premium is below (USD, 0 = off)</label>
       <input class="field-input" id="sscan-minprem" type="number" min="0" step="10" placeholder="e.g. 600" oninput="sscanDraft.minPrem=Math.max(0,parseFloat(this.value)||0)">
+
+      <label style="font-size:12.5px; color:var(--text-muted); display:flex; gap:8px; align-items:center; margin-top:14px"><input type="checkbox" id="sscan-sl-on" onchange="sscanSlChange()"> <b style="color:var(--text);white-space:nowrap">Stop-loss</b> <span id="sscan-sl-title"></span></label>
+      <div id="sscan-sl-cfg" style="display:none; margin-top:8px">
+        <div style="display:flex; gap:8px">
+          <div style="flex:1"><label class="field-label">Candles (N)</label><input class="field-input" id="sscan-sl-n" type="number" min="1" max="50" step="1" oninput="sscanSlChange()"></div>
+          <div style="flex:1"><label class="field-label">Buffer (%)</label><input class="field-input" id="sscan-sl-buf" type="number" min="0" step="0.05" oninput="sscanSlChange()"></div>
+          <div style="flex:1.3"><label class="field-label">Mode</label><select class="field-input" id="sscan-sl-mode" onchange="sscanSlChange()"><option value="fixed">Fixed at entry</option><option value="trail">Trailing (tightens)</option></select></div>
+        </div>
+        <div id="sscan-sl-hint" style="font-size:11.5px; color:var(--text-faint); margin-top:6px"></div>
+      </div>
 
       <label style="font-size:12.5px; color:var(--text-muted); display:flex; gap:8px; align-items:center; margin-top:12px"><input type="checkbox" id="sscan-fresh" onchange="sscanDraft.fresh=this.checked"> Only flag the first candle where all conditions turn true</label>
     </div>
@@ -2259,7 +2295,7 @@ const sscanTime = sec => new Date(sec * 1000 + 19800000).toISOString().slice(5, 
 let scanOverlay = null, scanOverlayTimer = null;   // activation markers drawn on the combined-strategy chart
 const sscanFmt = v => v == null ? '–' : v.toLocaleString('en-US', { maximumFractionDigits: v >= 100 ? 1 : 4 });
 function sscanRefLabel(c) { return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
-function sscanSummary(sc) { return sc.conds.map(c => 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · ') + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : ''); }
+function sscanSummary(sc) { return sc.conds.map(c => 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · ') + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); }
 
 function renderSScans() {
   const el = document.getElementById('sscan-list');
@@ -2303,6 +2339,19 @@ function removeSScan(i) { const gone = sscans[i]; sscans.splice(i, 1); sscanResu
 function setSScanSide(side) {
   sscanDraft.side = side;
   document.querySelectorAll('#sscan-side .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.side === side));
+  sscanSlUi();
+}
+function sscanSlUi() {
+  const d = sscanDraft, g = id => document.getElementById(id); if (!d || !d.sl || !g('sscan-sl-on')) return;
+  const sell = d.side === 'Sell', sl = d.sl;
+  g('sscan-sl-title').textContent = sell ? '— exit if price breaks the highest high of the last N candles' : '— exit if price breaks the lowest low of the last N candles';
+  g('sscan-sl-cfg').style.display = sl.on ? '' : 'none';
+  g('sscan-sl-hint').textContent = `Level = ${sell ? 'highest high' : 'lowest low'} of the ${sl.n} candles up to the entry signal${sl.buf ? (sell ? ' + ' : ' − ') + sl.buf + '%' : ''}, on the combined premium chart. ` + (sl.mode === 'trail' ? 'It is re-set every candle but only ever moves in your favour.' : 'It stays put until the trade exits.') + ' A gap through it fills at the open.';
+}
+function sscanSlChange() {
+  const g = id => document.getElementById(id), n = parseInt(g('sscan-sl-n').value, 10), b = parseFloat(g('sscan-sl-buf').value);
+  sscanDraft.sl = { on: g('sscan-sl-on').checked, n: n >= 1 ? Math.min(50, n) : 4, buf: b >= 0 ? b : 0, mode: g('sscan-sl-mode').value };
+  sscanSlUi();
 }
 function renderSScanConds() {
   document.getElementById('sscan-conds').innerHTML = sscanDraft.conds.map((c, i) => `
@@ -2339,6 +2388,8 @@ function openSScan(idx, stratName) {
   document.getElementById('sscan-tf').onchange = e => { sscanDraft.tf = e.target.value; };
   document.getElementById('sscan-fresh').checked = !!sscanDraft.fresh;
   document.getElementById('sscan-minprem').value = sscanDraft.minPrem || '';
+  if (!sscanDraft.sl) sscanDraft.sl = { on: idx == null, n: 4, buf: 0, mode: 'fixed' };   // new scans start with a 4-candle stop; saved scans keep whatever they had (off if none)
+  document.getElementById('sscan-sl-on').checked = !!sscanDraft.sl.on; document.getElementById('sscan-sl-n').value = sscanDraft.sl.n; document.getElementById('sscan-sl-buf').value = sscanDraft.sl.buf; document.getElementById('sscan-sl-mode').value = sscanDraft.sl.mode;
   setSScanSide(sscanDraft.side);
   renderSScanConds();
   document.getElementById('sscan-overlay').classList.add('open');
@@ -2380,9 +2431,12 @@ function sscanRefLine(candles, c) {
 /* Entry/exit signals as a position cycle: ONE entry when every condition first becomes true, then NO
    further entries until the exit fires (every condition flipped: below -> above, above -> below).
    Sell scan on EMA10/EMA20/Supertrend: SELL when close is below all three, BUY-exit when close is above all three. */
-function sscanSignals(candles, conds, xr, minPrem) {
-  const n = candles.length, entries = [], exits = [];
-  if (!n || !conds || !conds.length) return { entries, exits, inPos: false };
+/* Optional stop-loss (slr = {n, buf, mode, side}): a SELL position is stopped out when a candle's HIGH reaches the highest high of the
+   previous N candles (+ buf %); a BUY when the LOW reaches the lowest low (- buf %). 'fixed' = level set at entry; 'trail' = re-set every
+   candle but only ever tightened. A gap through the level fills at the open. stops[k] describes how exit k was triggered. */
+function sscanSignals(candles, conds, xr, minPrem, slr) {
+  const n = candles.length, entries = [], exits = [], stops = {};
+  if (!n || !conds || !conds.length) return { entries, exits, stops, inPos: false };
   const lines = conds.map(c => sscanRefLine(candles, c));
   const xl = xr ? sscanRefLine(candles, { k: 'ema', p: xr.p }) : null; // optional custom exit: close vs EMA
   const valid = new Array(n).fill(false), ent = new Array(n).fill(false), ext = new Array(n).fill(false);
@@ -2398,12 +2452,22 @@ function sscanSignals(candles, conds, xr, minPrem) {
     valid[i] = v; ent[i] = v && e; ext[i] = v && x;
     if (xl) ext[i] = xl[i] != null && (xr.op === 'above' ? candles[i].c > xl[i] : candles[i].c < xl[i]);
   }
-  let inPos = false;
+  let inPos = false, lvl = null;
+  const sellSide = !slr || slr.side !== 'Buy';
+  const lvlOf = (a, b) => { let v = sellSide ? -Infinity : Infinity; for (let k = Math.max(0, a); k <= b; k++) v = sellSide ? Math.max(v, candles[k].h) : Math.min(v, candles[k].l); return sellSide ? v * (1 + slr.buf / 100) : v * (1 - slr.buf / 100); };
   for (let i = 1; i < n; i++) {
-    if (!inPos) { if (ent[i] && valid[i - 1] && !ent[i - 1] && !(minPrem > 0 && candles[i].c < minPrem)) { entries.push(i); inPos = true; } }  // minPrem: no entry while the combined premium is below the minimum
-    else if (ext[i]) { exits.push(i); inPos = false; }
+    if (!inPos) { if (ent[i] && valid[i - 1] && !ent[i - 1] && !(minPrem > 0 && candles[i].c < minPrem)) { entries.push(i); inPos = true; if (slr) lvl = lvlOf(i - slr.n + 1, i); } }  // minPrem: no entry while the combined premium is below the minimum
+    else {
+      let hit = false;
+      if (slr) {
+        if (slr.mode === 'trail') { const t = lvlOf(i - slr.n, i - 1); lvl = sellSide ? Math.min(lvl, t) : Math.max(lvl, t); }
+        hit = sellSide ? candles[i].h >= lvl : candles[i].l <= lvl;
+      }
+      if (hit) { stops[exits.length] = { level: lvl, fill: sellSide ? Math.max(lvl, candles[i].o) : Math.min(lvl, candles[i].o) }; exits.push(i); inPos = false; }
+      else if (ext[i]) { exits.push(i); inPos = false; }
+    }
   }
-  return { entries, exits, inPos };
+  return { entries, exits, stops, inPos };
 }
 function sscanAllSeries(candles, conds) { // boolean per candle: are ALL conditions true on that candle's close?
   const lines = conds.map(c => sscanRefLine(candles, c));
@@ -2412,7 +2476,7 @@ function sscanAllSeries(candles, conds) { // boolean per candle: are ALL conditi
     return v != null && (c.op === 'below' ? cd.c < v : cd.c > v);
   }));
 }
-function sscanEval(candles, conds, xr) {
+function sscanEval(candles, conds, xr, slr) {
   const lines = conds.map(c => sscanRefLine(candles, c));
   const at = i => conds.map((c, j) => {
     const px = candles[i].c, v = lines[j][i];
@@ -2422,7 +2486,7 @@ function sscanEval(candles, conds, xr) {
   });
   const n = candles.length - 1;
   const now = at(n), prev = n > 0 ? at(n - 1) : null;
-  const acts = sscanSignals(candles, conds, xr).entries;   // one entry per cycle (exit must fire before the next)
+  const acts = sscanSignals(candles, conds, xr, 0, slr).entries;   // one entry per cycle (exit must fire before the next)
   const lastIdx = acts.length ? acts[acts.length - 1] : -1;
   return { details: now, allNow: now.every(d => d.ok), allPrev: prev ? prev.every(d => d.ok) : false, price: candles[n].c,
            lastActSec: lastIdx >= 0 ? liveTimeToSec(candles[lastIdx].t) : null, barsSince: lastIdx >= 0 ? n - lastIdx : null, actCount: acts.length };
@@ -2437,7 +2501,7 @@ async function runSScan(i) {
     try {
       const candles = await sscanCandles(und, sc.tf);
       if (candles.length < 5) throw new Error('not enough candles returned');
-      const ev = sscanEval(candles, sc.conds, sscanExitRule(sc));
+      const ev = sscanEval(candles, sc.conds, sscanExitRule(sc), sscanSlRule(sc));
       rows.push({ und, price: ev.price, details: ev.details, ok: sc.fresh ? ev.allNow && !ev.allPrev : ev.allNow, lastActSec: ev.lastActSec, barsSince: ev.barsSince, actCount: ev.actCount });
     } catch (e) { rows.push({ und, err: liveErrText(e) }); }
   }
@@ -2465,7 +2529,7 @@ function sscanChartSignals(ov) {
   let n = Math.min(replayIndex, replayCandles.length);
   if (n > 0 && secs) { const ts = liveTimeToSec(replayCandles[n - 1].t); if (ts != null && ts + secs > Date.now() / 1000) n--; }
   const cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
-  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr, p.minPrem) }, cs, { conds: ov.conds, xr: sscanExitRule(ov), minPrem: ov.minPrem || 0 });
+  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr, p.minPrem, p.slr) }, cs, { conds: ov.conds, xr: sscanExitRule(ov), minPrem: ov.minPrem || 0, slr: sscanSlRule(ov) });
   return { sig, cs };
 }
 async function openSScanChart(i, und) {
@@ -2701,7 +2765,7 @@ async function sp2Session(g, tpl, e, step, spots) {
     });
     if (live && cs.length && liveTimeToSec(cs[cs.length - 1].t) + secs > now / 1000) cs.pop(); // the forming candle never counts
     if (cs.length < 5) throw new Error('too few option candles (' + cs.length + ')');
-    const sig = sscanSignals(cs, g.sc.conds, sscanExitRule(g.sc), g.sc.minPrem), fill = i => cs[i + 1] ? cs[i + 1].o : cs[i].c, close = i => liveTimeToSec(cs[i].t) * 1000 + secs * 1000;
+    const sig = sscanSignals(cs, g.sc.conds, sscanExitRule(g.sc), g.sc.minPrem, sscanSlRule(g.sc)), fill = i => cs[i + 1] ? cs[i + 1].o : cs[i].c, close = i => liveTimeToSec(cs[i].t) * 1000 + secs * 1000;
     // Trades are executed on the ATM at the moment of the trigger (the signal itself comes from the session chart above),
     // and the exit closes the SAME strikes that were opened.
     const uc = liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${g.und}USD&resolution=${tf}&start=${s}&end=${en}`), tf);
@@ -2723,7 +2787,11 @@ async function sp2Session(g, tpl, e, step, spots) {
       T.ep = px(ls, iso16(T.et), 'o'); T.sk = ls.map(l => l.t + l.k).join(' + ');
       if (T.ep == null || !(T.ep > 0)) { out.skipped = (out.skipped || 0) + 1; continue; }
       if (g.sc.minPrem > 0 && T.ep < g.sc.minPrem) { out.minSkip = (out.minSkip || 0) + 1; continue; }   // actual fill premium (ATM at trigger time) below the minimum -> no entry
-      if (xi != null) { T.xt = close(xi); T.xc = close(xi) - secs * 1000; T.xp = px(ls, iso16(T.xt), 'o'); }
+      if (xi != null) {
+        T.xt = close(xi); T.xc = close(xi) - secs * 1000; T.xp = px(ls, iso16(T.xt), 'o');
+        const st = sig.stops[n];
+        if (st) { const sf = fill(ei); if (sf > 0) { T.xp = st.fill * T.ep / sf; T.stop = true; T.sl = st.level * T.ep / sf; } } // stop-loss: filled at the stop level (or the open on a gap), scaled to the strikes actually traded
+      }
       else if (!live) { T.xt = e; T.xp = px(ls, lastT, 'c'); T.expd = true; }
       else T.mark = px(ls, lastT, 'c');
       if ((T.xt != null && T.xp == null) || (T.xt == null && T.mark == null)) { out.skipped = (out.skipped || 0) + 1; continue; }
@@ -2838,7 +2906,7 @@ function renderSPerf() {
         : s.trades.map(T => { const r = sp2Pnl(T, side), roi = r / (T.ep * sp2.qty) * 100;
           if (sp2.f !== 'all' && (T.xp == null || (sp2.f === 'win' ? !(r > 0) : r > 0))) return '';
           return `<div class="sp2-r"><span><b>${ent}</b> entry · <span class="sp2-t">${sp2Dm(T.et)} IST</span><br><small style="color:var(--text-faint)">signal candle ${sp2Dm(T.ec)} IST / ${sp2U(T.ec)} UTC<br>ATM ${sscanEsc(T.sk || '')}</small></span><span>@ ${sscanFmt(T.ep)}</span></div>` +
-            (T.xp != null ? `<div class="sp2-r"><span><b>${ex}</b> exit · <span class="sp2-t">${sp2Dm(T.xt)} IST</span>${T.expd ? ' (expiry)' : `<br><small style="color:var(--text-faint)">signal candle ${sp2Dm(T.xc)} IST / ${sp2U(T.xc)} UTC</small>`}</span><span>@ ${sscanFmt(T.xp)} · <span class="${cls(r)}">${usd(r)} (${pct(roi)})</span></span></div>`
+            (T.xp != null ? `<div class="sp2-r"><span><b>${ex}</b> exit${T.stop ? ' · <b style="color:var(--red)">STOP-LOSS</b>' : ''} · <span class="sp2-t">${sp2Dm(T.xt)} IST</span>${T.expd ? ' (expiry)' : T.stop ? `<br><small style="color:var(--text-faint)">stop ${sscanFmt(T.sl)} hit in candle ${sp2Dm(T.xc)} IST</small>` : `<br><small style="color:var(--text-faint)">signal candle ${sp2Dm(T.xc)} IST / ${sp2U(T.xc)} UTC</small>`}</span><span>@ ${sscanFmt(T.xp)} · <span class="${cls(r)}">${usd(r)} (${pct(roi)})</span></span></div>`
               : `<div class="sp2-r"><span><b>OPEN</b> · not exited yet</span><span>now ${sscanFmt(T.mark)} · <span class="${cls(r)}">${usd(r)}</span></span></div>`); }).join('');
       const open = s.trades.some(T => T.xp == null);
       if (sp2.f !== 'all' && !s.err && !s.trades.some(T => { if (T.xp == null) return false; const r = sp2Pnl(T, side); return sp2.f === 'win' ? r > 0 : r <= 0; })) return '';
@@ -2991,6 +3059,7 @@ function oiCard(lay, rows, yAt, SH) {
   card.style.top = Math.max(2, Math.min(H - ch - 2, ry > H / 2 ? ry - ch - 12 : ry + 12)) + 'px';
 }
 /* Straddle exit: a Sell straddle is bought back when the premium closes above EMA 20 (a Buy straddle: closes below EMA 20). */
+function sscanSlRule(sc) { return sc && sc.sl && sc.sl.on ? { n: Math.max(1, sc.sl.n | 0 || 4), buf: Math.max(0, +sc.sl.buf || 0), mode: sc.sl.mode === 'trail' ? 'trail' : 'fixed', side: sc.side } : null; }
 function sscanExitRule(sc) { return sc && /^straddle$/i.test(sc.strat) ? { p: 20, op: sc.side === 'Sell' ? 'above' : 'below' } : null; }
 
 renderSScans();
@@ -6190,6 +6259,7 @@ function renderChart(forceEnd) {
 
   chartGeom = { PAD, CANDLE_PX, GAP, priceAreaH: BASE_H - GAP - VOLH - PAD, yMin, yMax };
   try { oiRender(); } catch (e) { /* OI overlay must never break the chart */ }
+  try { slaPreview(); } catch (e) { /* ignore */ }
   chartDisplayCandles = chartType === 'renko' ? renkoBricks : (chartType === 'heikinashi' ? haCandles : replayCandles);
   const readoutIdx = chartType === 'renko' ? chartDisplayCandles.length - 1 : replayIndex - 1;
   updateOhlcReadout(chartDisplayCandles[readoutIdx], readoutIdx);
@@ -8473,6 +8543,46 @@ function updateTicketEstimate() {
     (overBalance ? `<br><span style="color:var(--red)">Exceeds available balance (${fmtMoney(account.balance)}) — reduce quantity.</span>` : '');
 }
 
+/* ---------- Auto stop-loss: a short's SL goes just above the highest high of the last N candles, a long's just below the lowest low.
+   N and a buffer (a % of the level or fixed price points) are yours to set; the SL is worked out at the moment you press Sell / Buy.
+   In Live mode the still-forming candle is skipped, so "last N" means the last N CLOSED candles. ---------- */
+const SLA_KEY = 'tradepro_slauto_v1';
+let sla = { mode: 'manual', n: 4, buf: 0.05, unit: 'pct' };
+try { const v = JSON.parse(localStorage.getItem(SLA_KEY) || 'null'); if (v) sla = Object.assign(sla, v); } catch (e) { /* ignore */ }
+function slaInit() {
+  const g = id => document.getElementById(id); if (!g('sla-mode')) return;
+  g('sla-mode').value = sla.mode; g('sla-n').value = sla.n; g('sla-buf').value = sla.buf; g('sla-unit').value = sla.unit; slaApplyUi();
+}
+function slaApplyUi() {
+  const auto = sla.mode === 'candles', cfg = document.getElementById('sla-cfg'), inp = document.getElementById('ticket-sl');
+  if (cfg) cfg.style.display = auto ? '' : 'none';
+  if (inp) { inp.disabled = auto; inp.placeholder = auto ? 'Auto' : 'Price'; if (auto) inp.value = ''; }
+  slaPreview();
+}
+function slaChange() {
+  const g = id => document.getElementById(id);
+  sla.mode = g('sla-mode').value;
+  const n = parseInt(g('sla-n').value, 10), b = parseFloat(g('sla-buf').value);
+  sla.n = n >= 1 ? Math.min(50, n) : 4; sla.buf = b >= 0 ? b : 0; sla.unit = g('sla-unit').value;
+  try { localStorage.setItem(SLA_KEY, JSON.stringify(sla)); } catch (e) { /* ignore */ }
+  slaApplyUi();
+}
+function slaCompute(side) {
+  let c = replayCandles.slice(0, replayIndex);
+  if (typeof liveMode !== 'undefined' && liveMode && c.length > 1) c = c.slice(0, -1); // skip the forming candle
+  c = c.slice(-sla.n); if (!c.length) return null;
+  const lvl = side === 'short' ? Math.max(...c.map(x => x.h)) : Math.min(...c.map(x => x.l));
+  const off = sla.unit === 'pct' ? lvl * sla.buf / 100 : sla.buf;
+  const raw = side === 'short' ? lvl + off : lvl - off;
+  return { sl: Math.abs(raw) >= 1 ? Math.round(raw * 100) / 100 : Number(raw.toPrecision(4)), lvl, n: c.length };
+}
+function slaPreview() {
+  const el = document.getElementById('sla-preview'); if (!el || sla.mode !== 'candles') return;
+  const px = replayCandles.length && replayIndex ? currentPrice() : null, f = v => v.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const one = (side, lbl, word) => { const a = slaCompute(side); if (!a) return ''; const d = px ? Math.abs(a.sl - px) / px * 100 : null;
+    return `<div><b>${lbl}</b> SL ${f(a.sl)} <span style="color:var(--text-faint)">(${word} of last ${a.n}${sla.buf ? ' ' + (side === 'short' ? '+' : '−') + sla.buf + (sla.unit === 'pct' ? '%' : ' pts') : ''})${d != null ? ' · risk ' + d.toFixed(2) + '%' : ''}</span></div>`; };
+  el.innerHTML = one('short', 'Sell', 'highest high') + one('long', 'Buy', 'lowest low');
+}
 function submitOrder(side) {
   if (position || pendingOrder || !replayCandles.length) return;
   const msgEl = document.getElementById('ticket-msg');
@@ -8481,7 +8591,7 @@ function submitOrder(side) {
   if (!qty || qty <= 0) { msgEl.textContent = 'Enter a quantity greater than 0.'; return; }
   const slVal = parseFloat(document.getElementById('ticket-sl').value);
   const tpVal = parseFloat(document.getElementById('ticket-tp').value);
-  const sl = isNaN(slVal) ? null : slVal;
+  let sl = isNaN(slVal) ? null : slVal;
   const tp = isNaN(tpVal) ? null : tpVal;
   const type = currentOrderType();
   const fx = fxRateForInstrument(currentInstrument);
@@ -8497,6 +8607,12 @@ function submitOrder(side) {
     stopVal = parseFloat(document.getElementById('ticket-stop').value);
     if (!stopVal || stopVal <= 0) { msgEl.textContent = 'Enter a stop price.'; return; }
     refPrice = stopVal;
+  }
+  if (sla.mode === 'candles') {
+    const a = slaCompute(side);
+    if (!a) { msgEl.textContent = 'Auto stop-loss needs at least one candle.'; return; }
+    if (side === 'short' ? a.sl <= refPrice : a.sl >= refPrice) { msgEl.textContent = `Auto stop-loss ${a.sl} is on the wrong side of your ${side === 'short' ? 'sell' : 'buy'} price ${refPrice} (price has already broken the last ${a.n} candles). Widen N or the buffer, or set it manually.`; return; }
+    sl = a.sl;
   }
   const lev = effectiveLeverage(currentInstrument);
   const margin = requiredMargin(refPrice, qty, fx, currentInstrument, side);
@@ -8531,6 +8647,8 @@ function submitOrder(side) {
   renderChart(true);
   scheduleSave();
 }
+
+try { slaInit(); } catch (e) { /* ticket not ready */ }
 
 function fillMarketEntry(side, qty, sl, tp) {
   const fx = fxRateForInstrument(currentInstrument);
