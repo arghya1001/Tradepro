@@ -1727,6 +1727,7 @@
       <label class="field-label">Underlying</label>
       <select class="field-input" id="sscan-und" onchange="sscanDraft.und=this.value">
         <option value="BTC">BTC</option><option value="ETH">ETH</option><option value="BTC,ETH">BTC + ETH</option>
+        <option value="NIFTY">Nifty 50 (daily only)</option><option value="SENSEX">Sensex (daily only)</option><option value="BANKNIFTY">Bank Nifty (daily only)</option><option value="NIFTY,SENSEX,BANKNIFTY">Nifty + Sensex + Bank Nifty (daily only)</option>
       </select>
 
       <label class="field-label">Timeframe</label>
@@ -1735,6 +1736,10 @@
       <label class="field-label">Entry conditions — all must be true on the last closed candle</label>
       <div id="sscan-conds"></div>
       <button type="button" class="btn-ghost" onclick="sscanAddCond()">+ Add condition</button>
+      <button type="button" class="btn-ghost" onclick="sscanAddGuppy()">+ Guppy condition</button>
+      <button type="button" class="btn-ghost" onclick="sscanAddSqueeze()">+ EMA squeeze condition</button>
+      <button type="button" class="btn-ghost" onclick="sscanPresetSqueeze()" title="Ribbon squeezed, then close below the whole ribbon + below Supertrend (10,2), first signal only">★ EMA squeeze breakdown preset</button>
+      <button type="button" class="btn-ghost" onclick="sscanPresetGuppy()" title="Short EMAs 10,12,15 below long EMAs 30,35,40 + close below Supertrend (10,2), first signal only">★ Bearish Guppy + Supertrend preset</button>
 
       <label class="field-label" id="sscan-minprem-label">No entry if combined premium is below (USD, 0 = off)</label>
       <input class="field-input" id="sscan-minprem" type="number" min="0" step="10" placeholder="e.g. 600" oninput="sscanDraft.minPrem=Math.max(0,parseFloat(this.value)||0)">
@@ -2294,8 +2299,8 @@ const sscanEsc = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').rep
 const sscanTime = sec => new Date(sec * 1000 + 19800000).toISOString().slice(5, 16).replace('T', ' ') + ' IST';
 let scanOverlay = null, scanOverlayTimer = null;   // activation markers drawn on the combined-strategy chart
 const sscanFmt = v => v == null ? '–' : v.toLocaleString('en-US', { maximumFractionDigits: v >= 100 ? 1 : 4 });
-function sscanRefLabel(c) { return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
-function sscanSummary(sc) { return sc.conds.map(c => 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · ') + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); }
+function sscanRefLabel(c) { if (c.k === 'gsq') return 'EMA squeeze → ' + (c.op === 'below' ? 'breakdown' : 'breakout'); if (c.k === 'gmma') return `Guppy ${(c.s || SSCAN_GMMA.s).join(',')} vs ${(c.l || SSCAN_GMMA.l).join(',')}`; return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
+function sscanSummary(sc) { return sc.conds.map(c => c.k === 'gsq' ? `EMA squeeze (ribbon ≤ ${c.a || SSCAN_SQ.a}×ATR in ≥ ${c.m || SSCAN_SQ.m} of last ${c.n || SSCAN_SQ.n} bars) then close ${c.op === 'below' ? 'below the ribbon' : 'above the ribbon'}` : c.k === 'gmma' ? `Guppy short EMAs (${(c.s || SSCAN_GMMA.s).join(',')}) ${c.op === 'below' ? 'below' : 'above'} long EMAs (${(c.l || SSCAN_GMMA.l).join(',')})${c.mode === 'all' ? ' — all lines' : ''}` : 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · ') + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); }
 
 function renderSScans() {
   const el = document.getElementById('sscan-list');
@@ -2312,7 +2317,7 @@ function renderSScans() {
         const chip = row.ok ? `<span style="color:var(--green); font-weight:700">MATCH</span>` : `<span style="color:var(--text-faint); font-weight:600">no match</span>`;
         const lines = row.details.map(d => `<div style="font-size:11.5px; color:${d.ok ? 'var(--green)' : 'var(--text-muted)'}">${d.ok ? '✓' : '✗'} ${sscanEsc(d.text)}</div>`).join('');
         const when = row.lastActSec ? `<div style="font-size:11.5px; margin-top:4px; color:var(--text-muted)">${row.ok ? 'Active since' : 'Last activated'} <b>${sscanTime(row.lastActSec)}</b> · ${row.barsSince === 0 ? 'this candle' : row.barsSince + ' candle' + (row.barsSince > 1 ? 's' : '') + ' ago'} · ${row.actCount} activation${row.actCount > 1 ? 's' : ''} in the last ~400 candles</div>` : `<div style="font-size:11.5px; margin-top:4px; color:var(--text-faint)">Not activated in the last ~400 candles</div>`;
-        const open = row.actCount || row.ok ? `<button class="strat-chart-btn" onclick="openSScanChart(${i},'${row.und}')">Show ${sscanEsc(sc.side)} ${sscanEsc(sc.strat)} chart with activations ↗</button>` : '';
+        const open = (row.actCount || row.ok) && !isIndiaUnd(row.und) ? `<button class="strat-chart-btn" onclick="openSScanChart(${i},'${row.und}')">Show ${sscanEsc(sc.side)} ${sscanEsc(sc.strat)} chart with activations ↗</button>` : '';
         return `<div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border)">
           <div style="display:flex; justify-content:space-between; font-size:13px"><span><b>${row.und}</b> · close ${sscanFmt(row.price)}</span>${chip}</div>
           ${lines}${when}${open}</div>`;
@@ -2353,8 +2358,35 @@ function sscanSlChange() {
   sscanDraft.sl = { on: g('sscan-sl-on').checked, n: n >= 1 ? Math.min(50, n) : 4, buf: b >= 0 ? b : 0, mode: g('sscan-sl-mode').value };
   sscanSlUi();
 }
+function sscanGmmaList(i, key, v) { const a = String(v).split(/[ ,]+/).map(x => parseInt(x, 10)).filter(x => x >= 1 && x <= 500); if (a.length) sscanDraft.conds[i][key] = a; }
 function renderSScanConds() {
-  document.getElementById('sscan-conds').innerHTML = sscanDraft.conds.map((c, i) => `
+  document.getElementById('sscan-conds').innerHTML = sscanDraft.conds.map((c, i) => c.k === 'gsq' ? `
+    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px">
+      <span style="font-size:13px; color:var(--text-muted)">EMA squeeze, then</span>
+      <select class="field-input" style="width:118px" onchange="sscanDraft.conds[${i}].op=this.value">
+        <option value="below" ${c.op==='below'?'selected':''}>breakdown ↓</option><option value="above" ${c.op==='above'?'selected':''}>breakout ↑</option>
+      </select>
+      <span style="font-size:13px; color:var(--text-muted)">ribbon ≤</span>
+      <input class="field-input" style="width:60px" type="number" min="0.1" step="0.1" value="${c.a || SSCAN_SQ.a}" title="Max ribbon width, in multiples of ATR(14)" oninput="sscanDraft.conds[${i}].a=Math.max(0.1,parseFloat(this.value)||1)">
+      <span style="font-size:13px; color:var(--text-muted)">×ATR in ≥</span>
+      <input class="field-input" style="width:52px" type="number" min="1" value="${c.m || SSCAN_SQ.m}" title="Minimum squeezed bars" oninput="sscanDraft.conds[${i}].m=Math.max(1,parseInt(this.value)||3)">
+      <span style="font-size:13px; color:var(--text-muted)">of last</span>
+      <input class="field-input" style="width:52px" type="number" min="1" value="${c.n || SSCAN_SQ.n}" title="Look-back bars" oninput="sscanDraft.conds[${i}].n=Math.max(1,parseInt(this.value)||10)">
+      <button class="leg-remove" aria-label="Remove condition" onclick="sscanDraft.conds.splice(${i},1);renderSScanConds()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>` : c.k === 'gmma' ? `
+    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px">
+      <span style="font-size:13px; color:var(--text-muted)">Guppy: short EMAs</span>
+      <input class="field-input" style="width:104px" value="${(c.s || SSCAN_GMMA.s).join(',')}" title="Short EMA periods, comma separated" oninput="sscanGmmaList(${i},'s',this.value)">
+      <select class="field-input" style="width:84px" onchange="sscanDraft.conds[${i}].op=this.value">
+        <option value="below" ${c.op==='below'?'selected':''}>below</option><option value="above" ${c.op==='above'?'selected':''}>above</option>
+      </select>
+      <span style="font-size:13px; color:var(--text-muted)">long EMAs</span>
+      <input class="field-input" style="width:104px" value="${(c.l || SSCAN_GMMA.l).join(',')}" title="Long EMA periods, comma separated" oninput="sscanGmmaList(${i},'l',this.value)">
+      <select class="field-input" style="width:128px" title="avg = average of each group; all = every short line beyond every long line" onchange="sscanDraft.conds[${i}].mode=this.value">
+        <option value="avg" ${c.mode!=='all'?'selected':''}>group average</option><option value="all" ${c.mode==='all'?'selected':''}>all lines (strict)</option>
+      </select>
+      <button class="leg-remove" aria-label="Remove condition" onclick="sscanDraft.conds.splice(${i},1);renderSScanConds()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>` : `
     <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px">
       <span style="font-size:13px; color:var(--text-muted)">Close</span>
       <select class="field-input" style="width:84px" onchange="sscanDraft.conds[${i}].op=this.value">
@@ -2372,6 +2404,24 @@ function sscanSetRef(i, k) {
   const c = sscanDraft.conds[i];
   c.k = k;
   if (k === 'st') { c.p = 10; c.m = 3; } else { delete c.m; if (c.p === 10 && c.m == null) c.p = 20; }
+  renderSScanConds();
+}
+function sscanAddGuppy() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell' ? 'below' : 'above', k: 'gmma', s: SSCAN_GMMA.s.slice(), l: SSCAN_GMMA.l.slice(), mode: 'avg' }); renderSScanConds(); }
+function sscanAddSqueeze() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell' ? 'below' : 'above', k: 'gsq', a: SSCAN_SQ.a, n: SSCAN_SQ.n, m: SSCAN_SQ.m }); renderSScanConds(); }
+function sscanPresetSqueeze() {   // EMA ribbon squeeze, then a close below the whole ribbon + below Supertrend (10,2); first signal only
+  const d = sscanDraft, nm = document.getElementById('sscan-name');
+  d.conds = [{ op: 'below', k: 'gsq', a: SSCAN_SQ.a, n: SSCAN_SQ.n, m: SSCAN_SQ.m }, { op: 'below', k: 'st', p: 10, m: 2 }];
+  d.fresh = true; document.getElementById('sscan-fresh').checked = true;
+  setSScanSide('Sell');
+  if (!nm.value.trim()) nm.value = 'EMA squeeze breakdown + below Supertrend (10,2)';
+  renderSScanConds();
+}
+function sscanPresetGuppy() {   // Bearish Guppy crossover + close below Supertrend (10,2); fires on the first candle both are true
+  const d = sscanDraft, nm = document.getElementById('sscan-name');
+  d.conds = [{ op: 'below', k: 'gmma', s: SSCAN_GMMA.s.slice(), l: SSCAN_GMMA.l.slice(), mode: 'avg' }, { op: 'below', k: 'st', p: 10, m: 2 }];
+  d.fresh = true; document.getElementById('sscan-fresh').checked = true;
+  setSScanSide('Sell');
+  if (!nm.value.trim()) nm.value = 'Bearish Guppy crossover + below Supertrend (10,2)';
   renderSScanConds();
 }
 function sscanAddCond() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell' ? 'below' : 'above', k: 'ema', p: 20 }); renderSScanConds(); }
@@ -2411,7 +2461,26 @@ function saveSScan() {
 
 /* ---- scanning ---- */
 const sscanCache = {};   // 'BTCUSD|15m' -> { at, candles } so several scans share one fetch
+/* ---- Indian indices: daily candles come from our own GitHub data repo (updated every weekday after close) ----
+   Set INDIA_DATA_BASE to your repo's raw URL, e.g. 'https://raw.githubusercontent.com/YOURNAME/tradepro-data/main/data/' */
+const INDIA_DATA_BASE = 'https://raw.githubusercontent.com/YOURNAME/tradepro-data/main/data/';
+const INDIA_SYMS = ['NIFTY', 'SENSEX', 'BANKNIFTY'];
+const isIndiaUnd = u => INDIA_SYMS.indexOf(u) !== -1;
+async function indiaCandles(und, res) {
+  if (res !== '1d') throw new Error('Nifty / Sensex / Bank Nifty support the 1d timeframe only for now');
+  if (INDIA_DATA_BASE.indexOf('YOURNAME') !== -1) throw new Error('set INDIA_DATA_BASE in the app to your GitHub data repo first');
+  const r = await liveWithTimeout(fetch(INDIA_DATA_BASE + und + '_1d.json?v=' + Math.floor(Date.now() / 600000)), 12000);
+  if (!r.ok) throw new Error('data file not found (HTTP ' + r.status + ') — has the GitHub Action run yet?');
+  let candles = await r.json();
+  if (!Array.isArray(candles)) throw new Error('bad data file');
+  // drop today's candle until the NSE/BSE session has closed (15:30 IST)
+  const ist = new Date(Date.now() + 19800000), today = ist.toISOString().slice(0, 10), mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  const last = candles[candles.length - 1];
+  if (last && last.t === today && mins < 15 * 60 + 35) candles = candles.slice(0, -1);
+  return candles;
+}
 async function sscanCandles(und, res) {
+  if (isIndiaUnd(und)) return indiaCandles(und, res);
   const key = und + 'USD|' + res, hit = sscanCache[key];
   if (hit && Date.now() - hit.at < 20000) return hit.candles;
   const secs = LIVE_RES[res], end = Math.floor(Date.now() / 1000);
@@ -2422,7 +2491,52 @@ async function sscanCandles(und, res) {
   sscanCache[key] = { at: Date.now(), candles };
   return candles;
 }
+/* Guppy (GMMA) condition: a group of short EMAs vs a group of long EMAs. 'below' = bearish (short group under long group).
+   mode 'avg' = average of the short EMAs vs average of the long EMAs; 'all' = every short EMA beyond every long EMA (strict). */
+const SSCAN_GMMA = { s: [10, 12, 15], l: [30, 35, 40], mode: 'avg' };
+function sscanGmmaLine(candles, c) {
+  const closes = candles.map(x => x.c), avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+  const S = (c.s || SSCAN_GMMA.s).map(p => emaSeries(closes, p)), L = (c.l || SSCAN_GMMA.l).map(p => emaSeries(closes, p));
+  return candles.map((_, i) => {
+    const sv = S.map(a => a[i]), lv = L.map(a => a[i]);
+    if (sv.concat(lv).some(v => v == null || !isFinite(v))) return null;
+    return { sa: avg(sv), la: avg(lv), smin: Math.min(...sv), smax: Math.max(...sv), lmin: Math.min(...lv), lmax: Math.max(...lv) };
+  });
+}
+/* EMA squeeze -> breakdown/breakout. Ribbon = the Guppy EMAs (short + long groups).
+   Squeeze bar: ribbon width (highest EMA - lowest EMA) <= a x ATR(14).  Context: at least m of the previous n bars were squeezed.
+   Breakdown (op 'below'): context AND the close is below the lowest EMA of the ribbon.  Breakout (op 'above'): close above the highest EMA.
+   Exit (all-flipped rule): close back above (breakdown) / below (breakout) the average of the long EMAs. */
+const SSCAN_SQ = { a: 1.0, n: 10, m: 3 };
+function sscanSqueezeLine(candles, c) {
+  const closes = candles.map(x => x.c), N = candles.length;
+  const a = c.a > 0 ? c.a : SSCAN_SQ.a, n = c.n >= 1 ? c.n : SSCAN_SQ.n, m = c.m >= 1 ? c.m : SSCAN_SQ.m;
+  const S = (c.s || SSCAN_GMMA.s).map(p => emaSeries(closes, p)), L = (c.l || SSCAN_GMMA.l).map(p => emaSeries(closes, p));
+  const tr = candles.map((x, i) => i ? Math.max(x.h - x.l, Math.abs(x.h - candles[i - 1].c), Math.abs(x.l - candles[i - 1].c)) : x.h - x.l);
+  const atr = tr.map((_, i) => i < 14 ? null : tr.slice(i - 13, i + 1).reduce((x, y) => x + y, 0) / 14);
+  const lo = new Array(N).fill(null), hi = new Array(N).fill(null), la = new Array(N).fill(null), w = new Array(N).fill(null), sq = new Array(N).fill(false);
+  for (let i = 0; i < N; i++) {
+    const all = S.concat(L).map(arr => arr[i]);
+    if (all.some(v => v == null || !isFinite(v)) || !atr[i]) continue;
+    lo[i] = Math.min(...all); hi[i] = Math.max(...all); w[i] = (hi[i] - lo[i]) / atr[i];
+    la[i] = L.reduce((t, arr) => t + arr[i], 0) / L.length;
+    sq[i] = w[i] <= a;
+  }
+  return candles.map((cd, i) => {
+    if (lo[i] == null) return null;
+    let cnt = 0; for (let k = Math.max(0, i - n); k < i; k++) if (sq[k]) cnt++;
+    const ctx = cnt >= m;
+    return { w: w[i], cnt, n, m, a, lo: lo[i], hi: hi[i], la: la[i], ctx, dn: ctx && cd.c < lo[i], up: ctx && cd.c > hi[i] };
+  });
+}
+function sscanCmp(c, px, v, below, isExit) {   // is this condition true? (below=true: bearish / close under the line)
+  if (c.k === 'gsq') return isExit ? (below ? px < v.la : px > v.la) : (below ? v.dn : v.up);
+  if (c.k === 'gmma') return c.mode === 'all' ? (below ? v.smax < v.lmin : v.smin > v.lmax) : (below ? v.sa < v.la : v.sa > v.la);
+  return below ? px < v : px > v;
+}
 function sscanRefLine(candles, c) {
+  if (c.k === 'gmma') return sscanGmmaLine(candles, c);
+  if (c.k === 'gsq') return sscanSqueezeLine(candles, c);
   const closes = candles.map(x => x.c);
   if (c.k === 'ema') return emaSeries(closes, c.p);
   if (c.k === 'sma') return smaSeries(closes, c.p);
@@ -2446,8 +2560,8 @@ function sscanSignals(candles, conds, xr, minPrem, slr) {
       const l = lines[j][i];
       if (l == null) { v = false; e = false; x = false; break; }
       const px = candles[i].c, wantBelow = conds[j].op === 'below';
-      if (wantBelow ? !(px < l) : !(px > l)) e = false;
-      if (wantBelow ? !(px > l) : !(px < l)) x = false;
+      if (!sscanCmp(conds[j], px, l, wantBelow)) e = false;
+      if (!sscanCmp(conds[j], px, l, !wantBelow, true)) x = false;
     }
     valid[i] = v; ent[i] = v && e; ext[i] = v && x;
     if (xl) ext[i] = xl[i] != null && (xr.op === 'above' ? candles[i].c > xl[i] : candles[i].c < xl[i]);
@@ -2473,15 +2587,17 @@ function sscanAllSeries(candles, conds) { // boolean per candle: are ALL conditi
   const lines = conds.map(c => sscanRefLine(candles, c));
   return candles.map((cd, i) => conds.every((c, j) => {
     const v = lines[j][i];
-    return v != null && (c.op === 'below' ? cd.c < v : cd.c > v);
+    return v != null && sscanCmp(c, cd.c, v, c.op === 'below');
   }));
 }
 function sscanEval(candles, conds, xr, slr) {
   const lines = conds.map(c => sscanRefLine(candles, c));
   const at = i => conds.map((c, j) => {
     const px = candles[i].c, v = lines[j][i];
-    if (v == null) return { ok: false, text: 'Close vs ' + sscanRefLabel(c) + ' — not enough candles' };
-    const ok = c.op === 'below' ? px < v : px > v;
+    if (v == null) return { ok: false, text: (c.k === 'gmma' ? '' : 'Close vs ') + sscanRefLabel(c) + ' — not enough candles' };
+    const ok = sscanCmp(c, px, v, c.op === 'below');
+    if (c.k === 'gsq') return { ok, text: `EMA squeeze: ribbon ${sscanFmt(v.w)}×ATR (≤ ${v.a}), squeezed ${v.cnt}/${v.n} prior bars (need ${v.m}) · close ${sscanFmt(px)} ${c.op === 'below' ? 'vs ribbon low ' + sscanFmt(v.lo) : 'vs ribbon high ' + sscanFmt(v.hi)}` };
+    if (c.k === 'gmma') return { ok, text: c.mode === 'all' ? `${sscanRefLabel(c)}: short EMAs ${sscanFmt(v.smin)}–${sscanFmt(v.smax)} vs long EMAs ${sscanFmt(v.lmin)}–${sscanFmt(v.lmax)}` : `${sscanRefLabel(c)}: short avg ${sscanFmt(v.sa)} ${c.op === 'below' ? '<' : '>'} long avg ${sscanFmt(v.la)}` };
     return { ok, text: `Close ${sscanFmt(px)} ${c.op === 'below' ? '<' : '>'} ${sscanRefLabel(c)} ${sscanFmt(v)}` };
   });
   const n = candles.length - 1;
@@ -2529,10 +2645,11 @@ function sscanChartSignals(ov) {
   let n = Math.min(replayIndex, replayCandles.length);
   if (n > 0 && secs) { const ts = liveTimeToSec(replayCandles[n - 1].t); if (ts != null && ts + secs > Date.now() / 1000) n--; }
   const cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
-  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr, p.minPrem, p.slr) }, cs, { conds: ov.conds, xr: sscanExitRule(ov), minPrem: ov.minPrem || 0, slr: sscanSlRule(ov) });
+  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr, p.minPrem, p.slr) }, cs, { conds: ov.conds, xr: sscanExitRule(ov), minPrem: ov.perp ? 0 : ov.minPrem || 0, slr: sscanSlRule(ov) });
   return { sig, cs };
 }
 async function openSScanChart(i, und) {
+  if (isIndiaUnd(und)) return;   // premium charts need option data (crypto only)
   const sc = sscans[i];
   const t = sc && TEMPLATES.find(x => x.name === sc.strat);
   if (!t) return;
@@ -2555,7 +2672,7 @@ function sscanApplyChange(v) {
   if (v === '__new') {
     sscanFromChart = true;
     sscanFillApply();
-    openSScan(null, SSCAN_TYPE_NAMES[LIVE.strat.type] || 'Straddle');
+    openSScan(null, (LIVE.kind === 'strategy' && SSCAN_TYPE_NAMES[LIVE.strat.type]) || 'Straddle');
     return;
   }
   sscanApplied = v || null;
@@ -2566,11 +2683,12 @@ async function sscanApplyRefresh() {
   const token = ++sscanApplyToken;
   const draw = () => { try { renderChart(); } catch (e) { /* chart not ready yet */ } };
   if (!sscanApplied) { scanOverlay = null; if (info) info.textContent = ''; draw(); return; }
-  if (!liveMode || LIVE.kind !== 'strategy' || !LIVE.stratSymbol) return;
+  const onPerp = liveMode && LIVE.kind === 'perp';
+  if (!onPerp && (!liveMode || LIVE.kind !== 'strategy' || !LIVE.stratSymbol)) return;
   const sc = sscans.find(x => x.name === sscanApplied);
   if (!sc) { sscanApplied = null; scanOverlay = null; sscanFillApply(); if (info) info.textContent = ''; draw(); return; }
-  const und = LIVE.strat.und, symbol = LIVE.stratSymbol;
-  scanOverlay = Object.assign({}, sscanOverlayMeta(sc, und), { symbol });
+  const und = onPerp ? String(LIVE.symbol || '').replace(/USD.*$/, '') : LIVE.strat.und, symbol = onPerp ? LIVE.symbol : LIVE.stratSymbol;
+  scanOverlay = Object.assign({}, sscanOverlayMeta(sc, und), { symbol, perp: onPerp, minPrem: onPerp ? 0 : sc.minPrem || 0 });
   draw();   // renderChart fills the info line from the chart's own signals
 }
 function sscanOverlayWatch() { // markers are recomputed from the chart's own candles on every render, so nothing to poll
@@ -2734,7 +2852,7 @@ function sp2Save() { try { localStorage.setItem(SP2_KEY, JSON.stringify({ days: 
 const sp2U = ms => new Date(ms).toISOString().slice(11, 16);
 const sp2Dm = ms => { const s = new Date(ms + 19800000).toISOString(); return s.slice(8, 10) + ' ' + LIVE_MONTHS[+s.slice(5, 7) - 1] + ' ' + s.slice(11, 16); };
 function sp2Expiries(n) { const now = Date.now(), d = new Date(now); let e = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); if (e <= now) e += SP2_DAY; const o = []; for (let k = 0; k < n; k++) o.push(e - k * SP2_DAY); return o; }
-function sp2Groups() { const o = []; sscans.forEach(sc => { if (!sperfIsVolStrat(sc.strat)) return; sc.und.split(',').forEach(u => o.push({ key: sc.name + '|' + u + '|' + sc.tf + '|' + JSON.stringify(sc.conds) + '|' + (sc.minPrem || 0), sc, und: u, label: sc.name + ' · ' + u + ' · ' + sc.tf })); }); return o; }
+function sp2Groups() { const o = []; sscans.forEach(sc => { if (!sperfIsVolStrat(sc.strat)) return; sc.und.split(',').filter(u => !isIndiaUnd(u)).forEach(u => o.push({ key: sc.name + '|' + u + '|' + sc.tf + '|' + JSON.stringify(sc.conds) + '|' + (sc.minPrem || 0), sc, und: u, label: sc.name + ' · ' + u + ' · ' + sc.tf })); }); return o; }
 function sp2Step(und) { const ex = liveExpsFor(und), S = ex.length ? stratStrikes(und, ex[0]) : []; let m = Infinity; for (let i = 1; i < S.length; i++) m = Math.min(m, S[i] - S[i - 1]); return isFinite(m) && m > 0 ? m : (und === 'BTC' ? 200 : und === 'ETH' ? 10 : 1); }
 async function sp2Spots(und, from) {
   const r = liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${und}USD&resolution=1h&start=${Math.floor(from / 1000) - 3600}&end=${Math.floor(Date.now() / 1000)}`), '1h');
@@ -5875,12 +5993,12 @@ function renderChart(forceEnd) {
   });
 
   // scanner signals, evaluated on THIS chart's candles: one entry per cycle, then an exit when every condition flips
-  if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && liveMode && LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol) {
+  if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && liveMode && (scanOverlay.perp ? LIVE.kind === 'perp' : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
     const isSell = scanOverlay.side === 'Sell';
     const entCol = isSell ? '#F6465D' : '#2EBD85', exCol = isSell ? '#2EBD85' : '#F6465D';
     const entTag = isSell ? 'SELL' : 'BUY', exTag = isSell ? 'BUY EXIT' : 'SELL EXIT';
     const { sig, cs } = sscanChartSignals(scanOverlay);
-    try { sperfLogFromChart(scanOverlay, sig, cs); } catch (e) { /* logging must never break the chart */ }
+    if (!scanOverlay.perp) try { sperfLogFromChart(scanOverlay, sig, cs); } catch (e) { /* logging must never break the chart */ }
     const dia = (x, y, col) => `<path d="M${x.toFixed(2)},${(y-7).toFixed(2)} L${(x+6).toFixed(2)},${y.toFixed(2)} L${x.toFixed(2)},${(y+7).toFixed(2)} L${(x-6).toFixed(2)},${y.toFixed(2)} Z" fill="${col}" stroke="var(--bg, #000)" stroke-width="1"/>`;
     sig.entries.forEach(i => {
       if (i < drawLo || i > drawHi) return;
@@ -7509,8 +7627,11 @@ function liveApplyKindUi() {
   ['rc-live-ot-wrap', 'rc-live-strike-wrap'].forEach(id => show(id, opt));
   ['rc-live-strat-wrap', 'rc-live-center-wrap'].forEach(id => show(id, strat));
   show('rc-live-sw-wrap', strat && !!STRAT_DEFS[LIVE.strat.type].w);
-  show('rc-live-scan-wrap', strat);
-  if (strat && typeof sscanFillApply === 'function') sscanFillApply();
+  const perp = liveMode && LIVE.kind === 'perp';
+  show('rc-live-scan-wrap', strat || perp);
+  if ((strat || perp) && typeof sscanFillApply === 'function') sscanFillApply();
+  // an applied scan was set up on the other kind of chart: re-point it (perp <-> strategy)
+  if ((strat || perp) && typeof sscanApplied !== 'undefined' && sscanApplied && typeof scanOverlay !== 'undefined' && scanOverlay && !!scanOverlay.perp !== perp) setTimeout(() => { try { sscanApplyRefresh(); } catch (e) { /* ignore */ } }, 0);
   const k = document.getElementById('live-kind');
   if (k) k.value = LIVE.kind;
   const pt = document.getElementById('oc-panel-title');
