@@ -2862,7 +2862,7 @@ function renderSPerf() {
    Red = call sellers (call OI), green = put sellers (put OI), one bar pair per strike, drawn from the price axis.
    Mid shade = OI already there at the session start (17:30 IST) · DARK shade = new buildup (OI added since) · LIGHT shade, dashed edge = unwinding (OI removed). */
 const OI_KEY = 'tradepro_oi_v1';
-let oi = { on: true, exp: 'ALL', raw: null, base: null, und: null, at: 0, busy: false, err: null, sel: null, geo: null };
+let oi = { on: true, exp: 'ALL', raw: null, base: null, und: null, at: 0, busy: false, err: null, sel: null, geo: null, legend: false };
 try { const v = JSON.parse(localStorage.getItem(OI_KEY) || 'null'); if (v) { oi.on = v.on !== false; oi.exp = v.exp || 'ALL'; } } catch (e) { /* ignore */ }
 function oiSave() { try { localStorage.setItem(OI_KEY, JSON.stringify({ on: oi.on, exp: oi.exp })); } catch (e) { /* ignore */ } }
 function oiUnd() { const m = /^(BTC|ETH)USD/.exec((typeof LIVE !== 'undefined' && LIVE.symbol) || ''); return m ? m[1] : null; }
@@ -2887,6 +2887,23 @@ function oiRows() {
   add(oi.raw, ''); add(oi.base.raw, 'b');
   return Object.values(rows).sort((a, b) => a.k - b.k);
 }
+/* Own palette so the OI layer never competes with the red/green candles: AMBER = call sellers (CE), VIOLET = put sellers (PE).
+   Per colour: faint wash = OI already there · deep + bright edge = new buildup · pale dashed = unwinding. */
+const OI_SH = { r: { base: '#F5A524', add: '#B86A00', edge: '#FFC85C', rem: '#FFF1D2' }, g: { base: '#9B7BFF', add: '#5B35D6', edge: '#BDA9FF', rem: '#ECE6FF' } };
+function oiLeg() { oi.legend = !oi.legend; oiRender(); }
+function oiLegend(canvas, ready) {
+  let el = document.getElementById('oi-leg');
+  if (!el) { el = document.createElement('div'); el.id = 'oi-leg'; el.style.cssText = 'position:absolute;z-index:9;left:6px;bottom:52px;background:rgba(16,20,27,.97);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:11px;line-height:1.75;box-shadow:0 6px 18px rgba(0,0,0,.55);pointer-events:none;color:var(--text-muted)'; canvas.appendChild(el); }
+  if (!oi.on || !oi.legend || !ready) { el.style.display = 'none'; return; }
+  const S = OI_SH, since = new Date(oi.base.at + 19800000).toISOString().slice(11, 16);
+  const sw = css => `<span style="display:inline-block;width:20px;height:9px;border-radius:2px;vertical-align:middle;margin-right:8px;box-sizing:border-box;${css}"></span>`;
+  el.innerHTML = `<div>${sw(`background:${S.r.base};opacity:.35`)}OI already there at ${since} IST</div>` +
+    `<div>${sw(`background:${S.r.add};border:1.2px solid ${S.r.edge}`)}New buildup (OI added since)</div>` +
+    `<div>${sw(`background:${S.r.rem};opacity:.9;border:1px dashed ${S.r.rem}`)}Unwinding (OI removed)</div>` +
+    `<div style="margin-top:3px"><b style="color:${S.r.base}">■ Amber</b> = call sellers (CE) · <b style="color:${S.g.base}">■ Violet</b> = put sellers (PE)</div>` +
+    `<div style="font-size:10px;color:var(--text-faint)">CE / PE labels mark the biggest wall in view · tap a strike for numbers</div>`;
+  el.style.display = 'block';
+}
 function oiRender() {
   const canvas = document.getElementById('chart-canvas'); if (!canvas) return;
   let lay = document.getElementById('oi-layer'), ctl = document.getElementById('oi-ctl');
@@ -2902,12 +2919,14 @@ function oiRender() {
   if (!oi.busy && (oi.und !== und || Date.now() - oi.at > 60000)) oiFetch();
   const ready = oi.raw && oi.und === und && oi.base;
   const exps = ready ? [...new Set(Object.keys(oi.raw).map(k => k.split('|')[0]))].sort() : [];
-  const sig = oi.on + '|' + oi.exp + '|' + exps.join(',');
+  const sig = oi.on + '|' + oi.exp + '|' + exps.join(',') + '|' + oi.legend;
   if (ctl.dataset.sig !== sig) {
     ctl.dataset.sig = sig;
     ctl.innerHTML = `<button onclick="oiToggle()" style="all:unset;cursor:pointer;padding:3px 9px;border-radius:999px;font-weight:700;border:1px solid ${oi.on ? '#FFD43B' : 'var(--border)'};color:${oi.on ? '#FFD43B' : 'var(--text-muted)'}">OI ${oi.on ? 'on' : 'off'}</button>` +
-      (oi.on && exps.length ? `<select onchange="oiSetExp(this.value)" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;padding:2px 4px"><option value="ALL" ${oi.exp === 'ALL' ? 'selected' : ''}>All expiries</option>${exps.map(e => `<option value="${e}" ${e === oi.exp ? 'selected' : ''}>${liveExpLabel(e)}</option>`).join('')}</select>` : '');
+      (oi.on && exps.length ? `<select onchange="oiSetExp(this.value)" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;padding:2px 4px"><option value="ALL" ${oi.exp === 'ALL' ? 'selected' : ''}>All expiries</option>${exps.map(e => `<option value="${e}" ${e === oi.exp ? 'selected' : ''}>${liveExpLabel(e)}</option>`).join('')}</select>` : '') +
+      (oi.on ? `<button onclick="oiLeg()" title="What do the shades mean?" style="all:unset;cursor:pointer;width:20px;height:20px;box-sizing:border-box;border-radius:50%;text-align:center;line-height:18px;font-weight:700;font-size:11px;border:1px solid ${oi.legend ? '#FFD43B' : 'var(--border)'};color:${oi.legend ? '#FFD43B' : 'var(--text-muted)'}">i</button>` : '');
   }
+  oiLegend(canvas, ready);
   if (!oi.on) return;
   if (!ready || !chartGeom) { lay.innerHTML = oi.err ? `<div style="font-size:10px;color:var(--red);padding:2px 4px">OI: ${sscanEsc(oi.err)}</div>` : ''; return; }
   const g = chartGeom, axis = document.getElementById('price-axis'), H = parseFloat(axis && axis.style.height) || 340, W = Math.round(Math.min(170, canvas.clientWidth * 0.42));
@@ -2918,19 +2937,23 @@ function oiRender() {
   let gap = Infinity; for (let i = 1; i < rows.length; i++) gap = Math.min(gap, yAt(rows[i - 1].k) - yAt(rows[i].k));
   const rh = Math.max(4, Math.min(16, (isFinite(gap) ? gap : 14) - 1.5)), bh = rh / 2 - 0.4, sc = (W - 8) / maxV, RED = '#F6465D', GRN = '#2EBD85';
   /* Shades tell the story: mid tone = OI already there · DARK deep shade = new buildup · LIGHT pale shade (dashed edge) = unwinding */
-  const SH = { r: { base: '#F6465D', add: '#A80F27', rem: '#FFC1CA' }, g: { base: '#2EBD85', add: '#0B6B47', rem: '#B5F0D8' } };
+  const SH = OI_SH;
   let svg = '';
   const bar = (y, cur, base, id) => {
     const c = SH[id], solid = Math.min(cur, base) * sc, inc = Math.max(0, cur - base) * sc, dec = Math.max(0, base - cur) * sc;
-    if (solid > 0) svg += `<rect x="${(W - solid).toFixed(1)}" y="${y.toFixed(1)}" width="${solid.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.base}" fill-opacity=".5"/>`;
-    if (inc > 0.4) svg += `<rect x="${(W - solid - inc).toFixed(1)}" y="${y.toFixed(1)}" width="${inc.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.add}" stroke="${c.base}" stroke-width=".8"/>`;
-    if (dec > 0.4) svg += `<rect x="${(W - solid - dec).toFixed(1)}" y="${y.toFixed(1)}" width="${dec.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.rem}" fill-opacity=".6" stroke="${c.rem}" stroke-width="1" stroke-dasharray="2,2"/>`;
+    if (solid > 0) svg += `<rect x="${(W - solid).toFixed(1)}" y="${y.toFixed(1)}" width="${solid.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.base}" fill-opacity=".26"/>`;
+    if (inc > 0.4) svg += `<rect x="${(W - solid - inc).toFixed(1)}" y="${y.toFixed(1)}" width="${inc.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.add}" stroke="${c.edge}" stroke-width="1.2"/>`;
+    if (dec > 0.4) svg += `<rect x="${(W - solid - dec).toFixed(1)}" y="${y.toFixed(1)}" width="${dec.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.rem}" fill-opacity=".85" stroke="${c.rem}" stroke-width="1" stroke-dasharray="2,2"/>`;
   };
   rows.forEach(r => { const y = yAt(r.k) - rh / 2; bar(y, r.C, r.bC, 'r'); bar(y + bh + 0.8, r.P, r.bP, 'g'); });
   oi.geo = { W, H, rh, rows: rows.map(r => ({ k: r.k, y: yAt(r.k), len: Math.max(r.C, r.P, r.bC, r.bP) * sc })) };
-  if (oi.sel != null) { const sr = rows.find(r => r.k === oi.sel); if (sr) svg += `<rect x="0.5" y="${(yAt(sr.k) - rh / 2 - 1).toFixed(1)}" width="${W - 1}" height="${(rh + 2).toFixed(1)}" fill="none" stroke="#FFD43B" stroke-width="1" rx="2"/>`; }
-  const since = new Date(oi.base.at + 19800000).toISOString().slice(11, 16);
-  const lg = `<rect x="${W - 158}" y="2" width="10" height="7" fill="${SH.r.base}" fill-opacity=".5"/><text x="${W - 145}" y="9" font-size="8.5" fill="var(--text-muted)">OI</text><rect x="${W - 130}" y="2" width="10" height="7" fill="${SH.r.add}" stroke="${SH.r.base}" stroke-width=".8"/><text x="${W - 117}" y="9" font-size="8.5" fill="var(--text-muted)">buildup</text><rect x="${W - 80}" y="2" width="10" height="7" fill="${SH.r.rem}" fill-opacity=".6" stroke="${SH.r.rem}" stroke-dasharray="2,2"/><text x="${W - 67}" y="9" font-size="8.5" fill="var(--text-muted)">unwinding</text><text x="${W - 158}" y="19" font-size="8.5" fill="${SH.r.base}">call sellers</text><text x="${W - 96}" y="19" font-size="8.5" fill="${SH.g.base}">put sellers</text>`;
+  if (oi.sel != null) { const sr = rows.find(r => r.k === oi.sel); if (sr) svg += `<rect x="0.5" y="${(yAt(sr.k) - rh / 2 - 1).toFixed(1)}" width="${W - 1}" height="${(rh + 2).toFixed(1)}" fill="none" stroke="#fff" stroke-width="1" rx="2"/>`; }
+  /* label the biggest call wall (CE) and put wall (PE) in view, right next to their bars */
+  let wC = null, wP = null; rows.forEach(r => { if (!wC || r.C > wC.C) wC = r; if (!wP || r.P > wP.P) wP = r; });
+  const kf = v => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'k' : String(Math.round(v)), same = wC && wP && wC.k === wP.k;
+  const wall = (r, side, v, b) => { if (!r || !(v > 0)) return ''; const len = Math.max(v, b) * sc, yy = yAt(r.k) + (same ? (side === 'r' ? -1 : 8.5) : 3.5);
+    return `<text x="${(W - len - 5).toFixed(1)}" y="${yy.toFixed(1)}" text-anchor="end" font-size="9.5" font-weight="700" fill="${SH[side].edge}" stroke="#0A0D12" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${side === 'r' ? 'CE' : 'PE'} ${kf(v)}</text>`; };
+  const lg = wall(wC, 'r', wC && wC.C, wC && wC.bC) + wall(wP, 'g', wP && wP.P, wP && wP.bP);
   lay.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">${svg}${lg}</svg>`;
   oiCard(lay, rows, yAt, SH);
 }
@@ -2943,6 +2966,7 @@ function oiBindTap(canvas, lay) {
     const s = d; d = null;
     if (!s || Math.hypot(e.clientX - s.x, e.clientY - s.y) > 8 || Date.now() - s.t > 500) return;
     if (e.target.closest && e.target.closest('#oi-ctl')) return;
+    if (oi.legend) { oi.legend = false; oiRender(); }
     if (!oi.on || lay.style.display === 'none' || !oi.geo) return;
     const r = lay.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, G = oi.geo;
     let hit = null, best = 1e9;
@@ -2959,7 +2983,7 @@ function oiCard(lay, rows, yAt, SH) {
   if (!r) { card.style.display = 'none'; return; }
   const n = v => Math.round(v).toLocaleString('en-US'), exp = oi.exp === 'ALL' ? 'All expiries' : liveExpLabel(oi.exp);
   const since = new Date(oi.base.at + 19800000).toISOString().slice(11, 16);
-  const chg = (d, c) => { d = Math.round(d); return d === 0 ? '<span style="color:var(--text-faint)">no change</span>' : d > 0 ? `<span style="color:${c.base}">▲ +${n(d)} buildup</span>` : `<span style="color:${c.rem}">▼ −${n(-d)} unwinding</span>`; };
+  const chg = (d, c) => { d = Math.round(d); return d === 0 ? '<span style="color:var(--text-faint)">no change</span>' : d > 0 ? `<span style="color:${c.edge}">▲ +${n(d)} buildup</span>` : `<span style="color:${c.rem}">▼ −${n(-d)} unwinding</span>`; };
   const line = (lbl, cur, base, c) => `<div style="display:flex;justify-content:space-between;gap:14px;align-items:baseline;margin-top:3px"><span style="color:${c.base};font-weight:700">${lbl}</span><b style="font-size:12.5px;color:var(--text)">${n(cur)}</b></div><div style="text-align:right;font-size:10px">${chg(cur - base, c)}</div>`;
   card.innerHTML = `<div style="font-weight:700;color:var(--text)">${r.k.toLocaleString('en-US')} <span style="font-weight:500;color:var(--text-muted)">· ${exp}</span></div>` + line('CE · calls', r.C, r.bC, SH.r) + line('PE · puts', r.P, r.bP, SH.g) + `<div style="margin-top:4px;font-size:9.5px;color:var(--text-faint)">OI in contracts · change since ${since} IST</div>`;
   card.style.display = 'block'; card.style.maxWidth = Math.max(140, canvas.clientWidth - 72) + 'px';
@@ -3431,7 +3455,7 @@ function fmtAxisPrice(v) {
   // axis — TradingView-style gridline labels, separate from the colored "current price" tag.
   if (v == null || isNaN(v)) return '';
   const abs = Math.abs(v);
-  const decimals = abs >= 1000 ? 1 : abs >= 1 ? 2 : 4;
+  const decimals = abs >= 1000 ? 0 : abs >= 1 ? 2 : 4;
   return v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
