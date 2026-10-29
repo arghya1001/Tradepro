@@ -1740,6 +1740,8 @@
       <button type="button" class="btn-ghost" onclick="sscanAddSqueeze()">+ EMA squeeze condition</button>
       <button type="button" class="btn-ghost" onclick="sscanPresetSqueeze()" title="Ribbon squeezed then broken down + Guppy short EMAs below long EMAs + close below Supertrend (10,2), first signal only">★ Squeeze + Guppy + Supertrend preset</button>
       <button type="button" class="btn-ghost" onclick="sscanPresetGuppy()" title="Short EMAs 10,12,15 below long EMAs 30,35,40 + close below Supertrend (10,2), first signal only">★ Bearish Guppy + Supertrend preset</button>
+      <button type="button" class="btn-ghost" onclick="sscanPresetSqueezeBull()" title="Ribbon squeezed then broken up + Guppy short EMAs above long EMAs + close above Supertrend (10,2), first signal only">★ Bullish Squeeze + Guppy + Supertrend preset</button>
+      <button type="button" class="btn-ghost" onclick="sscanPresetGuppyBull()" title="Short EMAs 10,12,15 above long EMAs 30,35,40 + close above Supertrend (10,2), first signal only">★ Bullish Guppy + Supertrend preset</button>
 
       <label class="field-label" id="sscan-minprem-label">No entry if combined premium is below (USD, 0 = off)</label>
       <input class="field-input" id="sscan-minprem" type="number" min="0" step="10" placeholder="e.g. 600" oninput="sscanDraft.minPrem=Math.max(0,parseFloat(this.value)||0)">
@@ -2159,6 +2161,7 @@ let savedScanners = [
   { name:'Nifty golden cross watch', asset:'nifty', cat:'bullish', conds:[{ind:'MA 50', op:'crosses above', val:'MA 200'}] },
   { name:'BTC RSI overbought fade', asset:'btc', cat:'bearish', conds:[{ind:'RSI (14)', op:'crosses below', val:'70'}] },
   { name:'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)', asset:'btc', cat:'bearish', note:'runs in Strategy scanner', conds:[{ind:'Guppy EMA ribbon',op:'squeezed, then breaks down',val:'ribbon low'},{ind:'Guppy short EMAs',op:'below',val:'long EMAs'},{ind:'Price',op:'less than',val:'Supertrend (10,2)'}] },
+  { name:'Bullish: EMA squeeze breakout + Guppy crossover + above Supertrend (10,2)', asset:'btc', cat:'bullish', note:'runs in Strategy scanner', conds:[{ind:'Guppy EMA ribbon',op:'squeezed, then breaks up',val:'ribbon high'},{ind:'Guppy short EMAs',op:'above',val:'long EMAs'},{ind:'Price',op:'greater than',val:'Supertrend (10,2)'}] },
 ];
 
 function renderSavedScanners() {
@@ -2297,10 +2300,19 @@ try {
   if (!localStorage.getItem('tradepro_seed_guppy_v2')) {
     const old = ['Bearish Guppy crossover + below Supertrend (10,2)', 'EMA squeeze breakdown + below Supertrend (10,2)'];   // earlier separate seeds, replaced by the combined scan
     sscans = sscans.filter(x => !(x && old.indexOf(x.name) !== -1));
-    const sc = { name:'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)', strat:'Straddle', side:'Sell', und:'BTC', tf:'5m', fresh:true, minPrem:600, sl:{ on:true, n:4, buf:2, mode:'fixed' },
+    const sc = { name:'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)', strat:'Straddle', side:'Sell', und:'BTC,ETH', tf:'5m', fresh:true, minPrem:600, sl:{ on:true, n:4, buf:2, mode:'fixed' },
       conds:[{ op:'below', k:'gsq', a:1.0, n:10, m:3 }, { op:'below', k:'gmma', s:[10,12,15], l:[30,35,40], mode:'avg' }, { op:'below', k:'st', p:10, m:2 }] };
     if (!sscans.some(x => x && x.name === sc.name)) sscans.push(sc);
     localStorage.setItem('tradepro_seed_guppy_v2', '1');
+  }
+  // One-time (v3): bearish scan now covers BTC + ETH, and its exact mirror — the bullish scan — is added (Buy, every condition 'above').
+  if (!localStorage.getItem('tradepro_seed_guppy_v3')) {
+    const bearName = 'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)';
+    sscans.forEach(x => { if (x && x.name === bearName && x.und === 'BTC') x.und = 'BTC,ETH'; });
+    const bull = { name:'Bullish: EMA squeeze breakout + Guppy crossover + above Supertrend (10,2)', strat:'Straddle', side:'Buy', und:'BTC,ETH', tf:'5m', fresh:true, minPrem:600, sl:{ on:true, n:4, buf:2, mode:'fixed' },
+      conds:[{ op:'above', k:'gsq', a:1.0, n:10, m:3 }, { op:'above', k:'gmma', s:[10,12,15], l:[30,35,40], mode:'avg' }, { op:'above', k:'st', p:10, m:2 }] };
+    if (!sscans.some(x => x && x.name === bull.name)) sscans.push(bull);
+    localStorage.setItem('tradepro_seed_guppy_v3', '1');
   }
 } catch (e) { /* storage unavailable */ }
 try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ }
@@ -2434,6 +2446,22 @@ function sscanPresetGuppy() {   // Bearish Guppy crossover + close below Supertr
   d.fresh = true; document.getElementById('sscan-fresh').checked = true;
   setSScanSide('Sell');
   if (!nm.value.trim()) nm.value = 'Bearish Guppy crossover + below Supertrend (10,2)';
+  renderSScanConds();
+}
+function sscanPresetSqueezeBull() {   // mirror of the bearish squeeze preset: ribbon squeeze, then a close above the whole ribbon + above Supertrend (10,2); first signal only
+  const d = sscanDraft, nm = document.getElementById('sscan-name');
+  d.conds = [{ op: 'above', k: 'gsq', a: SSCAN_SQ.a, n: SSCAN_SQ.n, m: SSCAN_SQ.m }, { op: 'above', k: 'gmma', s: SSCAN_GMMA.s.slice(), l: SSCAN_GMMA.l.slice(), mode: 'avg' }, { op: 'above', k: 'st', p: 10, m: 2 }];
+  d.fresh = true; document.getElementById('sscan-fresh').checked = true;
+  setSScanSide('Buy');
+  if (!nm.value.trim()) nm.value = 'Bullish: EMA squeeze breakout + Guppy crossover + above Supertrend (10,2)';
+  renderSScanConds();
+}
+function sscanPresetGuppyBull() {   // Bullish Guppy crossover + close above Supertrend (10,2); fires on the first candle both are true
+  const d = sscanDraft, nm = document.getElementById('sscan-name');
+  d.conds = [{ op: 'above', k: 'gmma', s: SSCAN_GMMA.s.slice(), l: SSCAN_GMMA.l.slice(), mode: 'avg' }, { op: 'above', k: 'st', p: 10, m: 2 }];
+  d.fresh = true; document.getElementById('sscan-fresh').checked = true;
+  setSScanSide('Buy');
+  if (!nm.value.trim()) nm.value = 'Bullish Guppy crossover + above Supertrend (10,2)';
   renderSScanConds();
 }
 function sscanAddCond() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell' ? 'below' : 'above', k: 'ema', p: 20 }); renderSScanConds(); }
@@ -2657,7 +2685,7 @@ function sscanChartSignals(ov) {
   let n = Math.min(replayIndex, replayCandles.length);
   if (n > 0 && secs) { const ts = liveTimeToSec(replayCandles[n - 1].t); if (ts != null && ts + secs > Date.now() / 1000) n--; }
   const cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
-  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr, p.minPrem, p.slr) }, cs, { conds: ov.conds, xr: sscanExitRule(ov), minPrem: ov.perp ? 0 : ov.minPrem || 0, slr: sscanSlRule(ov) });
+  const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr, p.minPrem, p.slr) }, cs, { conds: ov.conds, xr: sscanExitRule(ov), minPrem: ov.perp || ov.opt ? 0 : ov.minPrem || 0, slr: sscanSlRule(ov) });
   return { sig, cs };
 }
 async function openSScanChart(i, und) {
@@ -2695,12 +2723,13 @@ async function sscanApplyRefresh() {
   const token = ++sscanApplyToken;
   const draw = () => { try { renderChart(); } catch (e) { /* chart not ready yet */ } };
   if (!sscanApplied) { scanOverlay = null; if (info) info.textContent = ''; draw(); return; }
-  const onPerp = liveMode && LIVE.kind === 'perp';
-  if (!onPerp && (!liveMode || LIVE.kind !== 'strategy' || !LIVE.stratSymbol)) return;
+  const onPerp = liveMode && LIVE.kind === 'perp', onOpt = liveMode && LIVE.kind === 'options' && /^[CP]-/.test(String(LIVE.symbol || ''));
+  if (!onPerp && !onOpt && (!liveMode || LIVE.kind !== 'strategy' || !LIVE.stratSymbol)) return;
   const sc = sscans.find(x => x.name === sscanApplied);
   if (!sc) { sscanApplied = null; scanOverlay = null; sscanFillApply(); if (info) info.textContent = ''; draw(); return; }
-  const und = onPerp ? String(LIVE.symbol || '').replace(/USD.*$/, '') : LIVE.strat.und, symbol = onPerp ? LIVE.symbol : LIVE.stratSymbol;
-  scanOverlay = Object.assign({}, sscanOverlayMeta(sc, und), { symbol, perp: onPerp, minPrem: onPerp ? 0 : sc.minPrem || 0 });
+  const und = onPerp ? String(LIVE.symbol || '').replace(/USD.*$/, '') : onOpt ? String(LIVE.symbol).split('-')[1] : LIVE.strat.und, symbol = onPerp || onOpt ? LIVE.symbol : LIVE.stratSymbol;
+  // perp and single-option charts: the combined-premium floor doesn't apply (it is sized for a two-leg straddle premium)
+  scanOverlay = Object.assign({}, sscanOverlayMeta(sc, und), { symbol, perp: onPerp, opt: onOpt, minPrem: onPerp || onOpt ? 0 : sc.minPrem || 0 });
   draw();   // renderChart fills the info line from the chart's own signals
 }
 function sscanOverlayWatch() { // markers are recomputed from the chart's own candles on every render, so nothing to poll
@@ -6005,12 +6034,12 @@ function renderChart(forceEnd) {
   });
 
   // scanner signals, evaluated on THIS chart's candles: one entry per cycle, then an exit when every condition flips
-  if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && liveMode && (scanOverlay.perp ? LIVE.kind === 'perp' : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
+  if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && liveMode && (scanOverlay.perp ? LIVE.kind === 'perp' : scanOverlay.opt ? (LIVE.kind === 'options' && LIVE.symbol === scanOverlay.symbol) : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
     const isSell = scanOverlay.side === 'Sell';
     const entCol = isSell ? '#F6465D' : '#2EBD85', exCol = isSell ? '#2EBD85' : '#F6465D';
     const entTag = isSell ? 'SELL' : 'BUY', exTag = isSell ? 'BUY EXIT' : 'SELL EXIT';
     const { sig, cs } = sscanChartSignals(scanOverlay);
-    if (!scanOverlay.perp) try { sperfLogFromChart(scanOverlay, sig, cs); } catch (e) { /* logging must never break the chart */ }
+    if (!scanOverlay.perp && !scanOverlay.opt) try { sperfLogFromChart(scanOverlay, sig, cs); } catch (e) { /* logging must never break the chart */ }
     const dia = (x, y, col) => `<path d="M${x.toFixed(2)},${(y-7).toFixed(2)} L${(x+6).toFixed(2)},${y.toFixed(2)} L${x.toFixed(2)},${(y+7).toFixed(2)} L${(x-6).toFixed(2)},${y.toFixed(2)} Z" fill="${col}" stroke="var(--bg, #000)" stroke-width="1"/>`;
     sig.entries.forEach(i => {
       if (i < drawLo || i > drawHi) return;
@@ -7640,10 +7669,10 @@ function liveApplyKindUi() {
   ['rc-live-strat-wrap', 'rc-live-center-wrap'].forEach(id => show(id, strat));
   show('rc-live-sw-wrap', strat && !!STRAT_DEFS[LIVE.strat.type].w);
   const perp = liveMode && LIVE.kind === 'perp';
-  show('rc-live-scan-wrap', strat || perp);
-  if ((strat || perp) && typeof sscanFillApply === 'function') sscanFillApply();
-  // an applied scan was set up on the other kind of chart: re-point it (perp <-> strategy)
-  if ((strat || perp) && typeof sscanApplied !== 'undefined' && sscanApplied && typeof scanOverlay !== 'undefined' && scanOverlay && !!scanOverlay.perp !== perp) setTimeout(() => { try { sscanApplyRefresh(); } catch (e) { /* ignore */ } }, 0);
+  show('rc-live-scan-wrap', strat || perp || opt);
+  if ((strat || perp || opt) && typeof sscanFillApply === 'function') sscanFillApply();
+  // an applied scan was set up on the other kind of chart: re-point it (perp <-> single option <-> strategy)
+  if ((strat || perp || opt) && typeof sscanApplied !== 'undefined' && sscanApplied && typeof scanOverlay !== 'undefined' && scanOverlay && (!!scanOverlay.perp !== perp || !!scanOverlay.opt !== opt)) setTimeout(() => { try { sscanApplyRefresh(); } catch (e) { /* ignore */ } }, 0);
   const k = document.getElementById('live-kind');
   if (k) k.value = LIVE.kind;
   const pt = document.getElementById('oc-panel-title');
