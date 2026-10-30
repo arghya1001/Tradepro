@@ -903,6 +903,7 @@
 
   /* ================= Mobile chart-first Replay layout (phones, <= 700px) ================= */
   #m-top, #m-sheet { display: none; }
+  #live-scan-info { display: none; }
   @media (max-width: 700px) {
     :root { --navh: 50px; }
 
@@ -967,7 +968,7 @@
     #view-replay .ind-control { margin: 0; }
 
     /* signal stats line: entries / exits / IN BUY */
-    #view-replay #live-scan-info { margin: 0; padding: 0 10px; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #view-replay #live-scan-info { margin: 0; padding: 0 10px; font-size: 11.5px; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     #view-replay #live-scan-info:empty { display: none; }
     #view-replay #live-scan-info[data-inbuy="1"] { color: var(--green); }
     #view-replay #live-scan-info[data-inbuy="2"] { color: var(--red); }
@@ -2428,6 +2429,12 @@ try {
     localStorage.setItem('tradepro_seed_guppy_v3', '1');
   }
 } catch (e) { /* storage unavailable */ }
+try {
+  if (!localStorage.getItem('tradepro_split_guppy_v1')) {
+    sscans.forEach(sc => { if (sc && /guppy/i.test(sc.name) && Array.isArray(sc.conds) && sc.conds.some(c => c.k === 'gmma') && sc.strat === 'Straddle') { sc.strat = 'Guppy crossover'; sc.minPrem = 0; } });
+    localStorage.setItem('tradepro_split_guppy_v1', '1');
+  }
+} catch (e) { /* storage unavailable */ }
 try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ }
 function persistSScans() { try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ } }
 let sscanResults = {};   // scan index -> { at, rows:[{und, ok, price, details, err}] }
@@ -2444,7 +2451,7 @@ function renderSScans() {
   if (!el) return;
   document.getElementById('sscan-count').textContent = sscans.length ? `(${sscans.length})` : '';
   if (!sscans.length) { el.innerHTML = '<div class="saved-empty">No strategy scans yet — tap “New strategy scan”.</div>'; return; }
-  el.innerHTML = sscans.map((sc, i) => {
+  const cards = sscans.map((sc, i) => {
     const r = sscanResults[i];
     const sideCol = sc.side === 'Sell' ? 'var(--red)' : 'var(--green)';
     let res = '';
@@ -2454,7 +2461,7 @@ function renderSScans() {
         const chip = row.ok ? `<span style="color:var(--green); font-weight:700">MATCH</span>` : `<span style="color:var(--text-faint); font-weight:600">no match</span>`;
         const lines = row.details.map(d => `<div style="font-size:11.5px; color:${d.ok ? 'var(--green)' : 'var(--text-muted)'}">${d.ok ? '✓' : '✗'} ${sscanEsc(d.text)}</div>`).join('');
         const when = row.lastActSec ? `<div style="font-size:11.5px; margin-top:4px; color:var(--text-muted)">${row.ok ? 'Active since' : 'Last activated'} <b>${sscanTime(row.lastActSec)}</b> · ${row.barsSince === 0 ? 'this candle' : row.barsSince + ' candle' + (row.barsSince > 1 ? 's' : '') + ' ago'} · ${row.actCount} activation${row.actCount > 1 ? 's' : ''} in the last ~400 candles</div>` : `<div style="font-size:11.5px; margin-top:4px; color:var(--text-faint)">Not activated in the last ~400 candles</div>`;
-        const open = (row.actCount || row.ok) && !isIndiaUnd(row.und) ? `<button class="strat-chart-btn" onclick="openSScanChart(${i},'${row.und}')">Show ${sscanEsc(sc.side)} ${sscanEsc(sc.strat)} chart with activations ↗</button>` : '';
+        const open = sc.strat === 'Guppy crossover' ? (isIndiaUnd(row.und) ? '' : `<button class="strat-chart-btn" onclick="openGuppyChart('${row.und}',${i})">Open on live chart (Bullish + Bearish) ↗</button>`) : ((row.actCount || row.ok) && !isIndiaUnd(row.und) ? `<button class="strat-chart-btn" onclick="openSScanChart(${i},'${row.und}')">Show ${sscanEsc(sc.side)} ${sscanEsc(sc.strat)} chart with activations ↗</button>` : '');
         return `<div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border)">
           <div style="display:flex; justify-content:space-between; font-size:13px"><span><b>${row.und}</b> · close ${sscanFmt(row.price)}</span>${chip}</div>
           ${lines}${when}${open}</div>`;
@@ -2473,9 +2480,12 @@ function renderSScans() {
       <div class="strat-legs">${sscanEsc(sscanSummary(sc))}</div>
       ${res}
     </div>`;
-  }).join('');
+  });
+  const isG = sc => sc.strat === 'Guppy crossover';
+  const sect = (title, pred) => { const items = cards.map((h, i) => pred(sscans[i]) ? h : '').join(''); return items ? `<div style="font-size:12.5px;font-weight:600;color:var(--text-muted);margin:14px 0 6px">${title}</div>${items}` : ''; };
+  el.innerHTML = sect('Straddle scanner', sc => !isG(sc)) + sect('Guppy crossover scanner', isG);
 }
-function removeSScan(i) { const gone = sscans[i]; sscans.splice(i, 1); sscanResults = {}; persistSScans(); if (gone && gone.name === sscanApplied) { sscanApplied = null; sscanApplyRefresh(); } renderSScans(); sscanFillApply(); }
+function removeSScan(i) { const gone = sscans[i]; sscans.splice(i, 1); sscanResults = {}; persistSScans(); if (gone && (gone.name === sscanApplied || (sscanApplied === '__pair' && /guppy/i.test(gone.name)))) { sscanApplied = null; sscanApplyRefresh(); } renderSScans(); sscanFillApply(); }
 
 /* ---- builder modal ---- */
 function setSScanSide(side) {
@@ -2585,7 +2595,7 @@ function openSScan(idx, stratName) {
     : JSON.parse(JSON.stringify(sscans[idx]));
   if (idx == null && stratName && /^Iron/.test(stratName)) sscanDraft.side = 'Sell';
   document.getElementById('sscan-name').value = sscanDraft.name;
-  document.getElementById('sscan-strat').innerHTML = SSCAN_STRATS.map(n => `<option ${n === sscanDraft.strat ? 'selected' : ''}>${n}</option>`).join('');
+  document.getElementById('sscan-strat').innerHTML = SSCAN_STRATS.concat(SSCAN_STRATS.indexOf(sscanDraft.strat) < 0 ? [sscanDraft.strat] : []).map(n => `<option ${n === sscanDraft.strat ? 'selected' : ''}>${n}</option>`).join('');
   document.getElementById('sscan-und').value = sscanDraft.und;
   document.getElementById('sscan-tf').innerHTML = SSCAN_TFS.map(t => `<option ${t === sscanDraft.tf ? 'selected' : ''}>${t}</option>`).join('');
   document.getElementById('sscan-tf').onchange = e => { sscanDraft.tf = e.target.value; };
@@ -2607,7 +2617,7 @@ function saveSScan() {
   sscanFromChart = false;
   sscanResults = {};
   persistSScans(); renderSScans(); closeSScan();
-  if (applyToChart) { sscanApplied = d.name; sscanApplyRefresh(); }
+  if (applyToChart) { sscanApplied = d.name; sscanApplyRefresh(); } else if (sscanApplied === '__pair') sscanApplyRefresh();
   sscanFillApply();
   runSScan(idx);
 }
@@ -2813,11 +2823,34 @@ async function openSScanChart(i, und) {
 /* ---- apply a scan straight onto the open strategy chart (uses the chart's own timeframe) ---- */
 let sscanApplied = null, sscanApplyToken = 0, sscanFromChart = false;
 const SSCAN_TYPE_NAMES = { straddle: 'Straddle', strangle: 'Strangle', ironfly: 'Iron butterfly', condor: 'Iron condor', bullcall: 'Bull call spread', bearput: 'Bear put spread' };
+function sscanGuppyPair() {   // chart-only merge: the Guppy-based Buy scan + the Guppy-based Sell scan, shown as one Signal option
+  const g = sscans.filter(sc => sc && /guppy/i.test(sc.name) && Array.isArray(sc.conds) && sc.conds.some(c => c.k === 'gmma'));
+  const bull = g.find(sc => sc.side === 'Buy'), bear = g.find(sc => sc.side === 'Sell');
+  return bull && bear ? { bull, bear } : null;
+}
+async function openGuppyChart(und, i) {   // Scanner tab -> live perpetual chart for this underlying, Guppy signals (Buy + Sell) switched on
+  try {
+    const sc = sscans[i];
+    showView('replay');
+    if (!liveMode) setDataMode('live');
+    const k = document.getElementById('live-kind');
+    if (k && k.value !== 'perp') { k.value = 'perp'; await onLiveKindChange(); }
+    const sy = document.getElementById('live-symbol'), want = und + 'USD';
+    if (sy && Array.from(sy.options).some(o => o.value === want)) { sy.value = want; onLiveSymbolChange(); }
+    const tf = document.getElementById('live-timeframe');
+    if (tf && sc && Array.from(tf.options).some(o => o.value === sc.tf)) { tf.value = sc.tf; onLiveTimeframeChange(); }
+    sscanApplied = sscanGuppyPair() ? '__pair' : (sc && sc.name) || null;
+    sscanFillApply(); sscanApplyRefresh();
+  } catch (e) { console.warn('openGuppyChart failed', e); }
+}
 function sscanFillApply() {
   const sel = document.getElementById('live-scan-apply');
   if (!sel) return;
+  const onStrat = liveMode && LIVE.kind === 'strategy';
+  const pr = onStrat ? null : sscanGuppyPair(), hide = pr ? [pr.bull.name, pr.bear.name] : [];
   sel.innerHTML = '<option value="">Off</option>' +
-    sscans.map(sc => `<option value="${sscanEsc(sc.name)}" ${sc.name === sscanApplied ? 'selected' : ''}>${sscanEsc(sc.name)} · ${sc.side}</option>`).join('') +
+    (pr ? `<option value="__pair" ${sscanApplied === '__pair' ? 'selected' : ''}>Guppy crossover: Bullish + Bearish · Buy + Sell</option>` : '') +
+    sscans.filter(sc => hide.indexOf(sc.name) < 0 && !(onStrat && sc.strat === 'Guppy crossover')).map(sc => `<option value="${sscanEsc(sc.name)}" ${sc.name === sscanApplied ? 'selected' : ''}>${sscanEsc(sc.name)} · ${sc.side}</option>`).join('') +
     '<option value="__new">+ New scan for this chart…</option>';
   if (!sscanApplied) sel.value = '';
 }
@@ -2838,11 +2871,13 @@ async function sscanApplyRefresh() {
   if (!sscanApplied) { scanOverlay = null; if (info) info.textContent = ''; draw(); return; }
   const onPerp = liveMode && LIVE.kind === 'perp', onOpt = liveMode && LIVE.kind === 'options' && /^[CP]-/.test(String(LIVE.symbol || ''));
   if (!onPerp && !onOpt && (!liveMode || LIVE.kind !== 'strategy' || !LIVE.stratSymbol)) return;
-  const sc = sscans.find(x => x.name === sscanApplied);
+  const pair = sscanApplied === '__pair' ? sscanGuppyPair() : null;
+  const sc = pair ? pair.bull : sscans.find(x => x.name === sscanApplied);
   if (!sc) { sscanApplied = null; scanOverlay = null; sscanFillApply(); if (info) info.textContent = ''; draw(); return; }
   const und = onPerp ? String(LIVE.symbol || '').replace(/USD.*$/, '') : onOpt ? String(LIVE.symbol).split('-')[1] : LIVE.strat.und, symbol = onPerp || onOpt ? LIVE.symbol : LIVE.stratSymbol;
   // perp and single-option charts: the combined-premium floor doesn't apply (it is sized for a two-leg straddle premium)
-  scanOverlay = Object.assign({}, sscanOverlayMeta(sc, und), { symbol, perp: onPerp, opt: onOpt, minPrem: onPerp || onOpt ? 0 : sc.minPrem || 0 });
+  const mkOv = x => Object.assign({}, sscanOverlayMeta(x, und), { symbol, perp: onPerp, opt: onOpt, minPrem: onPerp || onOpt ? 0 : x.minPrem || 0 });
+  scanOverlay = pair ? Object.assign(mkOv(pair.bull), { multi: [mkOv(pair.bull), mkOv(pair.bear)] }) : mkOv(sc);
   draw();   // renderChart fills the info line from the chart's own signals
 }
 function sscanOverlayWatch() { // markers are recomputed from the chart's own candles on every render, so nothing to poll
@@ -6162,13 +6197,15 @@ function renderChart(forceEnd) {
 
   // scanner signals, evaluated on THIS chart's candles: one entry per cycle, then an exit when every condition flips
   if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && liveMode && (scanOverlay.perp ? LIVE.kind === 'perp' : scanOverlay.opt ? (LIVE.kind === 'options' && LIVE.symbol === scanOverlay.symbol) : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
-    const isSell = scanOverlay.side === 'Sell';
+    const infoParts = [], multiOv = !!scanOverlay.multi;
+    (scanOverlay.multi || [scanOverlay]).forEach(ov => {
+    const isSell = ov.side === 'Sell';
     // Direction decides the look, not entry/exit: every BUY-type signal (BUY entry, BUY EXIT) sits BELOW the candle as a blue
     // up-arrow, every SELL-type signal (SELL entry, SELL EXIT) sits ABOVE the candle as a yellow down-arrow, so they never blend with the green/red candles.
     const entTag = isSell ? 'SELL' : 'BUY', exTag = isSell ? 'BUY EXIT' : 'SELL EXIT';
     const BUY_COL = '#2F9BFF', SELL_COL = '#FFD60A';
-    const { sig, cs } = sscanChartSignals(scanOverlay);
-    if (!scanOverlay.perp && !scanOverlay.opt) try { sperfLogFromChart(scanOverlay, sig, cs); } catch (e) { /* logging must never break the chart */ }
+    const { sig, cs } = sscanChartSignals(ov);
+    if (!ov.perp && !ov.opt) try { sperfLogFromChart(ov, sig, cs); } catch (e) { /* logging must never break the chart */ }
     const arrow = (i, tag) => {
       const isBuy = tag.indexOf('BUY') === 0, col = isBuy ? BUY_COL : SELL_COL, x = xAt(i), exit = /EXIT/.test(tag);
       const top = GAP, bot = GAP + (BASE_H - GAP - VOLH - PAD);
@@ -6185,13 +6222,17 @@ function renderChart(forceEnd) {
     };
     sig.entries.forEach(i => { if (i >= drawLo && i <= drawHi) signalMarkers += arrow(i, entTag); });
     sig.exits.forEach(i => { if (i >= drawLo && i <= drawHi) signalMarkers += arrow(i, exTag); });
-    const info = document.getElementById('live-scan-info');
-    if (info) {
+    {
       const ne = sig.entries.length, nx = sig.exits.length, lastE = ne ? sig.entries[ne - 1] : -1;
       const when = lastE >= 0 ? sscanTime(liveTimeToSec(cs[lastE].t)) : '';
-      info.textContent = ne ? `${entTag} entries: ${ne} · ${exTag.toLowerCase()}s: ${nx} · ${sig.inPos ? 'now IN ' + entTag + ' since ' + when : 'now flat · last ' + entTag + ' ' + when}`
-                            : `No ${entTag} signals on this chart in range`;
+      infoParts.push(multiOv
+        ? (ne ? `${entTag}: ${ne} in / ${nx} out · ${sig.inPos ? 'IN ' + entTag + ' since ' + when : 'flat'}` : `${entTag}: none in range`)
+        : (ne ? `${entTag} entries: ${ne} · ${exTag.toLowerCase()}s: ${nx} · ${sig.inPos ? 'now IN ' + entTag + ' since ' + when : 'now flat · last ' + entTag + ' ' + when}`
+              : `No ${entTag} signals on this chart in range`));
     }
+    });
+    const info = document.getElementById('live-scan-info');
+    if (info) info.textContent = infoParts.join('   |   ');
   }
 
   /* ---- Oscillator panes: each instance gets its OWN stacked pane, so RSI + MACD +
@@ -9623,7 +9664,7 @@ function selectContract(sym) {
     var info = $('live-scan-info');
     if (info && window.MutationObserver) new MutationObserver(function () {
       var t = info.textContent || '';
-      info.dataset.inbuy = /IN BUY/i.test(t) ? '1' : /IN SELL/i.test(t) ? '2' : '0';
+      var b = /IN BUY/i.test(t), sl = /IN SELL/i.test(t); info.dataset.inbuy = b && !sl ? '1' : sl && !b ? '2' : '0';
     }).observe(info, { childList: true, characterData: true, subtree: true });
 
     $('m-sym').onclick = function () {
