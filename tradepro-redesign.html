@@ -5479,6 +5479,30 @@ function rsiSelect(id, key, val) {
   updateIndicatorSelectParam(id, key, val); renderIndicatorChips(); scheduleSave(); refreshIndicatorSettings(id);
 }
 function rsiTabSet(id, t) { rsiTab = t; refreshIndicatorSettings(id); }
+/* Drag handle on the bottom edge of every oscillator pane: drag down = taller, up = shorter (touch and mouse). */
+let oscDrag = null;
+function oscHandlesRender(list) {
+  const canvas = document.getElementById('chart-canvas'); if (!canvas) return;
+  let lay = document.getElementById('osc-handles');
+  if (!lay) { lay = document.createElement('div'); lay.id = 'osc-handles'; lay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:0;z-index:7;pointer-events:none'; canvas.appendChild(lay); }
+  lay.innerHTML = list.map(o => `<div title="Drag to resize the pane" onpointerdown="oscDragStart(event,'${o.id}')" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" style="position:absolute;left:8px;top:${(o.bottom - 17).toFixed(0)}px;width:46px;height:15px;opacity:.9;border-radius:8px;background:var(--surface-2);border:1px solid var(--border-strong);display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;cursor:ns-resize;touch-action:none;pointer-events:auto"><i style="display:block;width:22px;height:1.5px;background:var(--text-muted)"></i><i style="display:block;width:22px;height:1.5px;background:var(--text-muted)"></i></div>`).join('');
+}
+function oscDragStart(e, id) {
+  const inst = activeIndicators.find(i => i.id === id); if (!inst) return;
+  e.preventDefault(); e.stopPropagation();
+  oscDrag = { id, y: e.clientY, h: Math.max(50, Math.min(400, +inst.paneH || 70)) };
+}
+window.addEventListener('pointermove', e => { if (oscDrag) { e.preventDefault(); setPaneHeight(oscDrag.id, oscDrag.h + (e.clientY - oscDrag.y)); } }, { passive: false });
+['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, () => { if (oscDrag) { oscDrag = null; scheduleSave(); } }));
+function setPaneHeight(id, v) {
+  const inst = activeIndicators.find(i => i.id === id); if (!inst) return;
+  inst.paneH = Math.max(50, Math.min(400, parseInt(v, 10) || 70));
+  renderChart(); scheduleSave();
+}
+function paneHeightRowHtml(inst) {
+  const h = Math.max(50, Math.min(400, +inst.paneH || 70));
+  return `<div class="ind-settings-row"><label>Pane height</label><div class="opacity-control"><input type="range" min="50" max="400" step="10" value="${h}" oninput="setPaneHeight('${inst.id}', this.value); document.getElementById('ph-${inst.id}').textContent=this.value+'px'"><span id="ph-${inst.id}" class="opacity-value">${h}px</span></div></div>`;
+}
 function rsiCancel(id) {
   if (rsiSnap && rsiSnap.id === id) {
     const inst = activeIndicators.find(i => i.id === id);
@@ -5514,7 +5538,8 @@ function rsiSettingsHtml(inst) {
       row(chk(cf.bg, `rsiSet('${id}','bg',null,this.checked)`), 'Hlines Background', 'bgColor', inst.bgColor);
   } else {
     body = `<div class="ind-settings-row" style="gap:8px">${chk(cf.shown !== false, `rsiSet('${id}','shown',null,this.checked)`)}<label style="color:var(--text)">Show indicator</label></div>
-      <div class="ind-settings-row" style="gap:8px">${chk(cf.labels !== false, `rsiSet('${id}','labels',null,this.checked)`)}<label style="color:var(--text)">Show value label on the price scale</label></div>`;
+      <div class="ind-settings-row" style="gap:8px">${chk(cf.labels !== false, `rsiSet('${id}','labels',null,this.checked)`)}<label style="color:var(--text)">Show value labels on the price scale</label></div>
+      ${paneHeightRowHtml(inst)}`;
   }
   return `<div class="ind-settings-head"><span>RSI</span><button type="button" class="collapse-btn" aria-label="Close" onclick="rsiCancel('${id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div style="display:flex;padding:4px 14px 0;border-bottom:1px solid var(--border-soft)">${tab('inputs', 'Inputs')}${tab('style', 'Style')}${tab('vis', 'Visibility')}</div>
@@ -5906,6 +5931,7 @@ function openIndicatorSettings(e, id) {
       ${widthRow}
       ${lineStyleRow}
       ${opacityRow}
+      ${def.type === 'oscillator' ? paneHeightRowHtml(inst) : ''}
     </div>
     <div class="ind-settings-foot">
       <button type="button" class="btn-ghost" style="flex:1;color:var(--red);" onclick="removeIndicator('${inst.id}'); closeIndicatorSettings()">Remove indicator</button>
@@ -5984,6 +6010,7 @@ function renderChart(forceEnd) {
   const volOn = activeIndicators.some(i => i.key === 'volume');   // volume bars only when the user adds the Volume indicator
   const VOLH = volOn ? 56 : 0, PAD = 10, GAP = PAD + 16;
   const OSC_GAP = 16, OSC_H = 70;
+  const oscHOf = inst => Math.max(50, Math.min(400, +inst.paneH || OSC_H));   // each oscillator pane has its own height (Pane height slider in its settings)
   const CANDLE_PX = candlePx;
   const revealed = replayCandles.slice(0, replayIndex);
   const lastCandle = revealed[revealed.length - 1];
@@ -5999,7 +6026,7 @@ function renderChart(forceEnd) {
   const oscInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'oscillator') : [];
   const overlayInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'overlay') : [];
   const signalInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'signal') : [];
-  const H = BASE_H + (oscInstances.length ? oscInstances.length * (OSC_GAP + OSC_H) : 14); // +14: time labels get their own strip, clear of the volume bars
+  const H = BASE_H + (oscInstances.length ? oscInstances.reduce((t, i) => t + OSC_GAP + oscHOf(i), 0) : 14); // +14: time labels get their own strip, clear of the volume bars
 
   // Fit the price scale to the candles actually on screen (not a fixed 260-bar window),
   // so one old spike far off-screen can't squash the visible candles into slivers.
@@ -6341,8 +6368,8 @@ function renderChart(forceEnd) {
   oscInstances.forEach((inst, pi) => {
     const def = INDICATOR_DEFS[inst.key];
     const result = indCalc(inst.key, def, replayCandles, inst.params);
-    const top = BASE_H - PAD + OSC_GAP + pi * (OSC_H + OSC_GAP);
-    const bottom = top + OSC_H;
+    const top = BASE_H - PAD + OSC_GAP + oscInstances.slice(0, pi).reduce((t, i) => t + oscHOf(i) + OSC_GAP, 0);
+    const bottom = top + oscHOf(inst);
 
     oscSvg += `<line x1="0" y1="${top.toFixed(1)}" x2="${W}" y2="${top.toFixed(1)}" stroke="var(--border-soft)" stroke-width="1"/>`;
     oscSvg += `<text x="4" y="${(top+11).toFixed(1)}" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">${def.name}${paramSummary(inst)}</text>`;
@@ -6393,6 +6420,7 @@ function renderChart(forceEnd) {
           if (!cf[k].on) return;
           const y = oY(cf[k].v);
           oscSvg += `<line x1="0" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(1)}" stroke="${col}" stroke-width="1" stroke-dasharray="${k === 'mid' ? '2,3' : '4,3'}" opacity="0.85"/>`;
+          if (cf.labels !== false) oscTagsHtml += `<div class="price-tag" style="top:${y.toFixed(0)}px; background:var(--surface-2); color:${col}; border:1px solid ${col};">${+cf[k].v}</div>`;
         });
         if (cf.plot) oscSvg += seriesPath(result.line, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
         if (cf.smooth && result.smooth && inst.params.smoothType !== 'None') oscSvg += seriesPath(result.smooth, oY, inst.secondaryColor, null, inst.width, inst.opacity);
@@ -6696,6 +6724,7 @@ function renderChart(forceEnd) {
   </svg>`;
   axisEl.style.height = H + 'px';
   axisEl.innerHTML = priceScaleLabels + axisTags + oscTagsHtml;
+  try { oscHandlesRender(oscInstances.map(i => ({ id: i.id, bottom: BASE_H - PAD + OSC_GAP + oscInstances.slice(0, oscInstances.indexOf(i)).reduce((t, j) => t + oscHOf(j) + OSC_GAP, 0) + oscHOf(i) }))); } catch (e) { /* handles are optional */ }
 
   requestAnimationFrame(() => {
     if (forceEnd || wasAtEdge) scrollEl.scrollLeft = scrollEl.scrollWidth - scrollEl.clientWidth;
