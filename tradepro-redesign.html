@@ -6207,7 +6207,7 @@ function renderChart(forceEnd) {
 
   // scanner signals, evaluated on THIS chart's candles: one entry per cycle, then an exit when every condition flips
   if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && liveMode && (scanOverlay.perp ? LIVE.kind === 'perp' : scanOverlay.opt ? (LIVE.kind === 'options' && LIVE.symbol === scanOverlay.symbol) : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
-    const infoParts = [], multiOv = !!scanOverlay.multi;
+    const infoParts = [], multiOv = !!scanOverlay.multi, placedPills = [];   // label boxes already drawn, so neighbouring entry/exit labels stack instead of overlapping
     (scanOverlay.multi || [scanOverlay]).forEach(ov => {
     const isSell = ov.side === 'Sell';
     // Direction decides the look, not entry/exit: every BUY-type signal (BUY entry, BUY EXIT) sits BELOW the candle as a blue
@@ -6222,13 +6222,16 @@ function renderChart(forceEnd) {
       const y = isBuy ? clampY(yAt(cs[i].l) + 22) : clampY(yAt(cs[i].h) - 22);            // arrow tip side
       const pts = isBuy ? `${x.toFixed(2)},${(y - 11).toFixed(2)} ${(x - 10).toFixed(2)},${(y + 8).toFixed(2)} ${(x + 10).toFixed(2)},${(y + 8).toFixed(2)}`
                         : `${x.toFixed(2)},${(y + 11).toFixed(2)} ${(x - 10).toFixed(2)},${(y - 8).toFixed(2)} ${(x + 10).toFixed(2)},${(y - 8).toFixed(2)}`;
-      const pw = tag.length * 6.6 + 12, ph = 17, py = isBuy ? y + 11 : y - 11 - ph;       // solid label pill beyond the arrow
+      const txt = exit ? tag : tag + ' ENTRY', pw = txt.length * 6.6 + 12, ph = 17;
+      let py = isBuy ? y + 11 : y - 11 - ph;       // label pill beyond the arrow; if another label is already there, stack further out
+      for (let g = 0; g < 6 && placedPills.some(r => r.buy === isBuy && Math.abs(r.x - x) < (r.w + pw) / 2 + 2 && Math.abs(r.y - py) < ph + 2); g++) py += isBuy ? ph + 3 : -(ph + 3);
+      placedPills.push({ x, y: py, w: pw, buy: isBuy });
       const bw = Math.max(candlePx, 6);
       return `<rect x="${(x - bw / 2).toFixed(2)}" y="${top.toFixed(1)}" width="${bw.toFixed(2)}" height="${(bot - top).toFixed(1)}" fill="${col}" fill-opacity="${exit ? .10 : .16}"/>` +   // full-height highlight column
         `<line x1="${x.toFixed(2)}" y1="${top.toFixed(1)}" x2="${x.toFixed(2)}" y2="${bot.toFixed(1)}" stroke="${col}" stroke-width="1" stroke-dasharray="${exit ? '2,4' : '5,3'}" stroke-opacity=".75"/>` +
-        `<polygon points="${pts}" fill="${col}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>` +
-        `<rect x="${(x - pw / 2).toFixed(2)}" y="${py.toFixed(2)}" width="${pw.toFixed(2)}" height="${ph}" rx="4" fill="${col}" stroke="#fff" stroke-width="1.2"/>` +
-        `<text x="${x.toFixed(2)}" y="${(py + 12.2).toFixed(2)}" font-size="11" font-weight="900" text-anchor="middle" fill="${isBuy ? '#fff' : '#161200'}" font-family="var(--mono)">${tag}</text>`;
+        `<polygon points="${pts}" fill="${exit ? '#0A0D12' : col}" stroke="${exit ? col : '#fff'}" stroke-width="${exit ? 2.4 : 1.6}" stroke-linejoin="round"/>` +
+        `<rect x="${(x - pw / 2).toFixed(2)}" y="${py.toFixed(2)}" width="${pw.toFixed(2)}" height="${ph}" rx="4" fill="${exit ? '#0A0D12' : col}" stroke="${exit ? col : '#fff'}" stroke-width="${exit ? 1.8 : 1.2}"/>` +
+        `<text x="${x.toFixed(2)}" y="${(py + 12.2).toFixed(2)}" font-size="11" font-weight="900" text-anchor="middle" fill="${exit ? col : (isBuy ? '#fff' : '#161200')}" font-family="var(--mono)">${txt}</text>`;
     };
     sig.entries.forEach(i => { if (i >= drawLo && i <= drawHi) signalMarkers += arrow(i, entTag); });
     sig.exits.forEach(i => { if (i >= drawLo && i <= drawHi) signalMarkers += arrow(i, exTag); });
