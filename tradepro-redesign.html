@@ -903,7 +903,7 @@
 
   /* ================= Mobile chart-first Replay layout (phones, <= 700px) ================= */
   #m-top, #m-sheet { display: none; }
-  #live-scan-info { display: none; }
+  #live-scan-info, #view-replay #live-scan-info { display: none !important; }   /* signal stats text removed on purpose */
   @media (max-width: 700px) {
     :root { --navh: 50px; }
 
@@ -3290,7 +3290,7 @@ function oiRender() {
   const canvas = document.getElementById('chart-canvas'); if (!canvas) return;
   let lay = document.getElementById('oi-layer'), ctl = document.getElementById('oi-ctl');
   if (!lay) {
-    lay = document.createElement('div'); lay.id = 'oi-layer'; lay.style.cssText = 'position:absolute;top:0;right:62px;pointer-events:none;z-index:4';
+    lay = document.createElement('div'); lay.id = 'oi-layer'; lay.style.cssText = 'position:absolute;top:0;right:62px;pointer-events:none;z-index:4;opacity:.6';
     ctl = document.createElement('div'); ctl.id = 'oi-ctl'; ctl.style.cssText = 'position:absolute;bottom:24px;left:6px;z-index:7;display:flex;gap:6px;align-items:center;font-size:11px';
     canvas.appendChild(lay); canvas.appendChild(ctl);
     oiBindTap(canvas, lay);
@@ -3311,7 +3311,7 @@ function oiRender() {
   oiLegend(canvas, ready);
   if (!oi.on) return;
   if (!ready || !chartGeom) { lay.innerHTML = oi.err ? `<div style="font-size:10px;color:var(--red);padding:2px 4px">OI: ${sscanEsc(oi.err)}</div>` : ''; return; }
-  const g = chartGeom, axis = document.getElementById('price-axis'), H = parseFloat(axis && axis.style.height) || 340, W = Math.round(Math.min(170, canvas.clientWidth * 0.42));
+  const g = chartGeom, axis = document.getElementById('price-axis'), H = parseFloat(axis && axis.style.height) || 340, W = Math.round(Math.min(170, canvas.clientWidth * (canvas.clientWidth < 520 ? 0.26 : 0.42)));
   const yAt = v => g.GAP + g.priceAreaH * (1 - (v - g.yMin) / (g.yMax - g.yMin));
   const rows = oiRows().filter(r => r.k >= g.yMin && r.k <= g.yMax);
   let maxV = 0; rows.forEach(r => { maxV = Math.max(maxV, r.C, r.P, r.bC, r.bP); });
