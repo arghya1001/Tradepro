@@ -900,6 +900,108 @@
   .costs-details[open] summary::before { content: '▾  '; }
   .costs-body { padding-top: 10px; display: flex; flex-direction: column; gap: 10px; }
   .costs-note { font-size: 11px; color: var(--text-faint); line-height: 1.55; }
+
+  /* ================= Mobile chart-first Replay layout (phones, <= 700px) ================= */
+  #m-top, #m-sheet { display: none; }
+  @media (max-width: 700px) {
+    :root { --navh: 50px; }
+
+    /* nav -> bottom, labeled */
+    .sidebar {
+      position: fixed; top: auto; left: 0; right: 0; bottom: 0; z-index: 160;
+      padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px));
+      border-bottom: none; border-top: 1px solid var(--border-soft);
+    }
+    .nav-item { padding: 4px 2px; }
+    .content { padding-bottom: calc(var(--navh) + 40px + env(safe-area-inset-bottom, 0px)); }
+
+    /* Replay: drop the global search bar and the page title block */
+    main:has(#view-replay:not([style*="none"])) > .topbar { display: none; }
+    main:has(#view-replay:not([style*="none"])) .content { padding: 6px 6px calc(var(--navh) + 150px + env(safe-area-inset-bottom, 0px)); gap: 6px; }
+    #view-replay { display: flex; flex-direction: column; gap: 6px; padding-bottom: 0; }
+    #view-replay .strat-title, #view-replay .strat-sub { display: none; }
+    #view-replay .panel { border-radius: 8px; }
+    #view-replay .m-chead { display: none; }
+
+    /* 1. top bar */
+    #m-top { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 8px; }
+    .m-sym { all: unset; cursor: pointer; font-size: 15px; font-weight: 600; display: flex; gap: 4px; align-items: center; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .m-caret { font-size: 10px; color: var(--text-muted); }
+    .m-sim { font-size: 10.5px; color: #D9A441; border: 1px solid #6B5320; border-radius: 999px; padding: 1px 7px; flex: none; }
+    .m-px { font-family: var(--mono); font-size: 14px; margin-left: auto; white-space: nowrap; }
+    .m-live { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); flex: none; }
+    .m-live b { max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .m-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); }
+    .m-live[data-state="live"] i { background: var(--green); }
+    .m-live[data-state="connecting"] i, .m-live[data-state="polling"] i { background: #D9A441; }
+    .m-live[data-state="error"] i { background: var(--red); }
+    .m-live[data-state="replay"] i { background: var(--accent); }
+    .m-gear { all: unset; cursor: pointer; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); border-radius: 8px; flex: none; }
+    .m-gear svg { width: 19px; height: 19px; }
+
+    /* 2. one-row chip toolbar */
+    #view-replay .replay-controls { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 6px 8px; align-items: center; scrollbar-width: none; }
+    #view-replay .replay-controls::-webkit-scrollbar { display: none; }
+    #view-replay .replay-controls .rc-field { min-width: 0; flex: none; display: flex; align-items: center; }
+    #view-replay .replay-controls .field-label { display: none; }
+    #view-replay .replay-controls .seg { margin: 0; gap: 0; }
+    #view-replay .replay-controls .seg-btn { flex: none; white-space: nowrap; padding: 6px 10px; font-size: 12px; border-radius: 0; }
+    #view-replay .replay-controls .seg-btn:first-child { border-radius: 999px 0 0 999px; }
+    #view-replay .replay-controls .seg-btn:last-child { border-radius: 0 999px 999px 0; margin-left: -1px; }
+    #view-replay .replay-controls select.field-input {
+      width: auto; max-width: 46vw; margin: 0; height: 30px; padding: 0 24px 0 11px; border-radius: 999px; font-size: 12px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 28px;
+      background: var(--surface-2) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'><path d='M0 0l4 5 4-5z' fill='%23808B9C'/></svg>") no-repeat right 9px center;
+    }
+    #view-replay #live-scan-apply { max-width: 150px; }
+    #view-replay #live-scan-apply.on { border-color: var(--accent); color: var(--accent); }
+    #view-replay #rc-live-scan-wrap::before { content: "Signal"; font-size: 11px; color: var(--text-faint); margin-right: 5px; }
+    #view-replay #rc-mode-wrap { order: 1; }
+    #view-replay #rc-live-symbol-wrap, #view-replay #rc-instrument-wrap { order: 2; }
+    #view-replay #rc-month-wrap { order: 3; }
+    #view-replay #rc-live-tf-wrap, #view-replay #rc-timeframe-wrap { order: 4; }
+    #view-replay #rc-charttype-wrap { order: 5; }
+    #view-replay .rc-indicators { order: 6; }
+    #view-replay #rc-live-scan-wrap { order: 7; }
+    #view-replay .ind-add-btn { padding: 0 11px; height: 30px; font-size: 12px; border-radius: 999px; white-space: nowrap; display: flex; align-items: center; }
+    #view-replay .ind-control { margin: 0; }
+
+    /* signal stats line: entries / exits / IN BUY */
+    #view-replay #live-scan-info { margin: 0; padding: 0 10px; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #view-replay #live-scan-info:empty { display: none; }
+    #view-replay #live-scan-info[data-inbuy="1"] { color: var(--green); }
+    #view-replay #live-scan-info[data-inbuy="2"] { color: var(--red); }
+
+    /* indicator legend strip above the chart (only when indicators exist) */
+    #view-replay #ind-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0; padding: 4px 8px 0; gap: 6px; scrollbar-width: none; }
+    #view-replay #ind-chips:empty { display: none; }
+    #view-replay .ind-chip { flex: none; padding: 3px 5px 3px 8px; font-size: 11px; }
+
+    /* slim playback strip under the chart */
+    #view-replay .playback-bar { padding: 4px 8px 8px; gap: 6px; }
+    #view-replay .pb-btn { width: 30px; height: 30px; }
+    #view-replay .speed-select { width: 64px; height: 30px; padding: 0 6px; margin: 0; line-height: 28px; }
+
+    /* 4. trade bar sits above the nav */
+    .quick-trade-bar { bottom: calc(var(--navh) + env(safe-area-inset-bottom, 0px)); padding: 6px 10px; box-shadow: none; z-index: 150; }
+    .qtb-info { cursor: pointer; }
+    .qtb-actions .btn-buy, .qtb-actions .btn-sell, .qtb-actions .btn-ghost { padding: 10px 22px; min-width: 84px; text-align: center; font-weight: 600; }
+
+    /* settings sheet */
+    #m-sheet { position: fixed; inset: 0; z-index: 300; }
+    #m-sheet.open { display: block; }
+    .m-sh-bg { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+    .m-sh-card { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow-y: auto; background: var(--surface-2); border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; padding: 14px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
+    .m-sh-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 15px; }
+    .m-sh-x { all: unset; cursor: pointer; font-size: 24px; line-height: 1; color: var(--text-muted); padding: 0 6px; }
+    #m-sh-body .rc-field { display: block; min-width: 0; margin: 0 0 12px; }
+    #m-sh-body .field-label { display: block; }
+    #m-sh-body:empty { display: none; }
+    .m-sh-lbl { font-size: 12px; color: var(--text-muted); margin: 4px 0 6px; }
+    #m-sh-zoom { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+    #m-sh-zoom .m-sh-lbl { flex: 0 0 100%; margin: 0; }
+    .m-sh-note { font-size: 12px; color: var(--text-faint); margin: 6px 0 0; line-height: 1.5; }
+  }
 </style>
 </head>
 <body>
@@ -5746,7 +5848,7 @@ function renderChart(forceEnd) {
     return;
   }
 
-  const BASE_H = window.innerWidth <= 700 ? Math.round(Math.max(340, Math.min(540, window.innerHeight * 0.5))) : 340;
+  const BASE_H = window.innerWidth <= 700 ? Math.round(Math.max(300, Math.min(760, window.innerHeight - 300))) : 340;
   const VOLH = 56, PAD = 10, GAP = PAD + 16;
   const OSC_GAP = 16, OSC_H = 70;
   const CANDLE_PX = candlePx;
@@ -9440,5 +9542,102 @@ function selectContract(sym) {
 <div class="drawing-delete-popup" id="drawing-delete-popup"></div>
 <div class="emoji-picker" id="emoji-picker"></div>
 <div class="tool-flyout" id="tool-flyout"></div>
+<script>
+/* Mobile chart-first layout helpers. Pure layout: moves existing controls, never changes their ids or handlers. */
+(function () {
+  try {
+    var $ = function (id) { return document.getElementById(id); };
+    var view = $('view-replay');
+    if (!view) return;
+    var MQ = window.matchMedia('(max-width:700px)');
+
+    var top = document.createElement('div');
+    top.id = 'm-top';
+    top.innerHTML = '<button type="button" class="m-sym" id="m-sym"><span id="m-sym-t">-</span><span class="m-caret">&#9662;</span></button>' +
+      '<span class="m-sim" title="Trades are simulated">SIM</span><span class="m-px" id="m-px"></span>' +
+      '<span class="m-live" id="m-live" data-state="idle"><i></i><b id="m-live-t" style="font-weight:500">Idle</b></span>' +
+      '<button type="button" class="m-gear" id="m-gear" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>';
+    view.insertBefore(top, view.firstChild);
+
+    var sheet = document.createElement('div');
+    sheet.id = 'm-sheet';
+    sheet.innerHTML = '<div class="m-sh-bg"></div><div class="m-sh-card"><div class="m-sh-head"><b>Settings</b><button type="button" class="m-sh-x" aria-label="Close">&times;</button></div>' +
+      '<div id="m-sh-body"></div><div id="m-sh-zoom"><div class="m-sh-lbl">Chart zoom and price scale</div></div>' +
+      '<p class="m-sh-note">Trades are simulated. No real orders are placed.</p></div>';
+    document.body.appendChild(sheet);
+    var openSheet = function (on) { sheet.classList.toggle('open', on); };
+    $('m-gear').onclick = function () { openSheet(true); };
+    sheet.querySelector('.m-sh-bg').onclick = function () { openSheet(false); };
+    sheet.querySelector('.m-sh-x').onclick = function () { openSheet(false); };
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') openSheet(false); });
+
+    var chead = $('replay-symbol-label'); chead = chead && chead.closest('.panel-head');
+    if (chead) chead.classList.add('m-chead');
+    var ctlPanel = view.querySelector('.replay-controls').closest('.panel');
+    var chartBody = view.querySelector('.chart-body-row');
+
+    var regs = [];
+    function reg(el, dest) { if (el) regs.push({ el: el, home: el.parentNode, next: el.nextSibling, dest: dest }); }
+    ['rc-live-kind-wrap', 'rc-live-strat-wrap', 'rc-live-und-wrap', 'rc-live-exp-wrap', 'rc-live-ot-wrap', 'rc-live-strike-wrap',
+     'rc-live-center-wrap', 'rc-live-sw-wrap', 'rc-live-status-wrap', 'rc-brick-wrap', 'rc-contract-wrap', 'rc-jumpdate-wrap'].forEach(function (id) {
+      reg($(id), function () { return [$('m-sh-body'), null]; });
+    });
+    Array.prototype.forEach.call(view.querySelectorAll('.zoom-cluster'), function (z) { reg(z, function () { return [$('m-sh-zoom'), null]; }); });
+    reg($('ind-chips'), function () { return [chartBody.parentNode, chartBody]; });
+    reg($('live-scan-info'), function () { return [view, ctlPanel.nextSibling]; });
+
+    function place() {
+      if (MQ.matches) {
+        regs.forEach(function (r) { var d = r.dest(); d[0].insertBefore(r.el, d[1]); });
+      } else {
+        for (var i = regs.length - 1; i >= 0; i--) {
+          var r = regs[i];
+          if (r.next && r.next.parentNode === r.home) r.home.insertBefore(r.el, r.next); else r.home.appendChild(r.el);
+        }
+        openSheet(false);
+      }
+    }
+    place();
+    if (MQ.addEventListener) MQ.addEventListener('change', place); else if (MQ.addListener) MQ.addListener(place);
+
+    function upd() {
+      try {
+        var sl = currentSymbolLabel(); if (!sl && liveMode) { var lsy = $('live-symbol'); sl = lsy && lsy.value; } $('m-sym-t').textContent = sl || '-';
+        var p = currentPrice();
+        $('m-px').textContent = p != null ? instrumentCurrency() + fmtPrice(p) : '';
+        var ls = $('live-status'), st = liveMode ? (ls ? ls.dataset.state : 'idle') : 'replay';
+        $('m-live').dataset.state = st;
+        var t = $('live-status-text');
+        $('m-live-t').textContent = liveMode ? ({ live: 'Live', connecting: 'Connecting', polling: 'Polling', error: 'Offline', idle: 'Idle' }[st] || 'Live') : 'Replay';
+        var sel = $('live-scan-apply'); if (sel) sel.classList.toggle('on', !!sel.value);
+      } catch (e) { /* not ready yet */ }
+    }
+    ['renderPnlBadge', 'renderQuickTradeBar'].forEach(function (n) {
+      var f = window[n];
+      if (typeof f === 'function') window[n] = function () { var r = f.apply(this, arguments); upd(); return r; };
+    });
+    var ls = $('live-status');
+    if (ls && window.MutationObserver) new MutationObserver(upd).observe(ls, { attributes: true, childList: true, subtree: true, characterData: true });
+    var sel = $('live-scan-apply'); if (sel) sel.addEventListener('change', upd);
+
+    var info = $('live-scan-info');
+    if (info && window.MutationObserver) new MutationObserver(function () {
+      var t = info.textContent || '';
+      info.dataset.inbuy = /IN BUY/i.test(t) ? '1' : /IN SELL/i.test(t) ? '2' : '0';
+    }).observe(info, { childList: true, characterData: true, subtree: true });
+
+    $('m-sym').onclick = function () {
+      var s = $(liveMode ? 'live-symbol' : 'replay-instrument');
+      if (s && s.offsetParent) { try { s.showPicker(); } catch (e) { s.focus(); } } else openSheet(true);
+    };
+    var qi = $('qtb-info');
+    if (qi) qi.addEventListener('click', function () {
+      var t = $('ticket-flat'); t = t && t.closest('.panel'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    upd();
+  } catch (err) { console.warn('mobile layout init failed', err); }
+})();
+</script>
+
 </body>
 </html>
