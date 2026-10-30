@@ -2435,6 +2435,13 @@ try {
     localStorage.setItem('tradepro_split_guppy_v1', '1');
   }
 } catch (e) { /* storage unavailable */ }
+// One-time: Guppy scans exit only on the EMA 15 close rule, so the 4-candle stop-loss is switched off (can be re-enabled in the scan editor).
+try {
+  if (!localStorage.getItem('tradepro_guppy_exit15_v1')) {
+    sscans.forEach(sc => { if (sc && sc.strat === 'Guppy crossover' && sc.sl) sc.sl.on = false; });
+    localStorage.setItem('tradepro_guppy_exit15_v1', '1');
+  }
+} catch (e) { /* storage unavailable */ }
 try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ }
 function persistSScans() { try { localStorage.setItem(SSCAN_KEY, JSON.stringify(sscans)); } catch (e) { /* ignore */ } }
 let sscanResults = {};   // scan index -> { at, rows:[{und, ok, price, details, err}] }
@@ -3367,7 +3374,10 @@ function oiCard(lay, rows, yAt, SH) {
 }
 /* Straddle exit: a Sell straddle is bought back when the premium closes above EMA 20 (a Buy straddle: closes below EMA 20). */
 function sscanSlRule(sc) { return sc && sc.sl && sc.sl.on ? { n: Math.max(1, sc.sl.n | 0 || 4), buf: Math.max(0, +sc.sl.buf || 0), mode: sc.sl.mode === 'trail' ? 'trail' : 'fixed', side: sc.side } : null; }
-function sscanExitRule(sc) { return sc && /^straddle$/i.test(sc.strat) ? { p: 20, op: sc.side === 'Sell' ? 'above' : 'below' } : null; }
+function sscanExitRule(sc) {
+  if (sc && sc.strat === 'Guppy crossover') return { p: 15, op: sc.side === 'Sell' ? 'above' : 'below' };   // Guppy: SELL exits on a close above EMA 15, BUY exits on a close below EMA 15
+  return sc && /^straddle$/i.test(sc.strat) ? { p: 20, op: sc.side === 'Sell' ? 'above' : 'below' } : null;
+}
 
 renderSScans();
 
@@ -6202,7 +6212,7 @@ function renderChart(forceEnd) {
     const isSell = ov.side === 'Sell';
     // Direction decides the look, not entry/exit: every BUY-type signal (BUY entry, BUY EXIT) sits BELOW the candle as a blue
     // up-arrow, every SELL-type signal (SELL entry, SELL EXIT) sits ABOVE the candle as a yellow down-arrow, so they never blend with the green/red candles.
-    const entTag = isSell ? 'SELL' : 'BUY', exTag = isSell ? 'BUY EXIT' : 'SELL EXIT';
+    const entTag = isSell ? 'SELL' : 'BUY', exTag = ov.strat === 'Guppy crossover' ? (isSell ? 'SELL EXIT' : 'BUY EXIT') : (isSell ? 'BUY EXIT' : 'SELL EXIT');   // Guppy: the exit is named after the trade it closes
     const BUY_COL = '#2F9BFF', SELL_COL = '#FFD60A';
     const { sig, cs } = sscanChartSignals(ov);
     if (!ov.perp && !ov.opt) try { sperfLogFromChart(ov, sig, cs); } catch (e) { /* logging must never break the chart */ }
