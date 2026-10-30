@@ -2811,7 +2811,7 @@ function sscanOverlayMeta(sc, und) { // the chart evaluates the scan on its OWN 
 }
 // Signals on the chart's own closed candles (the still-forming last candle is ignored: a signal needs a CLOSE).
 function sscanChartSignals(ov) {
-  const secs = LIVE_RES[LIVE.res];
+  const secs = liveMode ? LIVE_RES[LIVE.res] : 0;   // replay data is all historical: no still-forming candle to skip
   let n = Math.min(replayIndex, replayCandles.length);
   if (n > 0 && secs) { const ts = liveTimeToSec(replayCandles[n - 1].t); if (ts != null && ts + secs > Date.now() / 1000) n--; }
   const cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
@@ -2877,13 +2877,14 @@ async function sscanApplyRefresh() {
   const draw = () => { try { renderChart(); } catch (e) { /* chart not ready yet */ } };
   if (!sscanApplied) { scanOverlay = null; if (info) info.textContent = ''; draw(); return; }
   const onPerp = liveMode && LIVE.kind === 'perp', onOpt = liveMode && LIVE.kind === 'options' && /^[CP]-/.test(String(LIVE.symbol || ''));
-  if (!onPerp && !onOpt && (!liveMode || LIVE.kind !== 'strategy' || !LIVE.stratSymbol)) return;
+  const onReplay = !liveMode;
+  if (!onReplay && !onPerp && !onOpt && (LIVE.kind !== 'strategy' || !LIVE.stratSymbol)) return;
   const pair = sscanApplied === '__pair' ? sscanGuppyPair() : null;
   const sc = pair ? pair.bull : sscans.find(x => x.name === sscanApplied);
   if (!sc) { sscanApplied = null; scanOverlay = null; sscanFillApply(); if (info) info.textContent = ''; draw(); return; }
-  const und = onPerp ? String(LIVE.symbol || '').replace(/USD.*$/, '') : onOpt ? String(LIVE.symbol).split('-')[1] : LIVE.strat.und, symbol = onPerp || onOpt ? LIVE.symbol : LIVE.stratSymbol;
+  const und = onReplay ? '' : onPerp ? String(LIVE.symbol || '').replace(/USD.*$/, '') : onOpt ? String(LIVE.symbol).split('-')[1] : LIVE.strat.und, symbol = onReplay ? 'replay' : onPerp || onOpt ? LIVE.symbol : LIVE.stratSymbol;
   // perp and single-option charts: the combined-premium floor doesn't apply (it is sized for a two-leg straddle premium)
-  const mkOv = x => Object.assign({}, sscanOverlayMeta(x, und), { symbol, perp: onPerp, opt: onOpt, minPrem: onPerp || onOpt ? 0 : x.minPrem || 0 });
+  const mkOv = x => Object.assign({}, sscanOverlayMeta(x, und), { symbol, perp: onPerp, opt: onOpt, replay: onReplay, minPrem: onPerp || onOpt || onReplay ? 0 : x.minPrem || 0 });
   scanOverlay = pair ? Object.assign(mkOv(pair.bull), { multi: [mkOv(pair.bull), mkOv(pair.bear)] }) : mkOv(sc);
   draw();   // renderChart fills the info line from the chart's own signals
 }
@@ -4382,9 +4383,16 @@ const INDICATOR_DEFS = {
   supertrend: { name: 'Supertrend', full: 'Supertrend', type: 'overlay', editableColor: false,
     params: [{ key:'period', label:'ATR period', default:10 }, { key:'mult', label:'Multiplier', default:3 }],
     calc: (candles, p) => supertrendSeries(candles, p.period, p.mult) },
-  rsi: { name: 'RSI', full: 'Relative Strength Index', type: 'oscillator', renderKind: 'rsi',
-    params: [{ key:'period', label:'Period', default:14 }],
-    calc: (candles, p) => ({ line: rsiSeries(candles.map(c=>c.c), p.period) }) },
+  rsi: { name: 'RSI', full: 'RSI', type: 'oscillator', renderKind: 'rsi', secondaryLabel: 'Smoothed MA',
+    params: [{ key:'period', label:'Length', default:14 }, { key:'smoothType', label:'Smoothing Line', type:'select', options:['None','SMA','EMA','WMA'], default:'SMA' }, { key:'smoothLen', label:'Smoothing Length', default:20 }],
+    calc: (candles, p) => {
+      const line = rsiSeries(candles.map(c => c.c), p.period), t = p.smoothType || 'SMA', L = p.smoothLen > 0 ? p.smoothLen : 20;
+      let smooth = null;
+      if (t === 'SMA') smooth = smaSeriesNullable(line, L);
+      else if (t === 'EMA') smooth = emaSeriesNullable(line, L);
+      else if (t === 'WMA') { smooth = new Array(line.length).fill(null); const den = L * (L + 1) / 2; for (let i = L - 1; i < line.length; i++) { let sum = 0, ok = true; for (let j = 0; j < L; j++) { const v = line[i - L + 1 + j]; if (v == null) { ok = false; break; } sum += v * (j + 1); } if (ok) smooth[i] = sum / den; } }
+      return { line, smooth };
+    } },
   macd: { name: 'MACD', full: 'MACD', type: 'oscillator', renderKind: 'macd', secondaryLabel: 'Signal line',
     params: [{ key:'fast', label:'Fast', default:12 }, { key:'slow', label:'Slow', default:26 }, { key:'signal', label:'Signal', default:9 }],
     calc: (candles, p) => macdSeries(candles, p.fast, p.slow, p.signal) },
@@ -4440,6 +4448,7 @@ const INDICATOR_DEFS = {
       buyMarkers: signalSeries(candles, p.bullConditions || []),
       sellMarkers: signalSeries(candles, p.bearConditions || []),
     }) },
+  volume: { name: 'Volume', full: 'Volume', type: 'volume', editableColor: false, params: [], calc: () => ({}) },
   confluence: { name: 'SSL+AEFP', full: 'SSL Channel + Adaptive Ehlers Confluence', type: 'overlay', editableColor: false,
     // A combined indicator ported from two Pine Script indicators: the SSL Channel Pro trend-flip
     // signal (with its RSI/ADX/channel-width confirmation filters) gated by agreement with the
@@ -5307,7 +5316,7 @@ function renderIndicatorMenuList() {
   const restKeys = keys.filter(k => !favoriteIndicatorKeys.has(k));
   const renderRow = key => {
     const d = INDICATOR_DEFS[key];
-    const typeLabel = d.type === 'oscillator' ? 'separate pane' : (d.type === 'signal' ? 'markers on chart' : 'overlay');
+    const typeLabel = d.type === 'oscillator' ? 'separate pane' : (d.type === 'signal' ? 'markers on chart' : d.type === 'volume' ? 'bars under the chart' : 'overlay');
     const action = d.type === 'signal' ? `openSignalBuilder()` : `addIndicator('${key}')`;
     const isFav = favoriteIndicatorKeys.has(key);
     return `<div class="ind-menu-item-row">
@@ -5369,10 +5378,11 @@ window.addEventListener('resize', () => {
 
 function addIndicator(key) {
   const def = INDICATOR_DEFS[key];
+  if (key === 'volume' && activeIndicators.some(i => i.key === 'volume')) { document.getElementById('ind-menu').classList.remove('open'); return; }   // one volume pane is enough
   const params = {};
   def.params.forEach(p => { params[p.key] = p.default; });
   const inst = { id: 'ind' + (indicatorSeq++), key, params, color: IND_COLORS[activeIndicators.length % IND_COLORS.length], width: 1.5, opacity: 100, lineStyle: 'solid' };
-  if (def.secondaryLabel) inst.secondaryColor = '#D9A441';
+  if (def.secondaryLabel) inst.secondaryColor = key === 'rsi' ? '#FFFFFF' : '#D9A441';
   if (key === 'gmma') {
     inst.gmmaShortColor = '#009956'; // base hue each ribbon is shaded from, lightest (period 3) to this (period 15)
     inst.gmmaLongColor = '#FF5723';  // base hue for the long-term ribbon, lightest (period 30) to this (period 60)
@@ -5437,6 +5447,79 @@ function updateIndicatorLineStyle(id, style) {
   inst.lineStyle = style;
   renderChart();
   scheduleSave();
+}
+/* ---------- RSI settings (Inputs / Style / Visibility, Cancel / Ok) ---------- */
+let rsiTab = 'inputs', rsiSnap = null;
+function rsiEnsure(inst) {
+  inst.params = inst.params || {};
+  if (inst.params.smoothType == null) inst.params.smoothType = 'SMA';
+  if (!(inst.params.smoothLen > 0)) inst.params.smoothLen = 20;
+  if (!inst.rsi) inst.rsi = { plot: true, smooth: true, up: { on: true, v: 70 }, mid: { on: false, v: 50 }, lo: { on: true, v: 30 }, bg: false, shown: true, labels: true };
+  if (!inst.upColor) inst.upColor = '#4DD0E1';
+  if (!inst.midColor) inst.midColor = '#787B86';
+  if (!inst.loColor) inst.loColor = '#4DD0E1';
+  if (!inst.bgColor) inst.bgColor = '#7E57C2';
+  if (!inst.secondaryColor || inst.secondaryColor === '#D9A441') inst.secondaryColor = '#FFFFFF';
+  return inst.rsi;
+}
+function rsiSet(id, key, sub, val) {
+  const inst = activeIndicators.find(i => i.id === id); if (!inst) return;
+  const cf = rsiEnsure(inst);
+  if (sub) cf[key][sub] = val; else cf[key] = val;
+  renderChart(); scheduleSave();
+}
+function rsiSetNum(id, key, val) {
+  const v = parseFloat(val); if (isNaN(v)) return;
+  rsiSet(id, key, 'v', Math.max(0, Math.min(100, v)));
+}
+function rsiParam(id, key, val) {
+  updateIndicatorParam(id, key, val); renderIndicatorChips(); scheduleSave();
+}
+function rsiSelect(id, key, val) {
+  updateIndicatorSelectParam(id, key, val); renderIndicatorChips(); scheduleSave(); refreshIndicatorSettings(id);
+}
+function rsiTabSet(id, t) { rsiTab = t; refreshIndicatorSettings(id); }
+function rsiCancel(id) {
+  if (rsiSnap && rsiSnap.id === id) {
+    const inst = activeIndicators.find(i => i.id === id);
+    if (inst) { const o = JSON.parse(rsiSnap.json); Object.keys(inst).forEach(k => delete inst[k]); Object.assign(inst, o); }
+  }
+  closeIndicatorSettings(); renderIndicatorChips(); renderChart(); scheduleSave();
+}
+function rsiSettingsHtml(inst) {
+  const cf = rsiEnsure(inst), p = inst.params, id = inst.id;
+  const tab = (k, t) => `<button type="button" onclick="rsiTabSet('${id}','${k}')" style="all:unset;cursor:pointer;padding:6px 2px;margin-right:16px;font-size:13px;font-weight:600;color:${rsiTab === k ? 'var(--text)' : 'var(--text-muted)'};border-bottom:2px solid ${rsiTab === k ? 'var(--accent)' : 'transparent'}">${t}</button>`;
+  const num = (v, fn) => `<input type="number" value="${v}" style="width:58px;min-width:0;padding:4px 6px" onchange="${fn}">`;
+  const chk = (on, fn) => `<input type="checkbox" ${on ? 'checked' : ''} onchange="${fn}" style="width:18px;height:18px;accent-color:var(--accent);flex:none">`;
+  const sw = (field, cur) => `<button type="button" class="color-swatch-trigger" onclick="toggleColorGrid('${id}','${field}')"><span class="color-swatch-dot" style="background:${cur}"></span><span class="color-swatch-hex">${cur.toUpperCase()}</span></button>`;
+  const pop = field => {
+    const cur = field === 'primary' ? inst.color : field === 'secondary' ? inst.secondaryColor : inst[field];
+    if (customColorEditorFor && customColorEditorFor.instId === id && customColorEditorFor.field === field) return customColorEditorHtml();
+    if (colorGridOpenFor && colorGridOpenFor.instId === id && colorGridOpenFor.field === field) return colorGridHtml(id, field, cur);
+    return '';
+  };
+  const row = (checkHtml, label, field, cur, extra) => `<div class="ind-settings-row" style="gap:8px">${checkHtml}<label style="flex:1;color:var(--text)">${label}</label>${sw(field, cur)}${extra || ''}</div>${pop(field)}`;
+  let body = '';
+  if (rsiTab === 'inputs') {
+    body = `<div class="ind-settings-row"><label>Length</label>${num(p.period, `rsiParam('${id}','period',this.value)`)}</div>
+      <div class="ind-settings-row"><label>Smoothing Line</label><select class="field-input" style="width:auto;padding:5px 8px;font-size:12.5px" onchange="rsiSelect('${id}','smoothType',this.value)">${['None', 'SMA', 'EMA', 'WMA'].map(o => `<option ${p.smoothType === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
+      <div class="ind-settings-row"><label>Smoothing Length</label>${num(p.smoothLen, `rsiParam('${id}','smoothLen',this.value)`)}</div>`;
+  } else if (rsiTab === 'style') {
+    const ls = `<select class="field-input" style="width:auto;padding:4px 6px;font-size:12px" onchange="updateIndicatorLineStyle('${id}',this.value)">${['solid', 'dashed', 'dotted'].map(o => `<option ${(inst.lineStyle || 'solid') === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+    body = row(chk(cf.plot, `rsiSet('${id}','plot',null,this.checked)`), 'Plot', 'primary', inst.color, ls) +
+      row(chk(cf.smooth, `rsiSet('${id}','smooth',null,this.checked)`), 'Smoothed MA', 'secondary', inst.secondaryColor) +
+      row(chk(cf.up.on, `rsiSet('${id}','up','on',this.checked)`), 'UpperLimit', 'upColor', inst.upColor, num(cf.up.v, `rsiSetNum('${id}','up',this.value)`)) +
+      row(chk(cf.mid.on, `rsiSet('${id}','mid','on',this.checked)`), 'MiddleLimit', 'midColor', inst.midColor, num(cf.mid.v, `rsiSetNum('${id}','mid',this.value)`)) +
+      row(chk(cf.lo.on, `rsiSet('${id}','lo','on',this.checked)`), 'LowerLimit', 'loColor', inst.loColor, num(cf.lo.v, `rsiSetNum('${id}','lo',this.value)`)) +
+      row(chk(cf.bg, `rsiSet('${id}','bg',null,this.checked)`), 'Hlines Background', 'bgColor', inst.bgColor);
+  } else {
+    body = `<div class="ind-settings-row" style="gap:8px">${chk(cf.shown !== false, `rsiSet('${id}','shown',null,this.checked)`)}<label style="color:var(--text)">Show indicator</label></div>
+      <div class="ind-settings-row" style="gap:8px">${chk(cf.labels !== false, `rsiSet('${id}','labels',null,this.checked)`)}<label style="color:var(--text)">Show value label on the price scale</label></div>`;
+  }
+  return `<div class="ind-settings-head"><span>RSI</span><button type="button" class="collapse-btn" aria-label="Close" onclick="rsiCancel('${id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div style="display:flex;padding:4px 14px 0;border-bottom:1px solid var(--border-soft)">${tab('inputs', 'Inputs')}${tab('style', 'Style')}${tab('vis', 'Visibility')}</div>
+    <div class="ind-settings-body">${body}</div>
+    <div class="ind-settings-foot" style="display:flex;gap:8px"><button type="button" class="btn-ghost" style="color:var(--red)" onclick="removeIndicator('${id}'); closeIndicatorSettings()">Remove</button><span style="flex:1"></span><button type="button" class="btn-ghost" onclick="rsiCancel('${id}')">Cancel</button><button type="button" class="btn-ghost" style="background:var(--text);color:var(--bg)" onclick="closeIndicatorSettings()">Ok</button></div>`;
 }
 function dashForStyle(style) {
   if (style === 'dashed') return '6,4';
@@ -5675,6 +5758,7 @@ function paramSummary(inst) {
     return ' · ' + (parts.length ? parts.join(' + ') : 'no conditions');
   }
   if (!def.params.length) return '';
+  if (inst.key === 'rsi') { rsiEnsure(inst); return ' ' + inst.params.period + (inst.params.smoothType !== 'None' ? ',' + inst.params.smoothType + ',' + inst.params.smoothLen : ''); }
   return ' ' + def.params.map(p => inst.params[p.key]).join(',');
 }
 
@@ -5735,6 +5819,7 @@ function openIndicatorSettings(e, id) {
     inst.gmmaShow = inst.gmmaShow || { short: Array(GMMA_SHORT_PERIODS.length).fill(true), long: Array(GMMA_LONG_PERIODS.length).fill(true) };
   }
   const panel = document.getElementById('ind-settings');
+  if (inst.key === 'rsi') { rsiEnsure(inst); if (!rsiSnap || rsiSnap.id !== id) { rsiSnap = { id, json: JSON.stringify(inst) }; rsiTab = 'inputs'; } }
 
   const inputsHtml = def.params.length ? `
     <div class="ind-settings-section-title">Inputs</div>
@@ -5806,7 +5891,7 @@ function openIndicatorSettings(e, id) {
 
   const secondaryColorRow = isGmma ? gmmaTogglesHtml(inst) : def.secondaryLabel ? colorFieldHtml(inst, 'secondary', def.secondaryLabel) : '';
 
-  panel.innerHTML = `
+  const stdHtml = `
     <div class="ind-settings-head">
       <span>${def.full}</span>
       <button type="button" class="collapse-btn" aria-label="Close" onclick="closeIndicatorSettings()">
@@ -5826,6 +5911,7 @@ function openIndicatorSettings(e, id) {
       <button type="button" class="btn-ghost" style="flex:1;color:var(--red);" onclick="removeIndicator('${inst.id}'); closeIndicatorSettings()">Remove indicator</button>
     </div>
   `;
+  panel.innerHTML = inst.key === 'rsi' ? rsiSettingsHtml(inst) : stdHtml;
 
   const chipEl = document.querySelector(`.ind-chip[data-id="${id}"]`);
   const rect = (e.currentTarget || chipEl).getBoundingClientRect();
@@ -5858,6 +5944,7 @@ function refreshIndicatorSettings(id) {
   }
 }
 function closeIndicatorSettings() {
+  rsiSnap = null;
   document.getElementById('ind-settings').classList.remove('open');
   colorGridOpenFor = null;
   customColorEditorFor = null;
@@ -5894,7 +5981,8 @@ function renderChart(forceEnd) {
   }
 
   const BASE_H = window.innerWidth <= 700 ? Math.round(Math.max(300, Math.min(760, window.innerHeight - 300))) : 340;
-  const VOLH = 56, PAD = 10, GAP = PAD + 16;
+  const volOn = activeIndicators.some(i => i.key === 'volume');   // volume bars only when the user adds the Volume indicator
+  const VOLH = volOn ? 56 : 0, PAD = 10, GAP = PAD + 16;
   const OSC_GAP = 16, OSC_H = 70;
   const CANDLE_PX = candlePx;
   const revealed = replayCandles.slice(0, replayIndex);
@@ -5980,7 +6068,7 @@ function renderChart(forceEnd) {
       const yTop = yAt(Math.max(b.o, b.c)), yBot = yAt(Math.min(b.o, b.c));
       bars += `<rect x="${(x-bodyW/2).toFixed(2)}" y="${yTop.toFixed(2)}" width="${bodyW.toFixed(2)}" height="${Math.max(1.2, yBot-yTop).toFixed(2)}" fill="${color}" stroke="var(--bg)" stroke-width="0.6"/>`;
       const vY = volYAt(b.v);
-      volBars += `<rect x="${(x-bodyW/2).toFixed(2)}" y="${vY.toFixed(2)}" width="${bodyW.toFixed(2)}" height="${(BASE_H-PAD-vY).toFixed(2)}" fill="${color}" opacity="0.35"/>`;
+      if (volOn) volBars += `<rect x="${(x-bodyW/2).toFixed(2)}" y="${vY.toFixed(2)}" width="${bodyW.toFixed(2)}" height="${(BASE_H-PAD-vY).toFixed(2)}" fill="${color}" opacity="${(0.35 * ((activeIndicators.find(i => i.key === 'volume') || {}).opacity ?? 100) / 100).toFixed(2)}"/>`;
     });
   } else {
     const srcCandles = chartType === 'heikinashi' ? haCandles : replayCandles;
@@ -6004,7 +6092,7 @@ function renderChart(forceEnd) {
       bars += `<line x1="${x}" y1="${yHigh}" x2="${x}" y2="${yLow}" stroke="${color}" stroke-width="${isBuySignal||isSellSignal ? 1.8 : 1.2}"/>`;
       bars += `<rect x="${(x-bodyW/2).toFixed(2)}" y="${bodyTop.toFixed(2)}" width="${bodyW.toFixed(2)}" height="${Math.max(1.2, bodyBot-bodyTop).toFixed(2)}" fill="${color}"${isBuySignal||isSellSignal ? ` stroke="#fff" stroke-width="0.6"` : ''}/>`;
       const vY = volYAt(realC.v);
-      volBars += `<rect x="${(x-bodyW/2).toFixed(2)}" y="${vY.toFixed(2)}" width="${bodyW.toFixed(2)}" height="${(BASE_H-PAD-vY).toFixed(2)}" fill="${color}" opacity="0.35"/>`;
+      if (volOn) volBars += `<rect x="${(x-bodyW/2).toFixed(2)}" y="${vY.toFixed(2)}" width="${bodyW.toFixed(2)}" height="${(BASE_H-PAD-vY).toFixed(2)}" fill="${color}" opacity="${(0.35 * ((activeIndicators.find(i => i.key === 'volume') || {}).opacity ?? 100) / 100).toFixed(2)}"/>`;
     });
   }
 
@@ -6206,7 +6294,7 @@ function renderChart(forceEnd) {
   });
 
   // scanner signals, evaluated on THIS chart's candles: one entry per cycle, then an exit when every condition flips
-  if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && liveMode && (scanOverlay.perp ? LIVE.kind === 'perp' : scanOverlay.opt ? (LIVE.kind === 'options' && LIVE.symbol === scanOverlay.symbol) : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
+  if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && (scanOverlay.replay ? !liveMode : liveMode) && (scanOverlay.replay ? true : scanOverlay.perp ? LIVE.kind === 'perp' : scanOverlay.opt ? (LIVE.kind === 'options' && LIVE.symbol === scanOverlay.symbol) : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
     const infoParts = [], multiOv = !!scanOverlay.multi, placedPills = [];   // label boxes already drawn, so neighbouring entry/exit labels stack instead of overlapping
     (scanOverlay.multi || [scanOverlay]).forEach(ov => {
     const isSell = ov.side === 'Sell';
@@ -6296,15 +6384,25 @@ function renderChart(forceEnd) {
       oscSvg += seriesPath(result.line, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
       const lastVal = result.line[replayIndex - 1];
       if (lastVal != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastVal).toFixed(0)}px; background:${inst.color}; color:#06201D; border:none;">${lastVal.toFixed(2)}${def.unit || ''}</div>`;
-    } else { // rsi (default single-line 0-100 oscillator)
-      const oY = v => bottom - (Math.max(0, Math.min(100, v)) / 100) * (bottom - top);
-      [30, 50, 70].forEach(v => {
-        const y = oY(v);
-        oscSvg += `<line x1="0" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(1)}" stroke="var(--border-soft)" stroke-width="1" stroke-dasharray="${v===50?'2,3':'4,3'}"/>`;
-      });
-      oscSvg += seriesPath(result.line, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
-      const lastVal = result.line[replayIndex - 1];
-      if (lastVal != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastVal).toFixed(0)}px; background:${inst.color}; color:#06201D; border:none;">${lastVal.toFixed(1)}</div>`;
+    } else { // rsi: plot + smoothed MA + limit lines (configurable)
+      const cf = rsiEnsure(inst);
+      if (cf.shown !== false) {
+        const oY = v => bottom - (Math.max(0, Math.min(100, v)) / 100) * (bottom - top);
+        if (cf.bg && cf.up.on && cf.lo.on) oscSvg += `<rect x="0" y="${oY(cf.up.v).toFixed(1)}" width="${W}" height="${Math.max(0, oY(cf.lo.v) - oY(cf.up.v)).toFixed(1)}" fill="${inst.bgColor}" opacity="0.14"/>`;
+        [['up', inst.upColor], ['mid', inst.midColor], ['lo', inst.loColor]].forEach(([k, col]) => {
+          if (!cf[k].on) return;
+          const y = oY(cf[k].v);
+          oscSvg += `<line x1="0" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(1)}" stroke="${col}" stroke-width="1" stroke-dasharray="${k === 'mid' ? '2,3' : '4,3'}" opacity="0.85"/>`;
+        });
+        if (cf.plot) oscSvg += seriesPath(result.line, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
+        if (cf.smooth && result.smooth && inst.params.smoothType !== 'None') oscSvg += seriesPath(result.smooth, oY, inst.secondaryColor, null, inst.width, inst.opacity);
+        if (cf.labels !== false) {
+          const lastVal = result.line[replayIndex - 1];
+          if (cf.plot && lastVal != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastVal).toFixed(0)}px; background:${inst.color}; color:#06201D; border:none;">${lastVal.toFixed(1)}</div>`;
+          const lastSm = result.smooth ? result.smooth[replayIndex - 1] : null;
+          if (cf.smooth && lastSm != null && inst.params.smoothType !== 'None') oscTagsHtml += `<div class="price-tag" style="top:${oY(lastSm).toFixed(0)}px; background:${inst.secondaryColor}; color:#06201D; border:none;">${lastSm.toFixed(1)}</div>`;
+        }
+      }
     }
   });
 
@@ -7857,8 +7955,9 @@ function liveApplyKindUi() {
   ['rc-live-strat-wrap', 'rc-live-center-wrap'].forEach(id => show(id, strat));
   show('rc-live-sw-wrap', strat && !!STRAT_DEFS[LIVE.strat.type].w);
   const perp = liveMode && LIVE.kind === 'perp';
-  show('rc-live-scan-wrap', strat || perp || opt);
-  if ((strat || perp || opt) && typeof sscanFillApply === 'function') sscanFillApply();
+  show('rc-live-scan-wrap', true);   // signals also work on Replay data
+  if (typeof sscanFillApply === 'function') sscanFillApply();
+  if (!liveMode && typeof sscanApplied !== 'undefined' && sscanApplied && typeof scanOverlay !== 'undefined' && scanOverlay && !scanOverlay.replay) setTimeout(() => { try { sscanApplyRefresh(); } catch (e) { /* ignore */ } }, 0);
   // an applied scan was set up on the other kind of chart: re-point it (perp <-> single option <-> strategy)
   if ((strat || perp || opt) && typeof sscanApplied !== 'undefined' && sscanApplied && typeof scanOverlay !== 'undefined' && scanOverlay && (!!scanOverlay.perp !== perp || !!scanOverlay.opt !== opt)) setTimeout(() => { try { sscanApplyRefresh(); } catch (e) { /* ignore */ } }, 0);
   const k = document.getElementById('live-kind');
@@ -9693,5 +9792,9 @@ function selectContract(sym) {
 })();
 </script>
 
+<script>
+/* Replay mode also offers the scanner Signal dropdown (e.g. Guppy crossover), so show it on first load. */
+try { liveApplyKindUi(); } catch (e) { /* not ready */ }
+</script>
 </body>
 </html>
