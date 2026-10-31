@@ -1130,6 +1130,27 @@
     #m-sh-zoom .m-sh-lbl { flex: 0 0 100%; margin: 0; }
     .m-sh-note { font-size: 12px; color: var(--text-faint); margin: 6px 0 0; line-height: 1.5; }
   }
+
+  .ind-chip-off { opacity: 0.5; }
+  .lay-bg { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,0.6); display: none; align-items: flex-end; justify-content: center; }
+  .lay-bg.open { display: flex; }
+  .lay-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px 14px 0 0; width: 100%; max-width: 480px; max-height: 82vh; overflow-y: auto; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+  @media (min-width: 701px) { .lay-bg { align-items: center; } .lay-card { border-radius: 14px; } }
+  .lay-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 15px; font-weight: 600; }
+  .lay-x { all: unset; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 22px; }
+  .lay-row { display: flex; align-items: center; gap: 4px; border: 1px solid var(--border-soft); border-radius: 10px; margin-bottom: 8px; background: var(--surface); }
+  .lay-main { all: unset; cursor: pointer; flex: 1; min-width: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .lay-name { font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lay-meta { font-size: 11.5px; color: var(--text-muted); }
+  .lay-ico { all: unset; cursor: pointer; width: 38px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0; }
+  .lay-ico.on { color: var(--accent); }
+  .lay-ico.danger:hover { color: var(--red); }
+  .lay-ico svg { width: 18px; height: 18px; }
+  .lay-empty { font-size: 13px; color: var(--text-muted); padding: 6px 2px 12px; line-height: 1.5; }
+  .lay-save { display: flex; gap: 8px; margin-top: 14px; }
+  .lay-save input { flex: 1; min-width: 0; }
+  .lay-err { font-size: 12px; color: var(--red); margin-top: 6px; min-height: 0; }
+  .lay-note { font-size: 11.5px; color: var(--text-muted); margin-top: 12px; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -1520,6 +1541,7 @@
               <label class="field-label">Indicators</label>
               <div class="ind-control">
                 <button type="button" class="btn-ghost ind-add-btn" onclick="toggleIndicatorMenu(event)">+ Add indicator</button>
+                <button type="button" class="btn-ghost ind-add-btn" id="layouts-btn" onclick="layoutsOpen()">Layouts</button>
               </div>
             </div>
             <div class="ind-chips" id="ind-chips"></div>
@@ -4725,6 +4747,7 @@ function initReplay() {
     restoreMode = (saved.selection && saved.selection.mode === 'live') ? 'live' : 'replay';
   } else {
     activeIndicators = [{ id: 'ind' + (indicatorSeq++), key: 'sma', params: { period: 20 }, color: IND_COLORS[0], width: 1.5, opacity: 100, lineStyle: 'solid' }];
+    try { const dl = layouts.items.find(x => x.id === layouts.defaultId); if (dl) activeIndicators = JSON.parse(JSON.stringify(dl.indicators)).map(i => Object.assign(i, { id: 'ind' + (indicatorSeq++) })); } catch (e) { /* keep the starter indicator */ }
   }
 
   const magnetBtn = document.getElementById('magnet-btn');
@@ -6164,28 +6187,123 @@ function rsiSelect(id, key, val) {
 function rsiTabSet(id, t) { rsiTab = t; refreshIndicatorSettings(id); }
 /* Drag handle on the bottom edge of every oscillator pane: drag down = taller, up = shorter (touch and mouse). */
 let oscDrag = null;
+function oscDefaultH() { return window.innerWidth <= 700 ? 110 : 70; }
+let maxPaneId = null;
+function paneIsCollapsed(inst) { return !!inst.collapsed || !!(maxPaneId && maxPaneId !== inst.id); }
+const PANE_ICON = {
+  max: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  restore: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
+  up: '<path d="M6 15l6-6 6 6"/>',
+  down: '<path d="M6 9l6 6 6-6"/>',
+  hide: '<path d="M3 3l18 18M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 8.5 4.5 9.5 6a14 14 0 0 1-3.1 3.5M6.2 6.2A14 14 0 0 0 2.5 12c1 1.5 4.5 6 9.5 6 1.6 0 3-.4 4.2-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  set: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>'
+};
+function paneAct(act, id, ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  const inst = activeIndicators.find(i => i.id === id); if (!inst) return;
+  if (act === 'max') { maxPaneId = maxPaneId === id ? null : id; }
+  else if (act === 'col') { if (maxPaneId) maxPaneId = null; else inst.collapsed = !inst.collapsed; }
+  else if (act === 'hide') { inst.hidden = true; if (maxPaneId === id) maxPaneId = null; renderIndicatorChips(); }
+  else if (act === 'set') { openIndicatorSettings(ev || { stopPropagation() {} }, id); return; }
+  else if (act === 'x') { if (maxPaneId === id) maxPaneId = null; removeIndicator(id); scheduleSave(); return; }
+  renderChart(); scheduleSave();
+}
+function toggleIndicatorHidden(id) {
+  const inst = activeIndicators.find(i => i.id === id); if (!inst) return;
+  inst.hidden = !inst.hidden;
+  if (inst.hidden && maxPaneId === id) maxPaneId = null;
+  renderIndicatorChips(); renderChart(); scheduleSave();
+}
+/* Pane headers (name + maximize / collapse / hide / settings / close) sit in the strip above every oscillator pane;
+   the drag handle on the bottom edge still resizes an open pane. */
 function oscHandlesRender(list) {
   const canvas = document.getElementById('chart-canvas'); if (!canvas) return;
   let lay = document.getElementById('osc-handles');
-  if (!lay) { lay = document.createElement('div'); lay.id = 'osc-handles'; lay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:0;z-index:7;pointer-events:none'; canvas.appendChild(lay); }
-  lay.innerHTML = list.map(o => `<div title="Drag to resize the pane" onpointerdown="oscDragStart(event,'${o.id}')" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" style="position:absolute;left:8px;top:${(o.bottom - 17).toFixed(0)}px;width:46px;height:15px;opacity:.9;border-radius:8px;background:var(--surface-2);border:1px solid var(--border-strong);display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;cursor:ns-resize;touch-action:none;pointer-events:auto"><i style="display:block;width:22px;height:1.5px;background:var(--text-muted)"></i><i style="display:block;width:22px;height:1.5px;background:var(--text-muted)"></i></div>`).join('');
+  if (!lay) { lay = document.createElement('div'); lay.id = 'osc-handles'; lay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:0;z-index:10;pointer-events:none'; canvas.appendChild(lay); }
+  const ax = document.getElementById('price-axis'), axW = ax ? ax.offsetWidth : 56;
+  const mob = window.innerWidth <= 700, hw = mob ? 84 : 46, hh = mob ? 30 : 15, ht = mob ? 32 : 17;
+  const ic = k => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PANE_ICON[k]}</svg>`;
+  const bt = (act, label, k, id) => `<button type="button" aria-label="${label}" title="${label}" onclick="paneAct('${act}','${id}',event)" style="all:unset;box-sizing:border-box;cursor:pointer;width:${mob ? 32 : 28}px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);border-radius:6px;flex-shrink:0;-webkit-tap-highlight-color:transparent">${ic(k)}</button>`;
+  const stop = 'onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()"';
+  lay.innerHTML = list.map(o => {
+    const head = `<div ${stop} style="position:absolute;left:0;top:${(o.top - OSC_GAP).toFixed(0)}px;width:calc(100% - ${axW}px);height:${OSC_GAP}px;box-sizing:border-box;padding:0 2px 0 8px;display:flex;align-items:center;gap:0;background:var(--surface);border-top:1px solid var(--border-soft);pointer-events:auto;touch-action:manipulation"><span style="width:7px;height:7px;border-radius:50%;background:${o.color || 'var(--accent)'};flex-shrink:0;margin-right:6px"></span><span style="flex:1;min-width:0;font-size:11.5px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)">${o.name}</span>${bt('max', o.max ? 'Restore pane' : 'Maximize pane', o.max ? 'restore' : 'max', o.id)}${bt('col', (o.collapsed ? 'Expand pane' : 'Collapse pane'), o.collapsed ? 'down' : 'up', o.id)}${bt('hide', 'Hide indicator', 'hide', o.id)}${bt('set', 'Indicator settings', 'set', o.id)}${bt('x', 'Remove indicator', 'x', o.id)}</div>`;
+    const grip = (o.collapsed || o.max) ? '' : `<div title="Drag to resize the pane" onpointerdown="oscDragStart(event,'${o.id}')" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" style="position:absolute;left:8px;top:${(o.bottom - ht).toFixed(0)}px;width:${hw}px;height:${hh}px;opacity:.95;border-radius:${mob ? 15 : 8}px;background:var(--surface-2);border:1px solid var(--border-strong);display:flex;flex-direction:column;gap:${mob ? 4 : 2}px;align-items:center;justify-content:center;cursor:ns-resize;touch-action:none;pointer-events:auto"><i style="display:block;width:${mob ? 34 : 22}px;height:2px;background:var(--text-muted)"></i><i style="display:block;width:${mob ? 34 : 22}px;height:2px;background:var(--text-muted)"></i></div>`;
+    return head + grip;
+  }).join('');
 }
 function oscDragStart(e, id) {
   const inst = activeIndicators.find(i => i.id === id); if (!inst) return;
   e.preventDefault(); e.stopPropagation();
-  oscDrag = { id, y: e.clientY, h: Math.max(50, Math.min(400, +inst.paneH || 70)) };
+  oscDrag = { id, y: e.clientY, h: Math.max(50, Math.min(400, +inst.paneH || oscDefaultH())), moved: false };
 }
-window.addEventListener('pointermove', e => { if (oscDrag) { e.preventDefault(); setPaneHeight(oscDrag.id, oscDrag.h + (e.clientY - oscDrag.y)); } }, { passive: false });
-['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, () => { if (oscDrag) { oscDrag = null; scheduleSave(); } }));
+window.addEventListener('pointermove', e => { if (oscDrag) { e.preventDefault(); if (Math.abs(e.clientY - oscDrag.y) > 5) oscDrag.moved = true; setPaneHeight(oscDrag.id, oscDrag.h + (e.clientY - oscDrag.y)); } }, { passive: false });
+['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, () => {
+  if (!oscDrag) return;
+  const d = oscDrag; oscDrag = null;
+  scheduleSave();
+}));
 function setPaneHeight(id, v) {
   const inst = activeIndicators.find(i => i.id === id); if (!inst) return;
   inst.paneH = Math.max(50, Math.min(400, parseInt(v, 10) || 70));
   renderChart(); scheduleSave();
 }
 function paneHeightRowHtml(inst) {
-  const h = Math.max(50, Math.min(400, +inst.paneH || 70));
+  const h = Math.max(50, Math.min(400, +inst.paneH || oscDefaultH()));
   return `<div class="ind-settings-row"><label>Pane height</label><div class="opacity-control"><input type="range" min="50" max="400" step="10" value="${h}" oninput="setPaneHeight('${inst.id}', this.value); document.getElementById('ph-${inst.id}').textContent=this.value+'px'"><span id="ph-${inst.id}" class="opacity-value">${h}px</span></div></div>`;
 }
+
+/* ---------- Saved chart layouts: indicators + their pane sizes/hidden/collapsed state + chart style ---------- */
+const LAYOUTS_KEY = 'tradepro_layouts_v1';
+let layouts = { defaultId: null, items: [] };
+try { const v = JSON.parse(localStorage.getItem(LAYOUTS_KEY) || 'null'); if (v && Array.isArray(v.items)) layouts = { defaultId: v.defaultId || null, items: v.items }; } catch (e) { /* storage unavailable */ }
+function layoutsPersist() { try { localStorage.setItem(LAYOUTS_KEY, JSON.stringify(layouts)); } catch (e) { /* storage unavailable */ } }
+function layEsc(t) { return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function layoutSnapshot() { return { indicators: JSON.parse(JSON.stringify(activeIndicators)), chartType: chartType }; }
+function layoutApply(id) {
+  const L = layouts.items.find(x => x.id === id); if (!L) return;
+  maxPaneId = null;
+  activeIndicators = JSON.parse(JSON.stringify(L.indicators)).map(i => Object.assign(i, { id: 'ind' + (indicatorSeq++) }));
+  const sel = document.getElementById('replay-charttype');
+  if (L.chartType && sel && sel.value !== L.chartType) { sel.value = L.chartType; onChartTypeChange(); }
+  renderIndicatorChips(); renderChart(); scheduleSave();
+}
+function layoutsEnsureUi() {
+  if (document.getElementById('lay-bg')) return;
+  const bg = document.createElement('div');
+  bg.className = 'lay-bg'; bg.id = 'lay-bg';
+  bg.innerHTML = '<div class="lay-card" role="dialog" aria-label="Chart layouts"><div class="lay-head"><span>Chart layouts</span><button type="button" class="lay-x" aria-label="Close" onclick="layoutsClose()">&times;</button></div><div id="lay-list"></div><div class="lay-save"><input type="text" class="field-input" id="lay-name" placeholder="Layout name" maxlength="30" oninput="document.getElementById(\'lay-err\').textContent=\'\'"><button type="button" class="btn-primary" onclick="layoutSave()">Save current</button></div><div class="lay-err" id="lay-err"></div><div class="lay-note">Tap a layout to apply it. The star marks your default, which loads on a fresh start. Layouts are saved on this device.</div></div>';
+  bg.addEventListener('click', e => { if (e.target === bg) layoutsClose(); });
+  document.body.appendChild(bg);
+}
+function layoutsOpen() { layoutsEnsureUi(); layoutsRender(); document.getElementById('lay-bg').classList.add('open'); }
+function layoutsClose() { const b = document.getElementById('lay-bg'); if (b) b.classList.remove('open'); }
+function layoutsRender() {
+  const el = document.getElementById('lay-list'); if (!el) return;
+  const ico = {
+    star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
+    upd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>',
+    del: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>'
+  };
+  el.innerHTML = layouts.items.length ? layouts.items.map(L => {
+    const n = L.indicators.length, isDef = layouts.defaultId === L.id;
+    return `<div class="lay-row"><button type="button" class="lay-main" onclick="layoutApply('${L.id}'); layoutsClose()"><span class="lay-name">${layEsc(L.name)}${isDef ? ' · default' : ''}</span><span class="lay-meta">${n} indicator${n === 1 ? '' : 's'}</span></button><button type="button" class="lay-ico ${isDef ? 'on' : ''}" aria-label="${isDef ? 'Remove default' : 'Make default'}" onclick="layoutSetDefault('${L.id}')">${ico.star}</button><button type="button" class="lay-ico" aria-label="Update with current chart" onclick="layoutUpdate('${L.id}')">${ico.upd}</button><button type="button" class="lay-ico danger" aria-label="Delete layout" onclick="layoutDelete('${L.id}')">${ico.del}</button></div>`;
+  }).join('') : '<div class="lay-empty">No saved layouts yet. Set up your indicators and panes, then save them here.</div>';
+}
+function layoutSave() {
+  const inp = document.getElementById('lay-name'), err = document.getElementById('lay-err');
+  const name = (inp.value || '').trim();
+  if (!name) { err.textContent = 'Enter a name first'; return; }
+  const snap = layoutSnapshot();
+  const ex = layouts.items.find(x => x.name.toLowerCase() === name.toLowerCase());
+  if (ex) { ex.indicators = snap.indicators; ex.chartType = snap.chartType; }
+  else layouts.items.push({ id: 'lay' + Date.now().toString(36), name, indicators: snap.indicators, chartType: snap.chartType });
+  inp.value = ''; layoutsPersist(); layoutsRender();
+}
+function layoutUpdate(id) { const L = layouts.items.find(x => x.id === id); if (!L) return; const snap = layoutSnapshot(); L.indicators = snap.indicators; L.chartType = snap.chartType; layoutsPersist(); layoutsRender(); }
+function layoutSetDefault(id) { layouts.defaultId = layouts.defaultId === id ? null : id; layoutsPersist(); layoutsRender(); }
+function layoutDelete(id) { layouts.items = layouts.items.filter(x => x.id !== id); if (layouts.defaultId === id) layouts.defaultId = null; layoutsPersist(); layoutsRender(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') layoutsClose(); });
 function rsiCancel(id) {
   if (rsiSnap && rsiSnap.id === id) {
     const inst = activeIndicators.find(i => i.id === id);
@@ -6475,9 +6593,10 @@ function renderIndicatorChips() {
   el.innerHTML = activeIndicators.map(inst => {
     const def = INDICATOR_DEFS[inst.key];
     const displayName = def.type === 'signal' ? (inst.params.name || 'Signal') : def.name;
-    return `<span class="ind-chip" data-id="${inst.id}" onclick="openIndicatorSettings(event,'${inst.id}')">
+    return `<span class="ind-chip${inst.hidden ? ' ind-chip-off' : ''}" data-id="${inst.id}" onclick="openIndicatorSettings(event,'${inst.id}')">
       <span class="ind-chip-dot" style="background:${inst.color}"></span>
       <span class="ind-chip-label">${displayName}${paramSummary(inst)}</span>
+      ${def.type === 'signal' ? '' : `<button type="button" class="ind-chip-gear" aria-label="${inst.hidden ? 'Show' : 'Hide'} ${displayName}" onclick="event.stopPropagation(); toggleIndicatorHidden('${inst.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${PANE_ICON.hide}</svg></button>`}
       <button type="button" class="ind-chip-gear" aria-label="${displayName} settings" onclick="openIndicatorSettings(event,'${inst.id}')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.63 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.63a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.37 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1.05z"/></svg>
       </button>
@@ -6689,11 +6808,11 @@ function renderChart(forceEnd) {
     return;
   }
 
-  const BASE_H = window.innerWidth <= 700 ? Math.round(Math.max(300, Math.min(760, window.innerHeight - 300))) : 340;
+  const BASE_H0 = window.innerWidth <= 700 ? Math.round(Math.max(300, Math.min(760, window.innerHeight - 300))) : 340;
   const volOn = activeIndicators.some(i => i.key === 'volume');   // volume bars only when the user adds the Volume indicator
   const VOLH = volOn ? 56 : 0, PAD = 10, GAP = PAD + 16;
-  const OSC_GAP = 16, OSC_H = 70;
-  const oscHOf = inst => Math.max(50, Math.min(400, +inst.paneH || OSC_H));   // each oscillator pane has its own height (Pane height slider in its settings)
+  const OSC_GAP = 32, OSC_H = oscDefaultH(), effH = {};
+  const oscHOf = inst => (effH[inst.id] != null ? effH[inst.id] : Math.max(50, Math.min(400, +inst.paneH || OSC_H)));   // each oscillator pane has its own height (Pane height slider in its settings)
   const CANDLE_PX = candlePx;
   const revealed = replayCandles.slice(0, replayIndex);
   const lastCandle = revealed[revealed.length - 1];
@@ -6706,9 +6825,28 @@ function renderChart(forceEnd) {
   const renkoBricks = chartType === 'renko' ? computeRenkoBricks(replayCandles, replayIndex, renkoBrickSize || (renkoBrickSize = autoRenkoBrickSize())) : null;
   const indicatorsSupported = chartType !== 'renko';
 
-  const oscInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'oscillator') : [];
-  const overlayInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'overlay') : [];
+  const oscInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'oscillator' && !i.hidden) : [];
+  const overlayInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'overlay' && !i.hidden) : [];
   const signalInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'signal') : [];
+  if (maxPaneId && !oscInstances.some(i => i.id === maxPaneId)) maxPaneId = null;
+  const FIT_TOTAL = BASE_H0 + 14;
+  let BASE_H = BASE_H0;
+  if (oscInstances.length) {
+    const req = {};
+    oscInstances.forEach(i => { req[i.id] = paneIsCollapsed(i) ? 0 : (maxPaneId === i.id ? 1000 : Math.max(50, Math.min(400, +i.paneH || OSC_H))); });
+    if (window.innerWidth <= 700) {
+      const minBase = Math.round(Math.max(150, FIT_TOTAL * 0.45));
+      const gaps = oscInstances.length * OSC_GAP;
+      const room = Math.max(0, FIT_TOTAL - minBase - gaps);
+      const want = oscInstances.reduce((t, i) => t + req[i.id], 0);
+      const f = want > room && want > 0 ? room / want : 1;
+      oscInstances.forEach(i => { const h = req[i.id]; effH[i.id] = h > 0 ? Math.max(h === 1000 ? 50 : 40, Math.floor(h * f)) : 0; });
+      const used = gaps + oscInstances.reduce((t, i) => t + effH[i.id], 0);
+      BASE_H = Math.max(minBase, FIT_TOTAL - used);
+    } else {
+      oscInstances.forEach(i => { effH[i.id] = req[i.id] === 1000 ? 340 : req[i.id]; });
+    }
+  }
   const H = BASE_H + (oscInstances.length ? oscInstances.reduce((t, i) => t + OSC_GAP + oscHOf(i), 0) : 14); // +14: time labels get their own strip, clear of the volume bars
 
   // Fit the price scale to the candles actually on screen (not a fixed 260-bar window),
@@ -7049,13 +7187,13 @@ function renderChart(forceEnd) {
   /* ---- Oscillator panes: each instance gets its OWN stacked pane, so RSI + MACD +
      Stochastic can all coexist without fighting over one shared 0-100 scale. ---- */
   oscInstances.forEach((inst, pi) => {
+    if (paneIsCollapsed(inst)) return;
     const def = INDICATOR_DEFS[inst.key];
     const result = indCalc(inst.key, def, replayCandles, inst.params);
     const top = BASE_H - PAD + OSC_GAP + oscInstances.slice(0, pi).reduce((t, i) => t + oscHOf(i) + OSC_GAP, 0);
     const bottom = top + oscHOf(inst);
 
     oscSvg += `<line x1="0" y1="${top.toFixed(1)}" x2="${W}" y2="${top.toFixed(1)}" stroke="var(--border-soft)" stroke-width="1"/>`;
-    oscSvg += `<text x="4" y="${(top+11).toFixed(1)}" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">${def.name}${paramSummary(inst)}</text>`;
 
     if (def.renderKind === 'macd') {
       const vals = [];
@@ -7407,7 +7545,7 @@ function renderChart(forceEnd) {
   </svg>`;
   axisEl.style.height = H + 'px';
   axisEl.innerHTML = priceScaleLabels + axisTags + oscTagsHtml;
-  try { oscHandlesRender(oscInstances.map(i => ({ id: i.id, bottom: BASE_H - PAD + OSC_GAP + oscInstances.slice(0, oscInstances.indexOf(i)).reduce((t, j) => t + oscHOf(j) + OSC_GAP, 0) + oscHOf(i) }))); } catch (e) { /* handles are optional */ }
+  try { oscHandlesRender(oscInstances.map((inst, idx) => { const top = BASE_H - PAD + OSC_GAP + oscInstances.slice(0, idx).reduce((t, j) => t + oscHOf(j) + OSC_GAP, 0); return { id: inst.id, top, bottom: top + oscHOf(inst), name: INDICATOR_DEFS[inst.key].name + paramSummary(inst), color: inst.color, collapsed: paneIsCollapsed(inst), max: maxPaneId === inst.id, signal: false }; })); } catch (e) { /* headers are optional */ }
 
   requestAnimationFrame(() => {
     if (forceEnd || wasAtEdge) scrollEl.scrollLeft = scrollEl.scrollWidth - scrollEl.clientWidth;
