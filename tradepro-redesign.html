@@ -1149,7 +1149,7 @@
       <div class="nav-item" id="nav-markets" onclick="showView('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20V8"/></svg>Markets</div>
       <div class="nav-item" id="nav-scanner" onclick="showView('scanner')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Scanner</div>
       <div class="nav-item" id="nav-strategies" onclick="showView('strategies')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17l5-5 4 4 7-8"/><path d="M15 8h5v5"/></svg>Strategies</div>
-      <div class="nav-item" id="nav-replay" onclick="showView('replay')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Replay</div>
+      <div class="nav-item" id="nav-replay" onclick="showView('replay')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Trade</div>
     </nav>
 
     <div class="sidebar-footer">
@@ -1395,8 +1395,8 @@
 
         <div class="strat-head">
           <div>
-            <div class="strat-title">Replay</div>
-            <div class="strat-sub" id="replay-sub">Paper-trade real historical data — step through candles, place trades, track P&amp;L</div>
+            <div class="strat-title">Trade <span style="font-family:var(--mono);font-size:11px;font-weight:500;color:var(--accent);border:1px solid var(--accent-dim);border-radius:4px;padding:2px 6px;margin-left:6px;vertical-align:middle">SIM</span></div>
+            <div class="strat-sub" id="replay-sub">Replay: step through past candles and practice. No real orders are placed.</div>
             <button type="button" class="strat-chart-btn" id="back-to-strat" style="display:none;margin-top:8px" onclick="showView('strategies')">← Back to Strategies</button>
           </div>
         </div>
@@ -1404,10 +1404,10 @@
         <div class="panel">
           <div class="panel-body replay-controls">
             <div class="rc-field" id="rc-mode-wrap">
-              <label class="field-label">Data</label>
+              <label class="field-label">Mode</label>
               <div class="seg" id="data-mode-seg">
                 <button type="button" class="seg-btn active" data-dmode="replay" onclick="setDataMode('replay')">Replay</button>
-                <button type="button" class="seg-btn" data-dmode="live" onclick="setDataMode('live')">Live · Delta</button>
+                <button type="button" class="seg-btn" data-dmode="live" onclick="setDataMode('live')">Paper</button>
               </div>
             </div>
             <div class="rc-field" id="rc-live-kind-wrap" style="display:none">
@@ -9270,8 +9270,8 @@ function applyDataModeUi() {
   }
   const sub = document.getElementById('replay-sub');
   if (sub) sub.textContent = liveMode
-    ? 'Live Delta Exchange prices — trades are simulated, no real orders are placed'
-    : 'Paper-trade real historical data — step through candles, place trades, track P&L';
+    ? 'Paper: live Delta Exchange prices with simulated money. No real orders are placed.'
+    : 'Replay: step through past candles and practice. No real orders are placed.';
 }
 function setDataMode(mode, opts) {
   opts = opts || {};
@@ -10473,7 +10473,7 @@ function selectContract(sym) {
         var ls = $('live-status'), st = liveMode ? (ls ? ls.dataset.state : 'idle') : 'replay';
         $('m-live').dataset.state = st;
         var t = $('live-status-text');
-        $('m-live-t').textContent = liveMode ? ({ live: 'Live', connecting: 'Connecting', polling: 'Polling', error: 'Offline', idle: 'Idle' }[st] || 'Live') : 'Replay';
+        $('m-live-t').textContent = liveMode ? ({ live: 'Paper', connecting: 'Connecting', polling: 'Polling', error: 'Offline', idle: 'Idle' }[st] || 'Paper') : 'Replay';
         var sel = $('live-scan-apply'); if (sel) sel.classList.toggle('on', !!sel.value);
       } catch (e) { /* not ready yet */ }
     }
