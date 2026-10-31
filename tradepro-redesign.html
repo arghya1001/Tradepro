@@ -382,24 +382,68 @@
   .sc2-tag.neu { color: var(--text-muted); border-color: var(--border); }
   .sc2-chip:disabled { opacity: .45; cursor: not-allowed; }
   .modal.rb-modal { max-width: 560px; }
-  .rb-sec { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
-  .rb-hint { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; margin-top: 4px; }
-  .rb-chiprow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-  .field-input.rb-sel { padding: 8px 10px; font-size: 13px; min-width: 0; }
-  .field-input.rb-tfall { width: auto; max-width: 62%; color: var(--text-muted); }
-  .rb-rule { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 10px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
-  .rb-rule .field-input { background: var(--surface); }
-  .rb-rhead { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); }
-  .rb-x { all: unset; cursor: pointer; color: var(--text-faint); padding: 2px 4px; display: flex; }
-  .rb-x:hover { color: var(--red); }
-  .rb-src { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .rb-pre { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 0 10px; min-width: 0; cursor: text; }
+  .rb-cols { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1; min-height: 0; overflow: hidden; }
+  .rb-cols .modal-body { overflow-y: auto; padding: 14px 16px; gap: 10px; }
+  .rb-side { display: none; }
+  .rb-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 14px 10px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; font-size: 13px; cursor: pointer; flex-shrink: 0; }
+  .rb-strip:empty { display: none; }
+  .rb-more { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--accent); white-space: nowrap; }
+  .rb-dim { color: var(--text-muted); }
+  .rb-presets .rb-dim { font-size: 12px; }
+  .rb-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .rb-chip { all: unset; cursor: pointer; box-sizing: border-box; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; line-height: 1.2; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-align: left; }
+  .rb-chip:hover { border-color: var(--text-faint); }
+  .rb-chip small { font-size: 11px; color: var(--text-muted); }
+  .rb-chip.op { color: var(--accent); border-color: var(--accent-dim); }
+  .rb-chip.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .rb-chip svg { width: 14px; height: 14px; }
+  .rb-scope { all: unset; cursor: pointer; box-sizing: border-box; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; font-size: 13px; }
+  .rb-chv { display: flex; color: var(--text-faint); transition: transform .15s; } .rb-chv.up { transform: rotate(90deg); }
+  .rb-scopebody { padding: 10px 12px 12px; background: var(--surface-2); border: 1px solid var(--border-soft); border-top: none; border-radius: 0 0 10px 10px; margin-top: -6px; }
+  .rb-sec { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; font-size: 13px; font-weight: 500; }
+  .field-input.rb-sel { padding: 7px 10px; font-size: 12.5px; min-width: 0; }
+  .field-input.rb-tfall { width: auto; max-width: 60%; color: var(--text-muted); }
+  .rb-rules { display: flex; flex-direction: column; gap: 8px; }
+  .rb-rule { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 10px; }
+  .rb-rule.open { border-color: var(--accent); }
+  .rb-rrow { display: flex; gap: 8px; align-items: flex-start; }
+  .rb-rn { width: 20px; height: 20px; border-radius: 50%; background: var(--surface); color: var(--text-muted); font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 6px; }
+  .rb-chips { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+  .rb-x { all: unset; cursor: pointer; color: var(--text-faint); padding: 6px 2px; display: flex; flex-shrink: 0; } .rb-x:hover { color: var(--red); }
+  .rb-edit { border-top: 1px solid var(--border-soft); margin-top: 10px; padding-top: 2px; }
+  .rb-lb { font-size: 11.5px; color: var(--text-muted); margin: 10px 0 5px; }
+  .rb-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rb-step { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .rb-step button { all: unset; cursor: pointer; padding: 6px 15px; font-size: 16px; color: var(--text-muted); } .rb-step button:hover { color: var(--text); }
+  .rb-step span { padding: 6px 12px; min-width: 34px; text-align: center; font-size: 13.5px; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  .rb-efoot { display: flex; gap: 8px; margin-top: 14px; }
+  .rb-efoot .btn-ghost { padding: 7px 12px; font-size: 12.5px; }
+  .rb-pre { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 0 10px; min-width: 0; max-width: 200px; cursor: text; }
   .rb-pre span { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
   .rb-pre input { all: unset; flex: 1; min-width: 0; padding: 8px 0; font-size: 13px; text-align: right; color: var(--text); }
   .rb-pre:focus-within { border-color: var(--accent); }
-  .rb-human { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+  .rb-addrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .rb-trig { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+  .rb-trig .seg { margin-top: 0; } .rb-trig .seg-btn { padding: 5px 12px; font-size: 12px; }
+  .rb-hint { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; }
   .rb-alerts { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-faint); font-size: 12.5px; margin-top: 12px; }
-  #rb-preview { margin-top: 12px; }
+  .rb-prow { all: unset; cursor: pointer; box-sizing: border-box; width: 100%; display: flex; align-items: stretch; gap: 10px; border-top: 1px solid var(--border-soft); } .rb-prow:hover { background: var(--surface-2); }
+  .rb-pbar { width: 3px; flex-shrink: 0; }
+  .rb-ptxt { display: flex; flex-direction: column; padding: 9px 0; gap: 2px; min-width: 0; } .rb-ptxt b { font-size: 13.5px; font-weight: 500; } .rb-ptxt span { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+  .rs-bars { display: flex; align-items: flex-end; gap: 3px; height: 60px; margin-top: 8px; }
+  .rs-bar { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; font-size: 10px; color: var(--text-faint); line-height: 1.3; }
+  .rs-bar i { display: block; width: 100%; background: var(--accent); border-radius: 2px 2px 0 0; }
+  .rs-bar.z i { height: 1px; background: var(--border); }
+  .rs-bl { display: flex; gap: 3px; font-size: 10px; color: var(--text-faint); margin-top: 3px; }
+  .rs-bl span { flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; }
+  @media (max-width: 700px) { .modal.rb-modal { max-width: none; height: 100%; max-height: 100%; border-radius: 0; } }
+  @media (min-width: 900px) {
+    #rb-overlay { align-items: center; }
+    .modal.rb-modal { max-width: 1040px; height: min(86vh, 780px); border-radius: 14px; }
+    .rb-cols { grid-template-columns: minmax(0, 1fr) 400px; }
+    .rb-side { display: block; overflow-y: auto; padding: 14px 16px; border-left: 1px solid var(--border-soft); background: var(--surface); }
+    .rb-strip { display: none !important; }
+  }
   .rs-res { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
   .rs-sum { font-size: 12.5px; }
   .rs-sym { border-top: 1px solid var(--border-soft); padding-top: 9px; }
@@ -1941,20 +1985,40 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="rb-overlay" onclick="if(event.target===this) rbClose()">
+<div class="modal-overlay" id="rb-overlay">
   <div class="modal rb-modal">
     <div class="modal-head">
       <div class="modal-title" id="rb-title">New scanner</div>
-      <button class="collapse-btn" aria-label="Close" onclick="rbClose()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
+      <button class="collapse-btn" aria-label="Close" onclick="rbClose()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
-    <div class="modal-body" id="rb-body"></div>
-    <div class="modal-foot">
-      <button class="btn-ghost" onclick="rbClose()">Cancel</button>
-      <button class="btn-ghost" onclick="rbTest()">Test</button>
-      <button class="btn-primary" onclick="rbSave()">Save</button>
+    <div class="rb-cols">
+      <div class="modal-body" id="rb-body"></div>
+      <div class="rb-side" id="rb-side"></div>
     </div>
+    <div class="rb-strip" id="rb-strip" onclick="rbShowResults()"></div>
+    <div class="modal-foot"><button class="btn-primary" onclick="rbSave()">Save scanner</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="rb-pre-overlay" onclick="if(event.target===this) rbHidePresets()">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Start from a preset</div><button class="collapse-btn" aria-label="Close" onclick="rbHidePresets()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="modal-body" id="rb-pre-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="rb-res-overlay" onclick="if(event.target===this) rbHideResults()">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">How often it fired</div><button class="collapse-btn" aria-label="Close" onclick="rbHideResults()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="modal-body" id="rb-res-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="rb-save-overlay" onclick="if(event.target===this) this.classList.remove('open')">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Save scanner</div><button class="collapse-btn" aria-label="Close" onclick="document.getElementById('rb-save-overlay').classList.remove('open')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="modal-body" id="rb-save-body"></div>
+    <div class="modal-foot"><button class="btn-primary" onclick="rbCommit()">Save</button></div>
   </div>
 </div>
 
@@ -3821,12 +3885,26 @@ function rsSymHtml(r, R) {
   }
   return `<div class="rs-sym"><div class="rs-symhead"><b>${sscanEsc(r.sym)}</b>${chip}</div><div class="rs-cov">${cov}</div><div class="rs-line">${line}</div>${tbl}</div>`;
 }
+function rsBarsHtml(R) {
+  const stamps = []; R.results.forEach(r => { if (!r.err) rsInWin(r.triggers).forEach(t => stamps.push(t.ts)); });
+  if (!stamps.length) return '';
+  const monthly = rsWin === 'all' || rsWin === '90', now = new Date(), bk = [];
+  const mkey = ts => { const d = new Date(ts * 1000); return d.getUTCFullYear() * 12 + d.getUTCMonth(); };
+  if (monthly) for (let k = 11; k >= 0; k--) { const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - k, 1)); bk.push({ key: d.getUTCFullYear() * 12 + d.getUTCMonth(), label: RS_MON[d.getUTCMonth()], n: 0 }); }
+  else for (let k = +rsWin - 1; k >= 0; k--) { const d = new Date(Date.now() - k * 86400000); bk.push({ key: Math.floor(d.getTime() / 86400000), label: String(d.getUTCDate()), n: 0 }); }
+  let older = 0; stamps.forEach(ts => { const b = bk.find(x => x.key === (monthly ? mkey(ts) : Math.floor(ts / 86400))); if (b) b.n++; else older++; });
+  const max = Math.max(1, ...bk.map(b => b.n)), every = bk.length > 12 ? 5 : 1;
+  return `<div><div class="rs-line" style="margin:0">Fired per ${monthly ? 'month, last 12 months' : 'day'}</div>
+    <div class="rs-bars">${bk.map(b => `<div class="rs-bar${b.n ? '' : ' z'}" title="${b.label}: ${b.n}">${b.n && bk.length <= 12 ? b.n : ''}<i style="height:${b.n ? Math.max(4, Math.round(b.n / max * 40)) : 1}px"></i></div>`).join('')}</div>
+    <div class="rs-bl">${bk.map((b, i) => `<span>${i % every === 0 || i === bk.length - 1 ? b.label : ''}</span>`).join('')}</div>${older ? `<div class="rs-line">${older} more before that.</div>` : ''}</div>`;
+}
 function rsResultsHtml(R) {
   if (!R) return '';
   const chips = [['7', '7D'], ['30', '30D'], ['90', '90D'], ['all', 'All data']].map(([k, l]) => `<button class="sc2-chip${rsWin === k ? ' on' : ''}" onclick="rsSetWin('${k}')">${l}</button>`).join('');
   let tot = 0; R.results.forEach(r => { if (!r.err) tot += rsInWin(r.triggers).length; });
   return `<div class="rs-res"><div class="sc2-chips" style="margin:0">${chips}</div>
     <div class="rs-sum"><b>${tot}</b> trigger${tot === 1 ? '' : 's'} across ${R.results.length} coin${R.results.length === 1 ? '' : 's'} in ${rsWin === 'all' ? 'all available data' : 'the last ' + rsWin + ' days'}</div>
+    ${rsBarsHtml(R)}
     ${R.warn ? `<div class="rs-line" style="color:var(--red)">${sscanEsc(R.warn)}</div>` : ''}
     ${R.results.map(r => rsSymHtml(r, R)).join('')}
     <div class="rs-line">This only shows what price did afterwards. Past triggers don\u2019t predict future ones, and a few triggers is a small sample.</div></div>`;
@@ -3861,86 +3939,114 @@ function rsCardHtml(sc, meta) {
     </div></details>`;
 }
 
-/* ---- builder ---- */
-var rbDraft = null, rbEditing = null, rbPreviewHtml = '', rbTesting = false;
+/* ---- builder: rules as chip sentences, one inline editor at a time, live result strip, save sheet ---- */
+var rbDraft = null, rbEditing = null, rbSel = null, rbScopeOpen = false, rbAutoTimer = null, rbAutoR = null, rbAutoState = 'idle', rbAutoMsg = '';
+var RB_CHEV = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
 function rbBlankRule() { return rR(rP('close', '1d', 0), '>', rI('ema', 10, '1d', 0)); }
 function rbNewDraft() { return { name: '', cat: 'neutral', vis: 'private', market: 'crypto', symbols: RS_MARKETS.crypto.symbols.slice(), mode: 'all', rules: [rbBlankRule()], alerts: null }; }
-function rbOpen(idx) {
-  rbEditing = idx == null || idx < 0 ? null : idx;
-  rbDraft = rbEditing == null ? rbNewDraft() : JSON.parse(JSON.stringify(rscans[rbEditing]));
-  rbPreviewHtml = ''; rbRender();
+function rbShow() {
+  rbSel = null; rbScopeOpen = false; rbAutoR = null; rbAutoState = 'idle'; rbAutoMsg = '';
   document.getElementById('rb-title').textContent = rbEditing == null ? 'New scanner' : 'Edit scanner';
-  document.getElementById('rb-overlay').classList.add('open');
+  rbRender(); document.getElementById('rb-overlay').classList.add('open'); rbDirty();
 }
-function rbOpenPreset(id) {
-  const p = RS_PRESETS.find(x => x.id === id); if (!p) return;
-  rbEditing = null; rbDraft = rbNewDraft(); rbApplyPreset(p); rbPreviewHtml = ''; rbRender();
-  document.getElementById('rb-title').textContent = 'New scanner';
-  document.getElementById('rb-overlay').classList.add('open');
+function rbOpen(idx) { rbEditing = idx == null || idx < 0 ? null : idx; rbDraft = rbEditing == null ? rbNewDraft() : JSON.parse(JSON.stringify(rscans[rbEditing])); rbShow(); }
+function rbOpenPreset(id) { const p = RS_PRESETS.find(x => x.id === id); if (!p) return; rbEditing = null; rbDraft = rbNewDraft(); rbApplyPreset(p); rbShow(); }
+function rbApplyPreset(p) {
+  if (!rbDraft.name || RS_PRESETS.some(x => x.name === rbDraft.name)) rbDraft.name = p.name;
+  rbDraft.cat = p.cat; rbDraft.mode = p.mode || 'all'; rbDraft.rules = JSON.parse(JSON.stringify(p.rules));
 }
-function rbApplyPreset(p) { rbDraft.name = rbDraft.name || p.name; rbDraft.cat = p.cat; rbDraft.mode = p.mode || 'all'; rbDraft.rules = JSON.parse(JSON.stringify(p.rules)); }
-function rbPreset(id) { const p = RS_PRESETS.find(x => x.id === id); if (!p) return; rbDraft.name = ''; rbApplyPreset(p); rbPreviewHtml = ''; rbRender(); }
-function rbClose() { document.getElementById('rb-overlay').classList.remove('open'); }
-function rbSelHtml(opts, cur, onch) { return `<select class="field-input rb-sel" onchange="${onch}">${opts.map(([v, l]) => `<option value="${v}"${String(v) === String(cur) ? ' selected' : ''}>${l}</option>`).join('')}</select>`; }
-function rbSrcHtml(ri, side) {
-  const s = rbDraft.rules[ri][side], tfs = RS_MARKETS[rbDraft.market].tfs, set = k => `rbSet(${ri},'${side}','${k}',this.value)`;
-  const type = rbSelHtml([['price', 'Price'], ['ind', 'Indicator'], ['num', 'Number']], s.type, `rbType(${ri},'${side}',this.value)`);
-  const tf = rbSelHtml(tfs.map(t => [t, RS_TF_LABEL[t]]), s.tf, set('tf'));
-  const back = rbSelHtml(Array.from({ length: 11 }, (_, k) => [k, k === 0 ? 'Current candle' : k + (k === 1 ? ' candle ago' : ' candles ago')]), s.back | 0, set('back'));
-  if (s.type === 'num') return `<div class="rb-src">${type}<input class="field-input rb-sel" type="number" step="any" value="${s.value === '' ? '' : s.value}" placeholder="Value" oninput="rbSet(${ri},'${side}','value',this.value)"></div>`;
-  if (s.type === 'price') return `<div class="rb-src">${type}${rbSelHtml(Object.keys(RS_FIELDS).map(f => [f, f[0].toUpperCase() + f.slice(1)]), s.field, set('field'))}${tf}${back}</div>`;
-  const hasLen = s.ind !== 'macd' && s.ind !== 'macdsig';
-  return `<div class="rb-src">${type}${rbSelHtml(Object.keys(RS_IND_LABEL).map(k => [k, RS_IND_LABEL[k]]), s.ind, `rbSet(${ri},'${side}','ind',this.value,true)`)}
-    ${hasLen ? `<label class="rb-pre"><span>Length</span><input type="number" min="1" step="1" value="${s.len | 0}" oninput="rbSet(${ri},'${side}','len',this.value)"></label>` : ''}${tf}${back}
-    <label class="rb-pre"><span>Multiplier \u00d7</span><input type="number" step="any" value="${s.mult == null || s.mult === '' ? '' : s.mult}" placeholder="1" oninput="rbSet(${ri},'${side}','mult',this.value)"></label></div>`;
+function rbPreset(id) { const p = RS_PRESETS.find(x => x.id === id); if (!p) return; rbApplyPreset(p); rbSel = null; rbHidePresets(); rbRender(); rbDirty(); }
+function rbClose() { clearTimeout(rbAutoTimer); ['rb-overlay', 'rb-pre-overlay', 'rb-res-overlay', 'rb-save-overlay'].forEach(id => { const e = document.getElementById(id); if (e) e.classList.remove('open'); }); }
+
+/* chips */
+function rbSrcLabel(s) {
+  const when = (s.back | 0) === 0 ? 'now' : (s.back | 0) + ' ago';
+  if (s.type === 'num') return '<b>' + (s.value === '' || s.value == null ? '\u2026' : sscanEsc(String(s.value))) + '</b>';
+  if (s.type === 'price') return `${RS_TF_LABEL[s.tf] || s.tf} ${s.field} <small>${when}</small>`;
+  const hasLen = s.ind !== 'macd' && s.ind !== 'macdsig', m = s.mult != null && s.mult !== '' && +s.mult !== 1 ? s.mult + '\u00d7 ' : '';
+  return `${m}${RS_IND_LABEL[s.ind]}${hasLen ? ' ' + (s.len | 0) : ''} \u00b7 ${RS_TF_LABEL[s.tf] || s.tf} <small>${when}</small>`;
 }
+function rbOpLabel(o) { return o === '>' || o === '<' ? o : RS_OPS[o]; }
+function rbRuleHtml(r, i) {
+  const sel = rbSel && rbSel.ri === i ? rbSel.side : null, many = rbDraft.rules.length > 1;
+  const chip = side => `<button type="button" class="rb-chip${sel === side ? ' sel' : ''}" id="rb-c-${i}-${side}" onclick="rbPick(${i},'${side}')">${rbSrcLabel(r[side])}</button>`;
+  return `<div class="rb-rule${sel ? ' open' : ''}"><div class="rb-rrow"><span class="rb-rn">${i + 1}</span>
+    <div class="rb-chips">${chip('a')}<button type="button" class="rb-chip op${sel === 'op' ? ' sel' : ''}" onclick="rbPick(${i},'op')">${rbOpLabel(r.op)}</button>${chip('b')}</div>
+    ${many ? `<button type="button" class="rb-x" aria-label="Remove rule ${i + 1}" onclick="rbRemoveRule(${i})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>` : ''}</div>
+    ${sel ? rbEditorHtml(i, sel) : ''}</div>`;
+}
+function rbOptChip(on, label, fn) { return `<button type="button" class="sc2-chip${on ? ' on' : ''}" onclick="${fn}">${label}</button>`; }
+function rbStep(i, side, key, val, min, max) {
+  return `<div class="rb-step"><button type="button" aria-label="Less" onclick="rbStepBy(${i},'${side}','${key}',-1,${min},${max})">\u2212</button><span>${key === 'back' && val === 0 ? 'now' : val}</span><button type="button" aria-label="More" onclick="rbStepBy(${i},'${side}','${key}',1,${min},${max})">+</button></div>`;
+}
+function rbEditorHtml(i, side) {
+  const r = rbDraft.rules[i], tfs = RS_MARKETS[rbDraft.market].tfs;
+  const foot = `<div class="rb-efoot"><button type="button" class="btn-ghost" onclick="rbDup(${i})">Duplicate rule</button><button type="button" class="btn-ghost" onclick="rbPick(-1)">Done</button></div>`;
+  if (side === 'op') return `<div class="rb-edit"><div class="rb-lb">Compare</div><div class="rb-opts">${Object.keys(RS_OPS).map(o => rbOptChip(r.op === o, RS_OPS[o], `rbOp(${i},'${o}')`)).join('')}</div>${foot}</div>`;
+  const s = r[side], hasLen = s.ind !== 'macd' && s.ind !== 'macdsig';
+  let h = `<div class="rb-edit"><div class="rb-lb">${side === 'a' ? 'Look at' : 'Compare with'}</div><div class="rb-opts">${[['price', 'Price'], ['ind', 'Indicator'], ['num', 'Number']].map(([v, l]) => rbOptChip(s.type === v, l, `rbType(${i},'${side}','${v}')`)).join('')}</div>`;
+  if (s.type === 'num') h += `<div class="rb-lb">Value</div><label class="rb-pre"><input type="number" step="any" value="${s.value === '' ? '' : s.value}" aria-label="Value" oninput="rbNum(${i},'${side}','value',this.value)"></label>`;
+  else {
+    if (s.type === 'price') h += `<div class="rb-lb">Field</div><div class="rb-opts">${Object.keys(RS_FIELDS).map(f => rbOptChip(s.field === f, f[0].toUpperCase() + f.slice(1), `rbSetF(${i},'${side}','field','${f}')`)).join('')}</div>`;
+    else {
+      h += `<div class="rb-lb">Indicator</div><div class="rb-opts">${Object.keys(RS_IND_LABEL).map(x => rbOptChip(s.ind === x, RS_IND_LABEL[x], `rbSetF(${i},'${side}','ind','${x}')`)).join('')}</div>`;
+      if (hasLen) h += `<div class="rb-lb">Length</div>${rbStep(i, side, 'len', s.len | 0, 1, 500)}`;
+    }
+    h += `<div class="rb-lb">Timeframe</div><div class="rb-opts">${tfs.map(t => rbOptChip(s.tf === t, RS_TF_LABEL[t], `rbSetF(${i},'${side}','tf','${t}')`)).join('')}</div>`;
+    h += `<div class="rb-lb">Candles ago</div>${rbStep(i, side, 'back', s.back | 0, 0, 10)}`;
+    if (s.type === 'ind') h += `<div class="rb-lb">Multiplier</div><label class="rb-pre"><span>\u00d7</span><input type="number" step="any" value="${s.mult == null ? '' : s.mult}" placeholder="1" aria-label="Multiplier" oninput="rbNum(${i},'${side}','mult',this.value)"></label>`;
+  }
+  return h + foot + '</div>';
+}
+function rbRenderRules() { const el = document.getElementById('rb-rules'); if (el) el.innerHTML = rbDraft.rules.map(rbRuleHtml).join(''); }
+function rbPick(i, side) { if (i < 0 || (rbSel && rbSel.ri === i && rbSel.side === side)) rbSel = null; else rbSel = { ri: i, side }; rbRenderRules(); }
+function rbSetF(ri, side, key, val) { rbDraft.rules[ri][side][key] = val; rbRenderRules(); rbDirty(); }
+function rbStepBy(ri, side, key, d, min, max) { const s = rbDraft.rules[ri][side]; s[key] = Math.max(min, Math.min(max, (s[key] | 0) + d)); rbRenderRules(); rbDirty(); }
+function rbNum(ri, side, key, v) { const s = rbDraft.rules[ri][side]; s[key] = v === '' ? '' : parseFloat(v); const c = document.getElementById(`rb-c-${ri}-${side}`); if (c) c.innerHTML = rbSrcLabel(s); rbDirty(); }
+function rbType(ri, side, t) { const tf = rbDraft.rules[ri][side].tf || '1d'; rbDraft.rules[ri][side] = t === 'num' ? rN(0) : t === 'ind' ? rI('ema', 10, tf, 0) : rP('close', tf, 0); rbRenderRules(); rbDirty(); }
+function rbOp(ri, v) { rbDraft.rules[ri].op = v; rbRenderRules(); rbDirty(); }
+function rbAddRule() { const last = rbDraft.rules[rbDraft.rules.length - 1] || rbBlankRule(); rbDraft.rules.push(JSON.parse(JSON.stringify(last))); rbSel = { ri: rbDraft.rules.length - 1, side: 'a' }; rbRenderRules(); rbDirty(); }
+function rbDup(i) { rbDraft.rules.splice(i + 1, 0, JSON.parse(JSON.stringify(rbDraft.rules[i]))); rbSel = { ri: i + 1, side: 'a' }; rbRenderRules(); rbDirty(); }
+function rbRemoveRule(i) { rbDraft.rules.splice(i, 1); rbSel = null; rbRenderRules(); rbDirty(); }
+function rbApplyTf(tf) { if (!tf) return; rbDraft.rules.forEach(r => ['a', 'b'].forEach(sd => { if (r[sd].type !== 'num') r[sd].tf = tf; })); rbRenderRules(); rbDirty(); }
+
+/* scope (market + coins) */
+function rbRenderScope() {
+  const el = document.getElementById('rb-scope'); if (!el) return;
+  const mk = RS_MARKETS.crypto, n = rbDraft.symbols.length, all = n === mk.symbols.length;
+  el.innerHTML = `<button type="button" class="rb-scope" onclick="rbToggleScope()" aria-expanded="${rbScopeOpen}"><span>Crypto <span class="rb-dim">\u00b7 ${all ? 'all ' + n + ' coins' : n + ' of ' + mk.symbols.length + ' coins'}</span></span><span class="rb-chv${rbScopeOpen ? ' up' : ''}">${RB_CHEV}</span></button>` +
+    (rbScopeOpen ? `<div class="rb-scopebody"><div class="rb-lb" style="margin-top:0">Market</div><div class="rb-opts">${Object.keys(RS_MARKETS).map(k => { const m = RS_MARKETS[k]; return m.active ? `<button class="sc2-chip on" type="button">${m.label}</button>` : `<button class="sc2-chip" type="button" disabled title="Coming soon">${m.label} <span class="sc2-n">Soon</span></button>`; }).join('')}</div>
+      <div class="rb-lb">Coins</div><div class="rb-opts">${rbOptChip(all, 'All ' + mk.symbols.length, 'rbAllSyms()')}${mk.symbols.map(s => rbOptChip(rbDraft.symbols.indexOf(s) >= 0, s, `rbToggleSym('${s}')`)).join('')}</div></div>` : '');
+}
+function rbToggleScope() { rbScopeOpen = !rbScopeOpen; rbRenderScope(); }
+function rbToggleSym(s) { const i = rbDraft.symbols.indexOf(s); if (i >= 0) rbDraft.symbols.splice(i, 1); else rbDraft.symbols.push(s); rbDraft.symbols.sort((a, b) => RS_MARKETS.crypto.symbols.indexOf(a) - RS_MARKETS.crypto.symbols.indexOf(b)); rbRenderScope(); rbDirty(); }
+function rbAllSyms() { rbDraft.symbols = RS_MARKETS.crypto.symbols.slice(); rbRenderScope(); rbDirty(); }
+function rbRenderMode() { const el = document.getElementById('rb-mode'); if (el) el.innerHTML = [['all', 'All'], ['any', 'Any']].map(([v, l]) => `<button type="button" class="seg-btn${rbDraft.mode === v ? ' active' : ''}" onclick="rbSetMode('${v}')">${l}</button>`).join(''); }
+function rbSetMode(v) { rbDraft.mode = v; rbRenderMode(); rbDirty(); }
+
 function rbRender() {
   const d = rbDraft, el = document.getElementById('rb-body'); if (!el) return;
-  const mk = RS_MARKETS.crypto, allOn = d.symbols.length === mk.symbols.length;
-  const seg = (items, cur, fn) => `<div class="seg">${items.map(([v, l]) => `<button type="button" class="seg-btn${cur === v ? ' active' : ''}" onclick="${fn}('${v}')">${l}</button>`).join('')}</div>`;
+  const quick = ['gap_rally', 'soldiers', 'vol_burst'].map(id => RS_PRESETS.find(p => p.id === id)).filter(Boolean);
   el.innerHTML = `
-    <select class="field-input rb-sel" onchange="rbPreset(this.value); this.value=''"><option value="">Start from a preset\u2026</option>${RS_PRESETS.map(p => `<option value="${p.id}">${sscanEsc(p.name)}</option>`).join('')}</select>
-    <label class="field-label">Scanner name</label>
-    <input class="field-input" type="text" value="${sscanEsc(d.name)}" placeholder="e.g. Gap down, then rally" oninput="rbDraft.name=this.value">
-    <label class="field-label">Market</label>
-    <div class="rb-chiprow">${Object.keys(RS_MARKETS).map(k => { const m = RS_MARKETS[k]; return m.active ? `<button class="sc2-chip on" type="button">${m.label}</button>` : `<button class="sc2-chip" type="button" disabled title="Coming soon">${m.label} <span class="sc2-n">Soon</span></button>`; }).join('')}</div>
-    <label class="field-label">Coins to scan</label>
-    <div class="rb-chiprow"><button type="button" class="sc2-chip${allOn ? ' on' : ''}" onclick="rbAllSyms()">All ${mk.symbols.length}</button>${mk.symbols.map(s => `<button type="button" class="sc2-chip${d.symbols.indexOf(s) >= 0 ? ' on' : ''}" onclick="rbToggleSym('${s}')">${s}</button>`).join('')}</div>
-    <div class="rb-sec"><span>Rules</span><select class="field-input rb-sel rb-tfall" onchange="rbApplyTf(this.value); this.value=''"><option value="">Set all timeframes\u2026</option>${mk.tfs.map(t => `<option value="${t}">${RS_TF_LABEL[t]}</option>`).join('')}</select></div>
-    <div class="rb-hint">Each rule compares two things. "Current candle" is the candle being checked; on a higher timeframe it is the candle so far.</div>
-    ${d.rules.map((r, i) => `<div class="rb-rule"><div class="rb-rhead"><b>Rule ${i + 1}</b>${d.rules.length > 1 ? `<button class="rb-x" type="button" aria-label="Remove rule" onclick="rbRemoveRule(${i})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>` : ''}</div>
-      ${rbSrcHtml(i, 'a')}
-      ${rbSelHtml(Object.keys(RS_OPS).map(o => [o, RS_OPS[o]]), r.op, `rbOp(${i},this.value)`)}
-      ${rbSrcHtml(i, 'b')}
-      <div class="rb-human" id="rb-h-${i}">${sscanEsc(rsRuleText(r))}</div></div>`).join('')}
-    <button type="button" class="btn-ghost" onclick="rbAddRule()">+ Add rule</button>
-    <label class="field-label">Trigger when</label>${seg([['all', 'All rules are true'], ['any', 'Any rule is true']], d.mode, 'rbSetMode')}
-    <label class="field-label">Tag</label>${seg([['bullish', 'Bullish'], ['bearish', 'Bearish'], ['neutral', 'Neutral']], d.cat, 'rbSetCat')}
-    <label class="field-label">Visibility</label>${seg([['private', 'Private'], ['public', 'Public']], d.vis, 'rbSetVis')}
-    <div class="rb-hint">${d.vis === 'public' ? 'Public scanners can be seen and copied by others once accounts launch. Until then this only marks the scanner and stays on your device.' : 'Only you can see a private scanner.'}</div>
-    <div class="rb-alerts"><span>Alerts</span><span>Coming soon</span></div>
-    <div id="rb-preview">${rbPreviewHtml}</div>`;
+    <div class="rb-presets"><span class="rb-dim">Start from</span>${quick.map(p => `<button type="button" class="rb-chip" onclick="rbPreset('${p.id}')">${sscanEsc(p.name.length > 22 ? p.name.split(/[,:(]/)[0] : p.name)}</button>`).join('')}<button type="button" class="rb-chip" onclick="rbShowPresets()">All ${RS_PRESETS.length} ${RB_CHEV}</button></div>
+    <input class="field-input" id="rb-name" type="text" value="${sscanEsc(d.name)}" placeholder="Scanner name" aria-label="Scanner name" oninput="rbDraft.name=this.value">
+    <div id="rb-scope"></div>
+    <div class="rb-sec"><span>Rules</span><select class="field-input rb-sel rb-tfall" aria-label="Set all timeframes" onchange="rbApplyTf(this.value); this.value=''"><option value="">Set all timeframes\u2026</option>${RS_MARKETS.crypto.tfs.map(t => `<option value="${t}">${RS_TF_LABEL[t]}</option>`).join('')}</select></div>
+    <div id="rb-rules" class="rb-rules"></div>
+    <div class="rb-addrow"><button type="button" class="rb-chip" onclick="rbAddRule()">+ Add rule</button><span class="rb-trig">Trigger when <span class="seg" id="rb-mode"></span></span></div>
+    <div class="rb-hint">Tap any chip to change it. \u201cnow\u201d is the candle being checked; on a longer timeframe it is the candle so far.</div>`;
+  rbRenderScope(); rbRenderRules(); rbRenderMode(); rbPaint();
 }
-function rbSet(ri, side, key, val, rerender) {
-  const s = rbDraft.rules[ri][side];
-  if (key === 'back' || key === 'len') s[key] = Math.max(key === 'len' ? 1 : 0, parseInt(val, 10) || 0);
-  else if (key === 'value' || key === 'mult') s[key] = val === '' ? '' : parseFloat(val);
-  else s[key] = val;
-  if (rerender) rbRender(); else { const h = document.getElementById('rb-h-' + ri); if (h) h.textContent = rsRuleText(rbDraft.rules[ri]); }
+
+/* presets sheet */
+function rbShowPresets() {
+  const grp = (cat, label) => { const ps = RS_PRESETS.filter(p => p.cat === cat); return ps.length ? `<div class="sc2-sec" style="margin:12px 0 6px"><span>${label}</span><span class="sc2-n">${ps.length}</span></div>` + ps.map(p => `<button type="button" class="rb-prow" onclick="rbPreset('${p.id}')"><span class="rb-pbar" style="background:${scCatInfo(p.cat).col}"></span><span class="rb-ptxt"><b>${sscanEsc(p.name)}</b><span>${sscanEsc(p.desc)}</span></span></button>`).join('') : ''; };
+  document.getElementById('rb-pre-body').innerHTML = grp('bullish', 'Bullish') + grp('bearish', 'Bearish') + grp('neutral', 'Neutral');
+  document.getElementById('rb-pre-overlay').classList.add('open');
 }
-function rbType(ri, side, t) {
-  const old = rbDraft.rules[ri][side], tf = old.tf || '1d';
-  rbDraft.rules[ri][side] = t === 'num' ? rN(0) : t === 'ind' ? rI('ema', 10, tf, 0) : rP('close', tf, 0); rbRender();
-}
-function rbOp(ri, v) { rbDraft.rules[ri].op = v; const h = document.getElementById('rb-h-' + ri); if (h) h.textContent = rsRuleText(rbDraft.rules[ri]); }
-function rbAddRule() { rbDraft.rules.push(rbBlankRule()); rbRender(); }
-function rbRemoveRule(i) { rbDraft.rules.splice(i, 1); rbRender(); }
-function rbApplyTf(tf) { if (!tf) return; rbDraft.rules.forEach(r => { ['a', 'b'].forEach(sd => { if (r[sd].type !== 'num') r[sd].tf = tf; }); }); rbRender(); }
-function rbToggleSym(s) { const i = rbDraft.symbols.indexOf(s); if (i >= 0) rbDraft.symbols.splice(i, 1); else rbDraft.symbols.push(s); rbDraft.symbols.sort((a, b) => RS_MARKETS.crypto.symbols.indexOf(a) - RS_MARKETS.crypto.symbols.indexOf(b)); rbRender(); }
-function rbAllSyms() { rbDraft.symbols = RS_MARKETS.crypto.symbols.slice(); rbRender(); }
-function rbSetMode(v) { rbDraft.mode = v; rbRender(); }
-function rbSetCat(v) { rbDraft.cat = v; rbRender(); }
-function rbSetVis(v) { rbDraft.vis = v; rbRender(); }
+function rbHidePresets() { const e = document.getElementById('rb-pre-overlay'); if (e) e.classList.remove('open'); }
+
+/* validation + live result */
 function rbValidate() {
   const d = rbDraft;
   if (!d.symbols.length) return 'Pick at least one coin.';
@@ -3953,20 +4059,58 @@ function rbValidate() {
   }
   return '';
 }
-function rbPreviewRefresh() { const el = document.getElementById('rb-preview'); if (el && rbPreviewHtml) el.innerHTML = rbPreviewHtml; }
-async function rbTest() {
-  const err = rbValidate(), el = document.getElementById('rb-preview'); if (!el) return;
-  if (err) { rbPreviewHtml = `<div class="rs-line" style="color:var(--red)">${sscanEsc(err)}</div>`; el.innerHTML = rbPreviewHtml; return; }
-  if (rbTesting) return; rbTesting = true;
-  el.innerHTML = '<div class="rs-line">Testing against the latest candles\u2026</div>';
-  try { const R = await rsRun(JSON.parse(JSON.stringify(rbDraft))); rbDraftR = R; rbPreviewHtml = rsResultsHtml(R); } catch (e) { rbPreviewHtml = `<div class="rs-line" style="color:var(--red)">${sscanEsc(String(e && e.message || e))}</div>`; }
-  rbTesting = false; const el2 = document.getElementById('rb-preview'); if (el2) el2.innerHTML = rbPreviewHtml;
+function rbSig() { return JSON.stringify([rbDraft.rules, rbDraft.symbols, rbDraft.mode]); }
+function rbDirty() { clearTimeout(rbAutoTimer); if (!rbDraft) return; rbAutoState = rbValidate() ? 'err' : 'busy'; rbAutoMsg = rbValidate(); rbPaint(); if (rbAutoState === 'busy') rbAutoTimer = setTimeout(rbAutoTest, 700); }
+async function rbAutoTest() {
+  if (!rbDraft || rbValidate()) return;
+  const sig = rbSig(), snap = JSON.parse(JSON.stringify(rbDraft));
+  try { const R = await rsRun(snap); if (sig !== rbSig()) return; rbAutoR = R; rbAutoState = 'ok'; }
+  catch (e) { if (sig !== rbSig()) return; rbAutoR = null; rbAutoState = 'err'; rbAutoMsg = String(e && e.message || e); }
+  rbPaint();
 }
-var rbDraftR = null;
+function rbStripHtml() {
+  if (rbAutoState === 'busy') return '<span class="rb-dim">Checking the latest candles\u2026</span>';
+  if (rbAutoState === 'err') return `<span style="color:var(--red)">${sscanEsc(rbAutoMsg || 'Finish the rule to see results.')}</span>`;
+  const R = rbAutoR; if (!R) return '';
+  const ok = R.results.filter(r => !r.err);
+  if (!ok.length) return '<span class="rb-dim">No data from the feed yet.</span>';
+  if (R.warn) return '<span style="color:var(--red)">Needs more history than the feed provides.</span><span class="rb-more">Details ' + RB_CHEV + '</span>';
+  const n = ok.reduce((a, r) => a + r.triggers.length, 0), hit = ok.filter(r => r.now === true).map(r => r.sym);
+  return `<span><b>Fired ${n} time${n === 1 ? '' : 's'}</b> <span class="rb-dim">\u00b7 ${hit.length ? 'match now on ' + (hit.length > 2 ? hit.length + ' coins' : hit.join(' + ')) : 'no match now'}</span></span><span class="rb-more">History ${RB_CHEV}</span>`;
+}
+function rbPaint() {
+  const st = document.getElementById('rb-strip'); if (st) st.innerHTML = rbStripHtml();
+  rbPaintResults();
+}
+function rbPaintResults() {
+  const side = document.getElementById('rb-side'), rs = document.getElementById('rb-res-body');
+  const body = rbAutoR && rbAutoState === 'ok' ? rsResultsHtml(rbAutoR) : `<div class="rs-line">${rbAutoState === 'busy' ? 'Checking the latest candles\u2026' : rbAutoState === 'err' ? sscanEsc(rbAutoMsg) : 'Results appear here as you build.'}</div>`;
+  if (side) side.innerHTML = '<div class="rs-sum" style="font-weight:500;margin-bottom:6px">How often it fired</div>' + body;
+  if (rs) rs.innerHTML = body;
+}
+function rbPreviewRefresh() { rbPaintResults(); }
+function rbShowResults() { if (!rbAutoR) return; rbPaintResults(); document.getElementById('rb-res-overlay').classList.add('open'); }
+function rbHideResults() { const e = document.getElementById('rb-res-overlay'); if (e) e.classList.remove('open'); }
+
+/* save sheet */
+function rbSheetRender() {
+  const d = rbDraft, seg = (items, cur, fn) => `<div class="seg">${items.map(([v, l]) => `<button type="button" class="seg-btn${cur === v ? ' active' : ''}" onclick="${fn}('${v}')">${l}</button>`).join('')}</div>`;
+  document.getElementById('rb-save-body').innerHTML = `
+    <label class="field-label" style="margin-top:0">Tag</label>${seg([['bullish', 'Bullish'], ['bearish', 'Bearish'], ['neutral', 'Neutral']], d.cat, 'rbSetCat')}
+    <label class="field-label">Visibility</label>${seg([['private', 'Private'], ['public', 'Public']], d.vis, 'rbSetVis')}
+    <div class="rb-hint">${d.vis === 'public' ? 'Public scanners can be seen and copied by others once accounts launch. Until then this only marks the scanner and stays on your device.' : 'Only you can see a private scanner.'}</div>
+    <div class="rb-alerts"><span>Alerts</span><span>Coming soon</span></div>`;
+}
+function rbSetCat(v) { rbDraft.cat = v; rbSheetRender(); }
+function rbSetVis(v) { rbDraft.vis = v; rbSheetRender(); }
 function rbSave() {
-  const err = rbValidate(); if (err) { rbPreviewHtml = `<div class="rs-line" style="color:var(--red)">${sscanEsc(err)}</div>`; rbPreviewRefresh(); return; }
-  const d = JSON.parse(JSON.stringify(rbDraft));
-  d.name = (d.name || '').trim() || (RS_PRESETS.some(p => JSON.stringify(p.rules) === JSON.stringify(d.rules)) ? RS_PRESETS.find(p => JSON.stringify(p.rules) === JSON.stringify(d.rules)).name : scCatInfo(d.cat).label + ' scanner');
+  const err = rbValidate(); if (err) { rbAutoState = 'err'; rbAutoMsg = err; rbPaint(); return; }
+  rbSheetRender(); document.getElementById('rb-save-overlay').classList.add('open');
+}
+function rbCommit() {
+  const err = rbValidate(); if (err) return;
+  const d = JSON.parse(JSON.stringify(rbDraft)), same = RS_PRESETS.find(p => JSON.stringify(p.rules) === JSON.stringify(d.rules));
+  d.name = (d.name || '').trim() || (same ? same.name : scCatInfo(d.cat).label + ' scanner');
   d.owner = SC_USER.id; d.alerts = null;
   if (rbEditing == null) { d.id = 'r' + Date.now().toString(36); d.created = Date.now(); rscans.unshift(d); }
   else { d.id = rscans[rbEditing].id; d.created = rscans[rbEditing].created || Date.now(); rscans[rbEditing] = d; }
