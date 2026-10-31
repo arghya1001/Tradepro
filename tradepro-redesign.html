@@ -287,6 +287,133 @@
 
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+  /* ---------- Scanner screen (Live / Performance / Library) ---------- */
+  .sc2-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .sc2-tabs { display: flex; gap: 2px; flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 10px; padding: 3px; }
+  .sc2-tab { all: unset; cursor: pointer; flex: 1; min-width: 0; box-sizing: border-box; text-align: center; font-size: 12.5px; font-weight: 500; color: var(--text-muted); padding: 8px 4px; border-radius: 7px; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .sc2-tab:hover { color: var(--text); }
+  .sc2-tab.active { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+  .sc2-badge { display: none; font-size: 10.5px; font-weight: 700; background: var(--green); color: #04170E; border-radius: 999px; padding: 0 6px; line-height: 16px; }
+  .sc2-badge.on { display: inline-block; }
+  .sc2-icon, .sc2-plus { all: unset; cursor: pointer; box-sizing: border-box; width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sc2-icon { border: 1px solid var(--border); color: var(--text-muted); }
+  .sc2-icon:hover { color: var(--text); border-color: var(--text-faint); }
+  .sc2-newwrap .sc2-plus { all: unset; cursor: pointer; box-sizing: border-box; width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--accent); color: #06201D; }
+  .sc2-newwrap .sc2-plus:hover { background: #1FD9C6; }
+  .sc2-newwrap { position: relative; flex-shrink: 0; }
+  .sc2-menu { position: absolute; right: 0; top: 44px; z-index: 30; width: 262px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: 0 10px 28px rgba(0,0,0,.45); }
+  .sc2-menu[hidden] { display: none !important; }
+  .sc2-menu button { all: unset; cursor: pointer; box-sizing: border-box; display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 9px 10px; border-radius: 7px; }
+  .sc2-menu button:hover { background: var(--surface); }
+  .sc2-menu b { font-size: 13px; font-weight: 600; }
+  .sc2-menu span { font-size: 11.5px; color: var(--text-muted); }
+  .sc2-filters { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .sc2-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+  .sc2-filters .sc2-chips { margin-bottom: 0; flex: 1; }
+  .sc2-chip { all: unset; cursor: pointer; box-sizing: border-box; font-size: 12px; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .sc2-chip:hover { color: var(--text); border-color: var(--text-faint); }
+  .sc2-chip.on { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
+  .sc2-cdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .sc2-n { color: var(--text-faint); font-weight: 500; }
+  .sc2-chip.on .sc2-n { color: var(--text-muted); }
+  .sc2-auto { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; white-space: nowrap; position: relative; }
+  .sc2-auto input { position: absolute; opacity: 0; pointer-events: none; }
+  .sc2-sw { width: 28px; height: 16px; border-radius: 999px; background: var(--border); position: relative; transition: background .15s; flex-shrink: 0; }
+  .sc2-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted); transition: transform .15s, background .15s; }
+  .sc2-auto input:checked + .sc2-sw { background: var(--accent-dim); }
+  .sc2-auto input:checked + .sc2-sw::after { transform: translateX(12px); background: var(--accent); }
+  .sc2-auto input:focus-visible + .sc2-sw { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sc2-list { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 10px; overflow: hidden; }
+  .sc2-row { border-top: 1px solid var(--border-soft); }
+  .sc2-row:first-child { border-top: none; }
+  .sc2-row > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 0; min-height: 54px; -webkit-tap-highlight-color: transparent; }
+  .sc2-row > summary::-webkit-details-marker { display: none; }
+  .sc2-row > summary:hover { background: var(--surface-2); }
+  .sc2-row[open] > summary { background: var(--surface-2); }
+  .sc2-rbar { width: 3px; align-self: stretch; flex-shrink: 0; }
+  .sc2-main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 9px 0; }
+  .sc2-name { font-size: 13.5px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sc2-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc2-row[open] .sc2-name { -webkit-line-clamp: unset; display: block; }
+  @media (min-width: 700px) { .sc2-tabs { max-width: 440px; } .sc2-top { justify-content: flex-start; } }
+  .sc2-dots { display: flex; gap: 3px; flex-shrink: 0; }
+  .sc2-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--text-faint); display: inline-block; box-sizing: border-box; }
+  .sc2-dot.f { background: var(--green); border-color: var(--green); }
+  .sc2-st { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
+  .sc2-st.m { background: rgba(53,214,140,.15); color: var(--green); }
+  .sc2-st.n { color: var(--text-faint); font-weight: 500; padding: 2px 0; }
+  .sc2-chev { color: var(--text-faint); flex-shrink: 0; transition: transform .15s; }
+  .sc2-row[open] .sc2-chev { transform: rotate(180deg); }
+  .sc2-body { padding: 8px 14px 14px 15px; display: flex; flex-direction: column; gap: 6px; }
+  .sc2-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .sc2-acts .btn-ghost, .sc2-acts .btn-primary { padding: 7px 12px; font-size: 12.5px; }
+  .sc2-acts .danger:hover { color: var(--red); border-color: var(--red-dim); }
+  .sc2-empty { background: var(--surface); border: 1px dashed var(--border); border-radius: 10px; padding: 26px 18px; text-align: center; color: var(--text-muted); font-size: 13px; line-height: 1.55; }
+  .sc2-empty b { display: block; color: var(--text); font-size: 14px; margin-bottom: 4px; }
+  .sc2-empty .sc2-acts { justify-content: center; }
+  .sc2-foot { font-size: 11.5px; color: var(--text-faint); margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .sc2-search { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 10px; padding: 0 12px; margin-bottom: 10px; color: var(--text-faint); }
+  .sc2-search:focus-within { border-color: var(--accent); }
+  .sc2-search input { all: unset; flex: 1; min-width: 0; padding: 11px 0; font-size: 13.5px; color: var(--text); }
+  .sc2-search input::placeholder { color: var(--text-faint); }
+  .sc2-sec { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-muted); margin: 16px 2px 8px; }
+  .sc2-sec:first-child { margin-top: 10px; }
+  .sc2-secnote { font-weight: 400; color: var(--text-faint); margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+  .sc2-tag { font-size: 10.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0; line-height: 17px; }
+  .sc2-tag.bull { color: var(--green); border-color: var(--green-dim); }
+  .sc2-tag.bear { color: var(--red); border-color: var(--red-dim); }
+  .sc2-tag.def { color: var(--accent); border-color: var(--accent-dim); }
+  .sc2-tag.mine { color: var(--text); }
+  .sc2-conds { margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+  .sc2-conds li { font-family: var(--mono); font-size: 11.5px; color: var(--text-muted); padding-left: 12px; position: relative; line-height: 1.45; }
+  .sc2-conds li::before { content: ""; position: absolute; left: 0; top: 7px; width: 5px; height: 1px; background: var(--text-faint); }
+  .sc2-tagrow { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .sc2-tagrow > span { font-size: 11.5px; color: var(--text-muted); }
+  .sc2-tagrow .seg { margin-top: 0; }
+  .sc2-tagrow .seg-btn { padding: 5px 12px; font-size: 12px; }
+  .sc2-privacy { display: flex; gap: 8px; align-items: flex-start; font-size: 11.5px; color: var(--text-faint); line-height: 1.5; margin: 16px 2px 4px; }
+  .sc2-privacy svg { flex-shrink: 0; margin-top: 2px; }
+  #sc2-perf .panel-head { display: none; }
+  @media (min-width: 1000px) {
+    .sc2-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; background: none; border: 0; overflow: visible; }
+    .sc2-list .sc2-row { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 10px; overflow: hidden; }
+    .sc2-list .sc2-row:first-child { border-top: 1px solid var(--border-soft); }
+  }
+  .sc2-tag.neu { color: var(--text-muted); border-color: var(--border); }
+  .sc2-chip:disabled { opacity: .45; cursor: not-allowed; }
+  .modal.rb-modal { max-width: 560px; }
+  .rb-sec { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  .rb-hint { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; margin-top: 4px; }
+  .rb-chiprow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .field-input.rb-sel { padding: 8px 10px; font-size: 13px; min-width: 0; }
+  .field-input.rb-tfall { width: auto; max-width: 62%; color: var(--text-muted); }
+  .rb-rule { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 10px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .rb-rule .field-input { background: var(--surface); }
+  .rb-rhead { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); }
+  .rb-x { all: unset; cursor: pointer; color: var(--text-faint); padding: 2px 4px; display: flex; }
+  .rb-x:hover { color: var(--red); }
+  .rb-src { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .rb-pre { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 0 10px; min-width: 0; cursor: text; }
+  .rb-pre span { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+  .rb-pre input { all: unset; flex: 1; min-width: 0; padding: 8px 0; font-size: 13px; text-align: right; color: var(--text); }
+  .rb-pre:focus-within { border-color: var(--accent); }
+  .rb-human { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+  .rb-alerts { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-faint); font-size: 12.5px; margin-top: 12px; }
+  #rb-preview { margin-top: 12px; }
+  .rs-res { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+  .rs-sum { font-size: 12.5px; }
+  .rs-sym { border-top: 1px solid var(--border-soft); padding-top: 9px; }
+  .rs-symhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .rs-cov { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+  .rs-line { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+  .rs-tbl { overflow-x: auto; margin-top: 6px; -webkit-overflow-scrolling: touch; }
+  .rs-tbl table { border-collapse: collapse; min-width: 100%; font-family: var(--mono); font-size: 11.5px; }
+  .rs-tbl th { text-align: right; font-weight: 500; color: var(--text-faint); padding: 4px 8px; white-space: nowrap; border-bottom: 1px solid var(--border-soft); }
+  .rs-tbl td { text-align: right; padding: 5px 8px; white-space: nowrap; border-bottom: 1px solid var(--border-soft); }
+  .rs-tbl th:first-child, .rs-tbl td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); }
+  .rs-up { color: var(--green); } .rs-dn { color: var(--red); } .rs-na { color: var(--text-faint); }
+  @media (prefers-reduced-motion: reduce) { .sc2-chev, .sc2-sw, .sc2-sw::after { transition: none; } }
+
   /* ---------- Strategies view ---------- */
   .strat-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .strat-title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
@@ -342,7 +469,7 @@
 
   /* ---------- Builder modal ---------- */
   .modal-overlay {
-    display: none; position: fixed; inset: 0; z-index: 50;
+    display: none; position: fixed; inset: 0; z-index: 320;   /* above the mobile bottom nav (150/160) so a popup's footer buttons stay reachable */
     background: rgba(4,6,9,0.6);
     align-items: flex-end; justify-content: center;
     padding: 0;
@@ -1205,36 +1332,37 @@
 
       <div id="view-scanner" class="view" style="display:none">
 
-        <div class="strat-head">
-          <div>
-            <div class="strat-title">Scanner</div>
-            <div class="strat-sub">Screen the market with ready-made scans or build your own</div>
+        <div class="sc2-top">
+          <div class="sc2-tabs" role="tablist" aria-label="Scanner sections">
+            <button class="sc2-tab" id="sc2-tab-live" role="tab" onclick="scTab('live')">Live<span class="sc2-badge" id="sc2-live-n"></span></button>
+            <button class="sc2-tab" id="sc2-tab-perf" role="tab" onclick="scTab('perf')">Performance</button>
+            <button class="sc2-tab" id="sc2-tab-lib" role="tab" onclick="scTab('lib')">Library</button>
           </div>
-          <button class="btn-primary" onclick="openScanBuilder()">+ Build scanner</button>
-        </div>
-
-        <div class="panel" id="sscan-panel">
-          <div class="panel-head">
-            <div class="panel-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6M11 8v6"/></svg>
-              Strategy scanner <span id="sscan-count" style="color:var(--text-faint); font-weight:400;"></span>
-            </div>
-            <button class="collapse-btn" aria-label="Collapse strategy scanner" onclick="togglePanel(this)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          <button class="sc2-icon" aria-label="Scan all now" title="Scan all now" onclick="runAllSScans()">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+          </button>
+          <div class="sc2-newwrap">
+            <button class="btn-primary sc2-plus" aria-label="New scanner" onclick="scNewMenu(event)">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
-          </div>
-          <div class="panel-body">
-            <div class="strat-legs" style="margin-bottom:8px">Pick a combined options strategy (buy or sell) and the price conditions that should trigger it. The scan checks the underlying's last closed candle on live Delta data (BTC / ETH).</div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px">
-              <button class="btn-primary" onclick="openSScan()">+ New strategy scan</button>
-              <button class="btn-ghost" onclick="runAllSScans()">Scan all now</button>
-              <label style="font-size:12px; color:var(--text-muted); display:flex; gap:6px; align-items:center"><input type="checkbox" id="sscan-auto" onchange="sscanToggleAuto()"> Auto-scan every minute</label>
+            <div class="sc2-menu" id="sc2-newmenu" hidden>
+              <button onclick="rbOpen()"><b>Custom scanner</b><span>Your own rules: price, indicators, any timeframe</span></button>
+              <button onclick="openSScan()"><b>Strategy scan</b><span>Options and perps, runs live on Delta data</span></button>
             </div>
-            <div id="sscan-list"></div>
           </div>
         </div>
 
-        <div class="panel" id="sperf-panel">
+        <div id="sc2-live" class="sc2-pane">
+          <div class="sc2-filters"><div class="sc2-chips" id="sc2-live-chips"></div></div>
+          <div id="sscan-list"></div>
+          <div class="sc2-foot"><span id="sc2-live-foot"></span>
+            <label class="sc2-auto" title="Re-scan every minute"><input type="checkbox" id="sscan-auto" onchange="sscanToggleAuto()"><span class="sc2-sw"></span>Auto-scan every minute</label>
+          </div>
+          <span id="sscan-count" hidden></span>
+        </div>
+
+        <div id="sc2-perf" class="sc2-pane" style="display:none">
+<div class="panel" id="sperf-panel">
           <div class="panel-head">
             <div class="panel-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-7"/></svg>
@@ -1248,48 +1376,17 @@
             <div id="sperf-body"></div>
           </div>
         </div>
-
-        <div class="panel" id="saved-scan-panel">
-          <div class="panel-head">
-            <div class="panel-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-              My saved scanners <span id="saved-scan-count" style="color:var(--text-faint); font-weight:400;"></span>
-            </div>
-            <button class="collapse-btn" aria-label="Collapse saved scanners" onclick="togglePanel(this)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-          </div>
-          <div class="panel-body">
-            <div id="saved-scan-list" class="saved-list"></div>
-          </div>
         </div>
 
-        <div class="strat-cols cols-2">
-          <div class="panel">
-            <div class="panel-head">
-              <div class="panel-title" style="color:var(--green);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17l6-6 4 4 8-9"/></svg>
-                Bullish scanners
-              </div>
-              <button class="collapse-btn" aria-label="Collapse bullish scanners" onclick="togglePanel(this)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-              </button>
-            </div>
-            <div class="panel-body" id="cat-scan-bullish"></div>
+        <div id="sc2-lib" class="sc2-pane" style="display:none">
+          <div class="sc2-search">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="sc2-q" type="search" placeholder="Search scanners and conditions" autocomplete="off" oninput="scLibSearch(this.value)">
           </div>
-
-          <div class="panel">
-            <div class="panel-head">
-              <div class="panel-title" style="color:var(--red);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7l6 6 4-4 8 9"/></svg>
-                Bearish scanners
-              </div>
-              <button class="collapse-btn" aria-label="Collapse bearish scanners" onclick="togglePanel(this)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-              </button>
-            </div>
-            <div class="panel-body" id="cat-scan-bearish"></div>
-          </div>
+          <div class="sc2-chips" id="sc2-lib-scope"></div>
+          <div class="sc2-chips" id="sc2-lib-cats"></div>
+          <div id="sc2-lib-list"></div>
+          <div class="sc2-privacy" id="sc2-privacy"></div>
         </div>
 
       </div>
@@ -1817,6 +1914,23 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="rb-overlay" onclick="if(event.target===this) rbClose()">
+  <div class="modal rb-modal">
+    <div class="modal-head">
+      <div class="modal-title" id="rb-title">New scanner</div>
+      <button class="collapse-btn" aria-label="Close" onclick="rbClose()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="rb-body"></div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="rbClose()">Cancel</button>
+      <button class="btn-ghost" onclick="rbTest()">Test</button>
+      <button class="btn-primary" onclick="rbSave()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="sscan-overlay" onclick="if(event.target===this) closeSScan()">
   <div class="modal">
     <div class="modal-head">
@@ -1836,6 +1950,13 @@
       <div class="seg" id="sscan-side">
         <button type="button" class="seg-btn" data-side="Buy" onclick="setSScanSide('Buy')">Buy (long)</button>
         <button type="button" class="seg-btn" data-side="Sell" onclick="setSScanSide('Sell')">Sell (short)</button>
+      </div>
+
+      <label class="field-label">Tag in Library</label>
+      <div class="seg" id="sscan-cat">
+        <button type="button" class="seg-btn" data-cat="bullish" onclick="setSScanCat('bullish')">Bullish</button>
+        <button type="button" class="seg-btn" data-cat="bearish" onclick="setSScanCat('bearish')">Bearish</button>
+        <button type="button" class="seg-btn" data-cat="neutral" onclick="setSScanCat('neutral')">Neutral</button>
       </div>
 
       <label class="field-label">Underlying</label>
@@ -2255,54 +2376,18 @@ const SCAN_TEMPLATES = [
     defConds:[{ind:'Price', op:'less than', val:'20-day low'},{ind:'Volume', op:'greater than', val:'1.5x avg'}] },
 ];
 
-function renderScanTemplates() {
-  ['bullish','bearish'].forEach(cat => {
-    const list = SCAN_TEMPLATES.filter(t => t.cat === cat);
-    document.getElementById('cat-scan-' + cat).innerHTML = list.map(t => `
-      <div class="strat-card" onclick='useScanTemplate(${JSON.stringify(JSON.stringify(t))})'>
-        <div class="strat-card-top">
-          <div class="strat-name">${t.name}</div>
-          <div class="strat-use">Use template →</div>
-        </div>
-        <div class="strat-legs">${t.desc}</div>
-        <div class="strat-assets">${assetChips(t.assets)}</div>
-      </div>
-    `).join('');
-  });
-}
+function renderScanTemplates() { try { renderScLib(); } catch (e) { /* screen not ready yet */ } }
 
-let savedScanners = [
-  { name:'Nifty golden cross watch', asset:'nifty', cat:'bullish', conds:[{ind:'MA 50', op:'crosses above', val:'MA 200'}] },
-  { name:'BTC RSI overbought fade', asset:'btc', cat:'bearish', conds:[{ind:'RSI (14)', op:'crosses below', val:'70'}] },
-  { name:'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)', asset:'btc', cat:'bearish', note:'runs in Strategy scanner', conds:[{ind:'Guppy EMA ribbon',op:'squeezed, then breaks down',val:'ribbon low'},{ind:'Guppy short EMAs',op:'below',val:'long EMAs'},{ind:'Price',op:'less than',val:'Supertrend (10,2)'}] },
-  { name:'Bullish: EMA squeeze breakout + Guppy crossover + above Supertrend (10,2)', asset:'btc', cat:'bullish', note:'runs in Strategy scanner', conds:[{ind:'Guppy EMA ribbon',op:'squeezed, then breaks up',val:'ribbon high'},{ind:'Guppy short EMAs',op:'above',val:'long EMAs'},{ind:'Price',op:'greater than',val:'Supertrend (10,2)'}] },
-];
-
-function renderSavedScanners() {
-  const el = document.getElementById('saved-scan-list');
-  document.getElementById('saved-scan-count').textContent = savedScanners.length ? `(${savedScanners.length})` : '';
-  if (!savedScanners.length) {
-    el.innerHTML = `<div class="saved-empty">No saved scanners yet — build one or use a template below.</div>`;
-    return;
-  }
-  el.innerHTML = savedScanners.map((s,i) => {
-    const asset = ASSETS.find(a => a.id === s.asset);
-    return `
-    <div class="saved-row">
-      <span class="cat-dot" style="background:${s.cat === 'bullish' ? 'var(--green)' : 'var(--red)'}"></span>
-      <div class="saved-info">
-        <div class="saved-name">${s.name}</div>
-        <div class="saved-meta">${asset ? asset.name : s.asset} · ${s.conds.length} condition${s.conds.length>1?'s':''} · ${s.cat}${s.note ? ' · ' + s.note : ''}</div>
-      </div>
-      <button class="saved-remove" aria-label="Remove scanner" onclick="removeSavedScanner(${i})">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-8 0 1 13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-13"/></svg>
-      </button>
-    </div>`;
-  }).join('');
-}
+// Indicator scanners the user saved. Persisted per device today; each belongs to SC_USER (see the Scanner screen block) so a signed-in build can load only the owner's rows.
+const SAVED_SCAN_KEY = 'tradepro_saved_scanners_v1';
+let savedScanners = [];
+try { const v = JSON.parse(localStorage.getItem(SAVED_SCAN_KEY) || 'null'); if (Array.isArray(v)) savedScanners = v; } catch (e) { /* storage unavailable */ }
+function persistSaved() { try { localStorage.setItem(SAVED_SCAN_KEY, JSON.stringify(savedScanners)); } catch (e) { /* ignore */ } }
+function renderSavedScanners() { try { renderScLib(); } catch (e) { /* screen not ready yet */ } }
 
 function removeSavedScanner(i) {
   savedScanners.splice(i, 1);
+  persistSaved();
   renderSavedScanners();
 }
 
@@ -2380,6 +2465,7 @@ function saveScanner() {
     cat: currentScanCategory,
     conds: currentConditions.map(c => ({...c})),
   });
+  persistSaved();
   renderSavedScanners();
   closeScanBuilder();
 }
@@ -2457,7 +2543,14 @@ function renderSScans() {
   const el = document.getElementById('sscan-list');
   if (!el) return;
   document.getElementById('sscan-count').textContent = sscans.length ? `(${sscans.length})` : '';
-  if (!sscans.length) { el.innerHTML = '<div class="saved-empty">No strategy scans yet — tap “New strategy scan”.</div>'; return; }
+  if (!sscans.length && !rscans.length) {
+    const ce = document.getElementById('sc2-live-chips'); if (ce) ce.innerHTML = '';
+    const bd = document.getElementById('sc2-live-n'); if (bd) bd.classList.remove('on');
+    el.innerHTML = '<div class="sc2-empty"><b>No scanners yet</b>Build your own, or open the Library to start from a default.<div class="sc2-acts"><button class="btn-primary" onclick="rbOpen()">Build a scanner</button><button class="btn-ghost" onclick="openSScan()">New strategy scan</button><button class="btn-ghost" onclick="scTab(\'lib\')">Browse Library</button></div></div>';
+    try { renderScLib(); } catch (e) { /* not ready */ }
+    return;
+  }
+  const metas = [];
   const cards = sscans.map((sc, i) => {
     const r = sscanResults[i];
     const sideCol = sc.side === 'Sell' ? 'var(--red)' : 'var(--green)';
@@ -2474,29 +2567,49 @@ function renderSScans() {
           ${lines}${when}${open}</div>`;
       }).join('') + `<div style="font-size:10.5px; color:var(--text-faint); margin-top:6px">scanned ${new Date(r.at).toISOString().slice(11,19)} UTC</div>`;
     }
-    return `<div class="strat-card" style="cursor:default">
-      <div class="strat-card-top">
-        <div class="strat-name">${sscanEsc(sc.name)}</div>
-        <div style="display:flex; gap:6px">
-          <button class="strat-chart-btn" style="margin:0" onclick="runSScan(${i})">Scan</button>
-          <button class="strat-chart-btn" style="margin:0" onclick="openSScan(${i})">Edit</button>
-          <button class="saved-remove" aria-label="Remove scan" onclick="removeSScan(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-8 0 1 13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-13"/></svg></button>
+    const cat = sscanDeriveCat(sc), catCol = scCatInfo(cat).col;
+    const rows = r ? r.rows : [], hit = rows.filter(x => x && x.ok).map(x => x.und);
+    let best = null; rows.forEach(x => { if (x && x.details && x.details.length) { const n = x.details.filter(d => d.ok).length; if (!best || n > best.n) best = { n, t: x.details.length }; } });
+    metas[i] = { match: hit.length > 0, cat };
+    const dots = best ? Array.from({ length: Math.min(best.t, 6) }, (_, k) => `<i class="sc2-dot${k < best.n ? ' f' : ''}"></i>`).join('') : '';
+    const chip = !r ? '<span class="sc2-st n">Not scanned</span>' : hit.length ? `<span class="sc2-st m">Match · ${hit.join(' + ')}</span>` : `<span class="sc2-st n">${best && best.n ? best.n + ' of ' + best.t : 'No match'}</span>`;
+    const key = 's:' + sc.name;
+    return `<details class="sc2-row" data-k="${sscanEsc(key)}" ${scOpen[key] ? 'open' : ''} ontoggle="scToggle(this)">
+      <summary><span class="sc2-rbar" style="background:${catCol}"></span>
+        <span class="sc2-main"><span class="sc2-name">${sscanEsc(sc.name)}</span>
+          <span class="sc2-sub"><b style="color:${sideCol}; font-weight:600">${sc.side === 'Sell' ? 'Sell' : 'Buy'}</b> ${sscanEsc(sc.strat)} · ${sc.und.replace(/,/g, ' + ')} · ${sc.tf}</span></span>
+        <span class="sc2-dots">${dots}</span>${chip}${SC_CHEV}</summary>
+      <div class="sc2-body">
+        <div class="strat-legs">${sscanEsc(sscanSummary(sc))}${sc.fresh ? ' · flags only the first candle of a signal' : ''}</div>
+        ${res || '<div class="strat-legs">Not scanned yet. Tap Scan to check it now.</div>'}
+        <div class="sc2-acts">
+          <button class="btn-primary" onclick="runSScan(${i})">Scan now</button>
+          <button class="btn-ghost" onclick="openSScan(${i})">Edit</button>
+          <button class="btn-ghost danger" onclick="if(confirm('Delete this scan?')) removeSScan(${i})">Delete</button>
         </div>
-      </div>
-      <div class="strat-legs"><b style="color:${sideCol}">${sc.side === 'Sell' ? 'Sell' : 'Buy'}</b> ${sscanEsc(sc.strat)} · ${sc.und.replace(',', ' + ')} · ${sc.tf}${sc.fresh ? ' · first signal only' : ''}</div>
-      <div class="strat-legs">${sscanEsc(sscanSummary(sc))}</div>
-      ${res}
-    </div>`;
+      </div></details>`;
   });
-  const isG = sc => sc.strat === 'Guppy crossover';
-  const sect = (title, pred) => { const items = cards.map((h, i) => pred(sscans[i]) ? h : '').join(''); return items ? `<div style="font-size:12.5px;font-weight:600;color:var(--text-muted);margin:14px 0 6px">${title}</div>${items}` : ''; };
-  el.innerHTML = sect('Straddle scanner', sc => !isG(sc)) + sect('Guppy crossover scanner', isG);
+  const items = sscans.map((_, i) => ({ html: cards[i], match: metas[i].match, cat: metas[i].cat, ord: i }));
+  rscans.forEach((sc, j) => { const m = { match: false }, html = rsCardHtml(sc, m); items.push({ html, match: m.match, cat: sc.cat || 'neutral', ord: 1000 + j }); });
+  const cnt = { all: items.length, match: 0, bullish: 0, bearish: 0, neutral: 0 };
+  items.forEach(m => { if (m.match) cnt.match++; cnt[m.cat] = (cnt[m.cat] || 0) + 1; });
+  const dotOf = k => k === 'bullish' ? '<i class="sc2-cdot" style="background:var(--green)"></i>' : k === 'bearish' ? '<i class="sc2-cdot" style="background:var(--red)"></i>' : k === 'neutral' ? '<i class="sc2-cdot" style="background:var(--text-muted)"></i>' : '';
+  const ce = document.getElementById('sc2-live-chips');
+  if (ce) ce.innerHTML = [['all', 'All'], ['match', 'Match'], ['bullish', 'Bullish'], ['bearish', 'Bearish']].concat(cnt.neutral ? [['neutral', 'Neutral']] : []).map(([k, l]) => `<button class="sc2-chip${scLiveFilter === k ? ' on' : ''}" onclick="scSetLive('${k}')">${dotOf(k)}${l} <span class="sc2-n">${cnt[k]}</span></button>`).join('');
+  const bd = document.getElementById('sc2-live-n'); if (bd) { bd.textContent = cnt.match; bd.classList.toggle('on', cnt.match > 0); }
+  const show = items.filter(m => scLiveFilter === 'all' || (scLiveFilter === 'match' ? m.match : m.cat === scLiveFilter)).sort((x, y) => (y.match - x.match) || (x.ord - y.ord));
+  el.innerHTML = show.length ? `<div class="sc2-list">${show.map(m => m.html).join('')}</div>` : '<div class="sc2-empty"><b>Nothing in this view</b>No scans match this filter right now.</div>';
+  const times = Object.keys(sscanResults).map(k => sscanResults[k] && sscanResults[k].at).concat(Object.keys(rscanResults).map(k => rscanResults[k] && rscanResults[k].at)).filter(Boolean);
+  const ft = document.getElementById('sc2-live-foot'); if (ft) ft.textContent = times.length ? 'Last scan ' + new Date(Math.max.apply(null, times)).toISOString().slice(11, 16) + ' UTC' : 'Not scanned yet';
+  try { renderScLib(); } catch (e) { /* not ready */ }
 }
 function removeSScan(i) { const gone = sscans[i]; sscans.splice(i, 1); sscanResults = {}; persistSScans(); if (gone && (gone.name === sscanApplied || (sscanApplied === '__pair' && /guppy/i.test(gone.name)))) { sscanApplied = null; sscanApplyRefresh(); } renderSScans(); sscanFillApply(); }
 
 /* ---- builder modal ---- */
 function setSScanSide(side) {
   sscanDraft.side = side;
+  if (!sscanDraft.catManual) sscanDraft.cat = sscanDeriveCat(sscanDraft, true);
+  scSyncCatSeg();
   document.querySelectorAll('#sscan-side .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.side === side));
   sscanSlUi();
 }
@@ -2610,6 +2723,7 @@ function openSScan(idx, stratName) {
   document.getElementById('sscan-minprem').value = sscanDraft.minPrem || '';
   if (!sscanDraft.sl) sscanDraft.sl = { on: idx == null, n: 4, buf: 0, mode: 'fixed' };   // new scans start with a 4-candle stop; saved scans keep whatever they had (off if none)
   document.getElementById('sscan-sl-on').checked = !!sscanDraft.sl.on; document.getElementById('sscan-sl-n').value = sscanDraft.sl.n; document.getElementById('sscan-sl-buf').value = sscanDraft.sl.buf; document.getElementById('sscan-sl-mode').value = sscanDraft.sl.mode;
+  sscanDraft.catManual = !!sscanDraft.cat; if (!sscanDraft.cat) sscanDraft.cat = sscanDeriveCat(sscanDraft, true);
   setSScanSide(sscanDraft.side);
   renderSScanConds();
   document.getElementById('sscan-overlay').classList.add('open');
@@ -2619,6 +2733,7 @@ function saveSScan() {
   const d = sscanDraft;
   d.name = document.getElementById('sscan-name').value.trim() || (d.side === 'Sell' ? 'Short ' : 'Long ') + d.strat.toLowerCase() + ' scan';
   if (!d.conds.length) { alert('Add at least one condition.'); return; }
+  delete d.catManual; if (d.cat !== 'bullish' && d.cat !== 'bearish' && d.cat !== 'neutral') d.cat = sscanDeriveCat(d, true);
   if (sscanEditing == null) { sscans.unshift(d); sscanEditing = 0; } else sscans[sscanEditing] = d;
   const idx = sscanEditing, applyToChart = sscanFromChart || sscanApplied === d.name;
   sscanFromChart = false;
@@ -2797,7 +2912,7 @@ async function runSScan(i) {
 async function runAllSScans() {
   if (sscanBusy) return;
   sscanBusy = true;
-  try { for (let i = 0; i < sscans.length; i++) await runSScan(i); } finally { sscanBusy = false; }
+  try { for (let i = 0; i < sscans.length; i++) await runSScan(i); await rsRunAll(); } finally { sscanBusy = false; }
 }
 function sscanToggleAuto() {
   if (sscanAutoTimer) { clearInterval(sscanAutoTimer); sscanAutoTimer = null; }
@@ -3380,7 +3495,575 @@ function sscanExitRule(sc) {
   return sc && /^straddle$/i.test(sc.strat) ? { p: 20, op: sc.side === 'Sell' ? 'above' : 'below' } : null;
 }
 
+/* ---------- Scanner screen: Live · Performance · Library ---------- */
+// Ownership seam: everything under "Mine" belongs to SC_USER. Today that is this device (localStorage); when sign-in is added, set SC_USER to the
+// logged-in user and load/save only that user's rows. Default scanners (SCAN_TEMPLATES) stay read-only and shared by everyone.
+var SC_USER = { id: 'local', name: '', signedIn: false };
+var scTabNow = 'live', scLiveFilter = 'all', scLibScope = 'all', scLibCat = 'all', scLibQuery = '', scOpen = {};
+var SC_CHEV = '<svg class="sc2-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+var SC_LOCK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+try { scTabNow = localStorage.getItem('tradepro_sc_tab') || 'live'; } catch (e) { /* storage unavailable */ }
+if (['live', 'perf', 'lib'].indexOf(scTabNow) < 0) scTabNow = 'live';
+
+function scCatInfo(c) { return c === 'bearish' ? { col: 'var(--red)', label: 'Bearish', cls: 'bear' } : c === 'neutral' ? { col: 'var(--text-muted)', label: 'Neutral', cls: 'neu' } : { col: 'var(--green)', label: 'Bullish', cls: 'bull' }; }
+/* RULE ENGINE START — pure functions (no DOM, no network). One evaluator serves the live scan, the history view and, later, server-side alerts. */
+var RS_TF = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800, '1M': 2592000 };
+var RS_TF_ORDER = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'];
+var RS_TF_LABEL = { '1m': '1 min', '5m': '5 min', '15m': '15 min', '30m': '30 min', '1h': 'Hourly', '4h': '4 hour', '1d': 'Daily', '1w': 'Weekly', '1M': 'Monthly' };
+var RS_FIELDS = { open: 'o', high: 'h', low: 'l', close: 'c', volume: 'v' };
+var RS_IND_LABEL = { ema: 'EMA', sma: 'SMA', avgvol: 'Avg volume', rsi: 'RSI', atr: 'ATR', hh: 'Highest high', ll: 'Lowest low', macd: 'MACD line', macdsig: 'MACD signal' };
+var RS_OPS = { '>': 'is greater than', '<': 'is lower than', 'x>': 'crosses above', 'x<': 'crosses below' };
+
+function rsBucket(ts, tf) {
+  if (tf === '1M') { const d = new Date(ts * 1000); return d.getUTCFullYear() * 12 + d.getUTCMonth(); }
+  if (tf === '1w') return Math.floor((ts - 345600) / 604800);          // weeks start Monday 00:00 UTC
+  return Math.floor(ts / RS_TF[tf]);
+}
+function rsBucketStart(ts, tf) {
+  if (tf === '1M') { const d = new Date(ts * 1000); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) / 1000; }
+  if (tf === '1w') return Math.floor((ts - 345600) / 604800) * 604800 + 345600;
+  return Math.floor(ts / RS_TF[tf]) * RS_TF[tf];
+}
+// Base candles -> candles of timeframe `tf`. finals[pos] = completed bucket; part[i] = the bucket as it stands at base candle i (the "current" candle).
+function rsBuildSeries(base, tf, baseTf) {
+  const finals = [], bi = new Array(base.length).fill(-1), part = new Array(base.length).fill(null);
+  let cur = null, pos = -1, started = tf === baseTf;
+  for (let i = 0; i < base.length; i++) {
+    const x = base[i];
+    if (!started) { if (rsBucketStart(x.ts, tf) === x.ts) started = true; else continue; }   // skip a leading bucket we only have part of
+    const b = rsBucket(x.ts, tf);
+    if (!cur || cur.b !== b) { if (cur) finals[pos] = cur; pos++; cur = { b, ts: x.ts, o: x.o, h: x.h, l: x.l, c: x.c, v: x.v }; }
+    else { cur.h = Math.max(cur.h, x.h); cur.l = Math.min(cur.l, x.l); cur.c = x.c; cur.v += x.v; }
+    bi[i] = pos; part[i] = { o: cur.o, h: cur.h, l: cur.l, c: cur.c, v: cur.v };
+  }
+  if (cur) finals[pos] = cur;
+  return { tf, finals, bi, part, cache: {} };
+}
+function rsEmaArr(vals, len) {
+  const out = new Array(vals.length).fill(null), a = 2 / (len + 1);
+  if (vals.length < len) return out;
+  let s = 0; for (let i = 0; i < len; i++) s += vals[i];
+  out[len - 1] = s / len;
+  for (let i = len; i < vals.length; i++) out[i] = a * vals[i] + (1 - a) * out[i - 1];
+  return out;
+}
+function rsIndSeries(S, ind, len) {
+  const key = ind + ':' + len; if (S.cache[key]) return S.cache[key];
+  const F = S.finals, n = F.length, cl = F.map(x => x.c); let o;
+  if (ind === 'ema') o = { v: rsEmaArr(cl, len) };
+  else if (ind === 'sma') { const v = new Array(n).fill(null); let s = 0; for (let i = 0; i < n; i++) { s += cl[i]; if (i >= len) s -= cl[i - len]; if (i >= len - 1) v[i] = s / len; } o = { v };
+  } else if (ind === 'avgvol' || ind === 'hh' || ind === 'll') {   // over the previous `len` completed candles, excluding the candle itself
+    const v = new Array(n).fill(null);
+    for (let i = len; i < n; i++) {
+      if (ind === 'avgvol') { let s = 0; for (let j = i - len; j < i; j++) s += F[j].v; v[i] = s / len; }
+      else if (ind === 'hh') { let m = -Infinity; for (let j = i - len; j < i; j++) if (F[j].h > m) m = F[j].h; v[i] = m; }
+      else { let m = Infinity; for (let j = i - len; j < i; j++) if (F[j].l < m) m = F[j].l; v[i] = m; }
+    }
+    o = { v };
+  } else if (ind === 'rsi') {   // Wilder
+    const v = new Array(n).fill(null), g = new Array(n).fill(null), l = new Array(n).fill(null);
+    if (n > len) {
+      let sg = 0, sl = 0; for (let i = 1; i <= len; i++) { const d = cl[i] - cl[i - 1]; sg += d > 0 ? d : 0; sl += d < 0 ? -d : 0; }
+      g[len] = sg / len; l[len] = sl / len; v[len] = l[len] === 0 ? 100 : 100 - 100 / (1 + g[len] / l[len]);
+      for (let i = len + 1; i < n; i++) { const d = cl[i] - cl[i - 1]; g[i] = (g[i - 1] * (len - 1) + (d > 0 ? d : 0)) / len; l[i] = (l[i - 1] * (len - 1) + (d < 0 ? -d : 0)) / len; v[i] = l[i] === 0 ? 100 : 100 - 100 / (1 + g[i] / l[i]); }
+    }
+    o = { v, g, l };
+  } else if (ind === 'atr') {   // Wilder
+    const v = new Array(n).fill(null), tr = i => Math.max(F[i].h - F[i].l, Math.abs(F[i].h - F[i - 1].c), Math.abs(F[i].l - F[i - 1].c));
+    if (n > len) { let s = 0; for (let i = 1; i <= len; i++) s += tr(i); v[len] = s / len; for (let i = len + 1; i < n; i++) v[i] = (v[i - 1] * (len - 1) + tr(i)) / len; }
+    o = { v };
+  } else if (ind === 'macd' || ind === 'macdsig') {
+    const ef = rsEmaArr(cl, 12), es = rsEmaArr(cl, 26), m = new Array(n).fill(null);
+    for (let i = 0; i < n; i++) if (ef[i] != null && es[i] != null) m[i] = ef[i] - es[i];
+    const first = m.findIndex(x => x != null), sig = new Array(n).fill(null);
+    if (first >= 0) { const tail = rsEmaArr(m.slice(first), 9); for (let i = 0; i < tail.length; i++) sig[first + i] = tail[i]; }
+    o = { v: ind === 'macd' ? m : sig, ef, es, m, sig };
+  } else o = { v: new Array(n).fill(null) };
+  S.cache[key] = o; return o;
+}
+// Value of an indicator for the candle at `pos`; when k === 0 it is the CURRENT candle (still forming at higher timeframes), built from the previous completed ones plus the candle so far.
+function rsIndVal(src, S, i, pos, k) {
+  const len = Math.max(1, src.len | 0 || 14), ind = src.ind, P = S.part[i], F = S.finals, ser = rsIndSeries(S, ind, len);
+  if (k > 0) return ser.v[pos];
+  if (pos < 1) return null;
+  if (ind === 'ema') { const p = ser.v[pos - 1]; return p == null ? null : (2 / (len + 1)) * P.c + (1 - 2 / (len + 1)) * p; }
+  if (ind === 'sma') { if (pos < len - 1) return null; let s = P.c; for (let j = pos - len + 1; j < pos; j++) s += F[j].c; return s / len; }
+  if (ind === 'avgvol' || ind === 'hh' || ind === 'll') return ser.v[pos];
+  if (ind === 'rsi') { const g = ser.g[pos - 1], l = ser.l[pos - 1]; if (g == null) return null; const d = P.c - F[pos - 1].c, ng = (g * (len - 1) + (d > 0 ? d : 0)) / len, nl = (l * (len - 1) + (d < 0 ? -d : 0)) / len; return nl === 0 ? 100 : 100 - 100 / (1 + ng / nl); }
+  if (ind === 'atr') { const p = ser.v[pos - 1]; if (p == null) return null; const pc = F[pos - 1].c, tr = Math.max(P.h - P.l, Math.abs(P.h - pc), Math.abs(P.l - pc)); return (p * (len - 1) + tr) / len; }
+  if (ind === 'macd' || ind === 'macdsig') {
+    const pf = ser.ef[pos - 1], ps = ser.es[pos - 1]; if (pf == null || ps == null) return null;
+    const m = ((2 / 13) * P.c + (1 - 2 / 13) * pf) - ((2 / 27) * P.c + (1 - 2 / 27) * ps);
+    if (ind === 'macd') return m;
+    const psig = ser.sig[pos - 1]; return psig == null ? null : 0.2 * m + 0.8 * psig;
+  }
+  return null;
+}
+function rsVal(src, i, ctx) {
+  if (src.type === 'num') return +src.value;
+  const S = ctx.series[src.tf]; if (!S) return null;
+  const k = src.back | 0, cp = S.bi[i]; if (cp < 0) return null;
+  const pos = cp - k; if (pos < 0) return null;
+  let v;
+  if (src.type === 'price') { const cd = k === 0 ? S.part[i] : S.finals[pos]; v = cd ? cd[RS_FIELDS[src.field] || 'c'] : null; }
+  else v = rsIndVal(src, S, i, pos, k);
+  return v == null || !isFinite(v) ? null : v * (src.mult == null || src.mult === '' ? 1 : +src.mult);
+}
+function rsSources(rules) { const out = []; (rules || []).forEach(r => { out.push(r.a); out.push(r.b); }); return out.filter(x => x && x.type !== 'num'); }
+function rsBaseTf(rules) {
+  let best = -1; rsSources(rules).forEach(s => { const ix = RS_TF_ORDER.indexOf(s.tf); if (ix > best) best = ix; });
+  const finest = rsSources(rules).reduce((m, s) => Math.min(m, RS_TF_ORDER.indexOf(s.tf)), 99);
+  if (finest === 99) return '1d';
+  const tf = RS_TF_ORDER[finest];
+  return tf === '1w' || tf === '1M' ? '1d' : tf;
+}
+// How many base candles of history the rules need before every value can be computed.
+function rsNeedCandles(rules, baseTf) {
+  let need = 10;
+  rsSources(rules).forEach(s => {
+    const ratio = Math.max(1, RS_TF[s.tf] / RS_TF[baseTf]), L = Math.max(1, s.len | 0 || 14), k = s.back | 0;
+    let cnt = k + 3;
+    if (s.type === 'ind') cnt += s.ind === 'macd' || s.ind === 'macdsig' ? 26 * 3 + 18 : (s.ind === 'ema' || s.ind === 'rsi' || s.ind === 'atr') ? L * 3 : L;
+    need = Math.max(need, Math.ceil((cnt + 1) * ratio + ratio));
+  });
+  return need;
+}
+function rsCtx(rules, base, baseTf) {
+  const series = {}; rsSources(rules).forEach(s => { if (!series[s.tf]) series[s.tf] = rsBuildSeries(base, s.tf, baseTf); });
+  return { base, baseTf, series };
+}
+// Evaluate every rule at base candle i. Returns { ok: true|false|null, det: [true|false|null per rule] }  (null = not enough history yet)
+function rsEvalAt(sc, ctx, i) {
+  const det = (sc.rules || []).map(r => {
+    const a = rsVal(r.a, i, ctx), b = rsVal(r.b, i, ctx); if (a == null || b == null) return null;
+    if (r.op === 'x>' || r.op === 'x<') { if (i < 1) return null; const a1 = rsVal(r.a, i - 1, ctx), b1 = rsVal(r.b, i - 1, ctx); if (a1 == null || b1 == null) return null; return r.op === 'x>' ? (a1 <= b1 && a > b) : (a1 >= b1 && a < b); }
+    return r.op === '<' ? a < b : a > b;
+  });
+  let ok;
+  if (!det.length) ok = null;
+  else if (sc.mode === 'any') ok = det.some(x => x === true) ? true : det.every(x => x === null) ? null : false;
+  else ok = det.some(x => x === null) ? null : det.every(x => x === true);
+  return { ok, det };
+}
+var RS_AFTER = [1, 3, 5, 10];
+// base: [{ts,o,h,l,c,v}] closed candles. Returns the live state plus every past trigger (first candle a signal turns true) with neutral after-the-fact moves.
+function rsScanCandles(sc, base, baseTf) {
+  const n = base.length, ctx = rsCtx(sc.rules, base, baseTf), ok = new Array(n).fill(null); let last = null;
+  for (let i = 0; i < n; i++) { last = rsEvalAt(sc, ctx, i); ok[i] = last.ok; }
+  const triggers = [];
+  for (let i = 0; i < n; i++) {
+    if (ok[i] !== true || (i > 0 && ok[i - 1] === true)) continue;
+    const px = base[i].c, after = {}; RS_AFTER.forEach(N => { after[N] = i + N < n ? (base[i + N].c / px - 1) * 100 : null; });
+    let up = null, dn = null, avail = Math.min(10, n - 1 - i);
+    if (avail > 0) { let hi = -Infinity, lo = Infinity; for (let j = i + 1; j <= i + avail; j++) { if (base[j].h > hi) hi = base[j].h; if (base[j].l < lo) lo = base[j].l; } up = (hi / px - 1) * 100; dn = (lo / px - 1) * 100; }
+    triggers.push({ ts: base[i].ts, price: px, after, up, dn, avail });
+  }
+  const firstOk = ok.findIndex(x => x !== null), now = n ? ok[n - 1] : null;
+  let since = null; if (now === true) { let j = n - 1; while (j > 0 && ok[j - 1] === true) j--; since = base[j].ts; }
+  return { now, det: last ? last.det : [], since, triggers, n, from: n ? base[0].ts : null, to: n ? base[n - 1].ts : null, evalFrom: firstOk >= 0 ? base[firstOk].ts : null, baseTf };
+}
+/* RULE ENGINE END */
+
+/* ---------- Custom scanners: markets, presets, storage, data, builder, results ---------- */
+// Markets. Only Crypto is live; the others are placeholders so the picker and the scanner format are ready (each scanner stores `market` + `symbols`).
+// XAUTUSD and PAXGUSD are simply part of Crypto here, listed by their own names.
+var RS_MARKETS = {
+  crypto:  { label: 'Crypto', active: true, symbols: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'XAUTUSD', 'PAXGUSD'], tfs: ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'] },
+  nifty50: { label: 'Nifty 50', active: false }, mcx: { label: 'MCX', active: false }, all: { label: 'All markets', active: false }
+};
+var RS_FETCH_CAP = 4000, RS_KEY = 'tradepro_rule_scans_v1', rscans = [], rscanResults = {}, rsRunning = {}, rsWin = 'all', rsCache = {};
+try { const v = JSON.parse(localStorage.getItem(RS_KEY) || 'null'); if (Array.isArray(v)) rscans = v; } catch (e) { /* storage unavailable */ }
+function rsPersist() { try { localStorage.setItem(RS_KEY, JSON.stringify(rscans)); } catch (e) { /* ignore */ } }
+
+function rP(field, tf, back) { return { type: 'price', field, tf, back: back | 0 }; }
+function rI(ind, len, tf, back, mult) { return { type: 'ind', ind, len, tf, back: back | 0, mult: mult == null ? 1 : mult }; }
+function rN(v) { return { type: 'num', value: v }; }
+function rR(a, op, b) { return { a, op, b }; }
+function rsGreen(tf, k) { return rR(rP('close', tf, k), '>', rP('open', tf, k)); }
+function rsRed(tf, k) { return rR(rP('close', tf, k), '<', rP('open', tf, k)); }
+var RS_PRESETS = [
+  { id: 'bull_engulf', cat: 'bullish', name: 'Bullish engulfing', desc: 'A green candle whose body fully covers the previous red candle',
+    rules: [rsRed('1d', 1), rsGreen('1d', 0), rR(rP('close', '1d', 0), '>', rP('open', '1d', 1)), rR(rP('open', '1d', 0), '<', rP('close', '1d', 1))] },
+  { id: 'soldiers', cat: 'bullish', name: 'Three white soldiers', desc: 'Three green candles in a row, each closing higher and opening inside the last body',
+    rules: [rsGreen('1d', 0), rsGreen('1d', 1), rsGreen('1d', 2), rR(rP('close', '1d', 0), '>', rP('close', '1d', 1)), rR(rP('close', '1d', 1), '>', rP('close', '1d', 2)), rR(rP('open', '1d', 0), '>', rP('open', '1d', 1)), rR(rP('open', '1d', 1), '>', rP('open', '1d', 2))] },
+  { id: 'gap_rally', cat: 'bullish', name: 'Gap down, then rally above yesterday\u2019s high', desc: 'Yesterday closed red, today opened below its low, then closed above its high',
+    rules: [rR(rP('open', '1d', 1), '>', rP('close', '1d', 1)), rR(rP('open', '1d', 0), '<', rP('low', '1d', 1)), rR(rP('close', '1d', 0), '>', rP('high', '1d', 1))] },
+  { id: 'mtf_ema', cat: 'bullish', name: 'Hourly close below EMA 10, daily above EMA 10', desc: 'The last hourly close was below its EMA 10 while today\u2019s daily price is above the daily EMA 10',
+    rules: [rR(rP('close', '1h', 1), '<', rI('ema', 10, '1h', 1)), rR(rP('close', '1d', 0), '>', rI('ema', 10, '1d', 0))] },
+  { id: 'golden', cat: 'bullish', name: 'Bullish crossover (golden cross)', desc: '50-day moving average crosses above the 200-day', rules: [rR(rI('sma', 50, '1d', 0), 'x>', rI('sma', 200, '1d', 0))] },
+  { id: 'rsi_bounce', cat: 'bullish', name: 'RSI oversold bounce', desc: 'RSI(14) crosses back above 30 from below', rules: [rR(rI('rsi', 14, '1d', 0), 'x>', rN(30))] },
+  { id: 'macd_bull', cat: 'bullish', name: 'MACD bullish crossover', desc: 'MACD line crosses above the signal line', rules: [rR(rI('macd', 0, '1d', 0), 'x>', rI('macdsig', 0, '1d', 0))] },
+  { id: 'vol_up', cat: 'bullish', name: 'Volume breakout (up)', desc: 'Price closes above the 20-day high on 1.5x average volume',
+    rules: [rR(rP('close', '1d', 0), '>', rI('hh', 20, '1d', 0)), rR(rP('volume', '1d', 0), '>', rI('avgvol', 20, '1d', 0, 1.5))] },
+  { id: 'bear_engulf', cat: 'bearish', name: 'Bearish engulfing', desc: 'A red candle whose body fully covers the previous green candle',
+    rules: [rsGreen('1d', 1), rsRed('1d', 0), rR(rP('close', '1d', 0), '<', rP('open', '1d', 1)), rR(rP('open', '1d', 0), '>', rP('close', '1d', 1))] },
+  { id: 'crows', cat: 'bearish', name: 'Three black crows', desc: 'Three red candles in a row, each closing lower and opening inside the last body',
+    rules: [rsRed('1d', 0), rsRed('1d', 1), rsRed('1d', 2), rR(rP('close', '1d', 0), '<', rP('close', '1d', 1)), rR(rP('close', '1d', 1), '<', rP('close', '1d', 2)), rR(rP('open', '1d', 0), '<', rP('open', '1d', 1)), rR(rP('open', '1d', 1), '<', rP('open', '1d', 2))] },
+  { id: 'death', cat: 'bearish', name: 'Bearish crossover (death cross)', desc: '50-day moving average crosses below the 200-day', rules: [rR(rI('sma', 50, '1d', 0), 'x<', rI('sma', 200, '1d', 0))] },
+  { id: 'rsi_fade', cat: 'bearish', name: 'RSI overbought reversal', desc: 'RSI(14) crosses back below 70 from above', rules: [rR(rI('rsi', 14, '1d', 0), 'x<', rN(70))] },
+  { id: 'macd_bear', cat: 'bearish', name: 'MACD bearish crossover', desc: 'MACD line crosses below the signal line', rules: [rR(rI('macd', 0, '1d', 0), 'x<', rI('macdsig', 0, '1d', 0))] },
+  { id: 'vol_dn', cat: 'bearish', name: 'Volume breakdown', desc: 'Price closes below the 20-day low on 1.5x average volume',
+    rules: [rR(rP('close', '1d', 0), '<', rI('ll', 20, '1d', 0)), rR(rP('volume', '1d', 0), '>', rI('avgvol', 20, '1d', 0, 1.5))] },
+  { id: 'vol_burst', cat: 'neutral', name: 'Volume burst', desc: 'The latest hourly volume is more than 3x its 20-hour average', rules: [rR(rP('volume', '1h', 0), '>', rI('avgvol', 20, '1h', 0, 3))] }
+];
+RS_PRESETS.forEach(p => { p.mode = 'all'; });
+
+/* ---- text for rules ---- */
+function rsSrcText(s) {
+  if (!s) return '?';
+  if (s.type === 'num') return String(s.value);
+  const when = (s.back | 0) === 0 ? '' : ' (' + (s.back | 0) + ' ago)', tf = RS_TF_LABEL[s.tf] || s.tf;
+  if (s.type === 'price') return tf + ' ' + s.field + when;
+  const m = s.mult != null && s.mult !== '' && +s.mult !== 1 ? s.mult + '\u00d7 ' : '', hasLen = s.ind !== 'macd' && s.ind !== 'macdsig';
+  return m + RS_IND_LABEL[s.ind] + (hasLen ? ' ' + (s.len | 0) : '') + ' on ' + tf.toLowerCase() + when;
+}
+function rsRuleText(r) { return rsSrcText(r.a) + ' ' + (RS_OPS[r.op] || r.op) + ' ' + rsSrcText(r.b); }
+
+/* ---- data ---- */
+async function rsFetchBase(sym, tf, count) {
+  const key = sym + '|' + tf + '|' + count, hit = rsCache[key];
+  if (hit && Date.now() - hit.at < 20000) return hit.candles;
+  const sec = LIVE_RES[tf], end = Math.floor(Date.now() / 1000), CH = 1500; let all = [], e = end, left = count;
+  while (left > 0) {
+    const take = Math.min(CH, left), s0 = e - sec * take;
+    const part = liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(sym)}&resolution=${tf}&start=${s0}&end=${e}`), tf);
+    if (!part.length) break;
+    all = part.concat(all); e = s0; left -= take;
+    if (part.length < take * 0.9) break;   // the symbol has no older history
+  }
+  const seen = {}, out = [];
+  all.forEach(c => { const ts = liveTimeToSec(c.t); if (ts == null || seen[ts]) return; seen[ts] = 1; out.push({ ts, o: c.o, h: c.h, l: c.l, c: c.c, v: c.v }); });
+  out.sort((a, b) => a.ts - b.ts);
+  while (out.length && out[out.length - 1].ts + sec > end) out.pop();   // a signal needs a CLOSED candle
+  rsCache[key] = { at: Date.now(), candles: out };
+  return out;
+}
+async function rsRun(sc) {
+  const tf = rsBaseTf(sc.rules), need = rsNeedCandles(sc.rules, tf), count = Math.min(RS_FETCH_CAP, Math.max(500, need + 1200));
+  const warn = need > RS_FETCH_CAP ? `These rules need about ${need.toLocaleString()} ${RS_TF_LABEL[tf].toLowerCase()} candles of history, but only ${RS_FETCH_CAP.toLocaleString()} are read, so they cannot be evaluated. Use a longer timeframe or a shorter indicator length.` : '';
+  const results = await Promise.all((sc.symbols || []).map(async sym => {
+    try { const base = await rsFetchBase(sym, tf, count); const r = rsScanCandles(sc, base, tf); r.sym = sym; return r; }
+    catch (e) { return { sym, err: typeof liveErrText === 'function' ? liveErrText(e) : String(e && e.message || e) }; }
+  }));
+  return { at: Date.now(), baseTf: tf, need, count, warn, results };
+}
+async function rsRunOne(id) {
+  const sc = rscans.find(x => x.id === id); if (!sc || rsRunning[id]) return;
+  rsRunning[id] = true; renderSScans();
+  try { rscanResults[id] = await rsRun(sc); } catch (e) { rscanResults[id] = { at: Date.now(), baseTf: rsBaseTf(sc.rules), results: (sc.symbols || []).map(s => ({ sym: s, err: String(e && e.message || e) })) }; }
+  rsRunning[id] = false; renderSScans();
+}
+function rsDue(sc) { const R = rscanResults[sc.id]; if (!R) return true; const age = Date.now() - R.at, sec = RS_TF[rsBaseTf(sc.rules)] || 3600; return age >= (sec >= 3600 ? 300000 : 55000); }
+async function rsRunAll() { for (const sc of rscans) { if (rsDue(sc)) await rsRunOne(sc.id); } }
+
+/* ---- results (shared by the Live row and the builder preview) ---- */
+var RS_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function rsFmt(ts, tf, yr) {
+  if (RS_TF[tf] >= 86400) { const u = new Date(ts * 1000); return u.getUTCDate() + ' ' + RS_MON[u.getUTCMonth()] + (yr ? ' ' + u.getUTCFullYear() : ''); }
+  const d = new Date((ts + 19800) * 1000);   // IST
+  return d.getUTCDate() + ' ' + RS_MON[d.getUTCMonth()] + (yr ? ' ' + d.getUTCFullYear() : '') + ' ' + String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+}
+function rsPct(v) { return v == null ? '<span class="rs-na">\u2014</span>' : `<span class="${v > 0 ? 'rs-up' : v < 0 ? 'rs-dn' : ''}">${v > 0 ? '+' : ''}${v.toFixed(2)}%</span>`; }
+function rsPx(v) { return v >= 100 ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : v.toLocaleString(undefined, { maximumFractionDigits: 4 }); }
+function rsInWin(trs) { if (rsWin === 'all') return trs; const cut = Date.now() / 1000 - (+rsWin) * 86400; return trs.filter(t => t.ts >= cut); }
+function rsStats(trs, N) {
+  const v = trs.map(t => t.after[N]).filter(x => x != null); if (!v.length) return null;
+  const s = v.slice().sort((a, b) => a - b), med = s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+  return { n: v.length, up: v.filter(x => x > 0).length, dn: v.filter(x => x < 0).length, med };
+}
+function rsSetWin(k) { rsWin = k; renderSScans(); rbPreviewRefresh(); }
+function rsSymHtml(r, R) {
+  if (r.err) return `<div class="rs-sym"><div class="rs-symhead"><b>${sscanEsc(r.sym)}</b><span class="sc2-st n">No data</span></div><div class="rs-line">No data from the feed yet: ${sscanEsc(r.err)}</div></div>`;
+  const tf = R.baseTf, yr = r.to - r.from > 300 * 86400, F = (t) => rsFmt(t, tf, yr), trs = rsInWin(r.triggers), chip = r.now === true ? `<span class="sc2-st m">Match${r.since ? ' since ' + F(r.since) : ''}</span>` : r.now === false ? '<span class="sc2-st n">No match now</span>' : '<span class="sc2-st n">Not enough history</span>';
+  let cov = `Data ${F(r.from)} \u2192 ${F(r.to)} \u00b7 ${r.n.toLocaleString()} ${RS_TF_LABEL[tf].toLowerCase()} candles`;
+  if (r.evalFrom && r.from != null && r.evalFrom - r.from > 0.3 * (r.to - r.from)) cov += ` \u00b7 rules computable from ${F(r.evalFrom)}`;
+  let line;
+  if (trs.length) {
+    const st = rsStats(trs, 5);
+    line = `Triggered <b>${trs.length}</b> time${trs.length === 1 ? '' : 's'}` + (st ? `. After 5 candles: <span class="rs-up">up ${st.up}</span> \u00b7 <span class="rs-dn">down ${st.dn}</span> \u00b7 median ${rsPct(st.med)} (${st.n} measured)` : '. Too recent to measure yet');
+  } else if (r.triggers.length) {
+    const lastT = r.triggers[r.triggers.length - 1];
+    line = `No triggers in this window. Last triggered <b>${F(lastT.ts)}</b>, ${r.triggers.length} time${r.triggers.length === 1 ? '' : 's'} in all available data.`;
+  } else line = 'Has not triggered in the available data.';
+  let tbl = '';
+  if (trs.length) {
+    const rows = trs.slice().reverse().slice(0, 15).map(t => `<tr><td>${F(t.ts)}</td><td>${rsPx(t.price)}</td><td>${rsPct(t.after[1])}</td><td>${rsPct(t.after[3])}</td><td>${rsPct(t.after[5])}</td><td>${rsPct(t.after[10])}</td><td>${rsPct(t.up)}</td><td>${rsPct(t.dn)}</td></tr>`).join('');
+    tbl = `<div class="rs-tbl"><table><thead><tr><th>Triggered</th><th>Price</th><th>+1</th><th>+3</th><th>+5</th><th>+10</th><th>High</th><th>Low</th></tr></thead><tbody>${rows}</tbody></table></div>` +
+      (trs.length > 15 ? `<div class="rs-line">${trs.length - 15} earlier trigger${trs.length - 15 === 1 ? '' : 's'} not shown.</div>` : '') +
+      `<div class="rs-line">+N = move after N ${RS_TF_LABEL[tf].toLowerCase()} candles, measured from the trigger candle\u2019s close. High / Low = best and worst point within the next 10 candles.${RS_TF[tf] < 86400 ? ' Times in IST.' : ''}</div>`;
+  }
+  return `<div class="rs-sym"><div class="rs-symhead"><b>${sscanEsc(r.sym)}</b>${chip}</div><div class="rs-cov">${cov}</div><div class="rs-line">${line}</div>${tbl}</div>`;
+}
+function rsResultsHtml(R) {
+  if (!R) return '';
+  const chips = [['7', '7D'], ['30', '30D'], ['90', '90D'], ['all', 'All data']].map(([k, l]) => `<button class="sc2-chip${rsWin === k ? ' on' : ''}" onclick="rsSetWin('${k}')">${l}</button>`).join('');
+  let tot = 0; R.results.forEach(r => { if (!r.err) tot += rsInWin(r.triggers).length; });
+  return `<div class="rs-res"><div class="sc2-chips" style="margin:0">${chips}</div>
+    <div class="rs-sum"><b>${tot}</b> trigger${tot === 1 ? '' : 's'} across ${R.results.length} coin${R.results.length === 1 ? '' : 's'} in ${rsWin === 'all' ? 'all available data' : 'the last ' + rsWin + ' days'}</div>
+    ${R.warn ? `<div class="rs-line" style="color:var(--red)">${sscanEsc(R.warn)}</div>` : ''}
+    ${R.results.map(r => rsSymHtml(r, R)).join('')}
+    <div class="rs-line">This only shows what price did afterwards. Past triggers don\u2019t predict future ones, and a few triggers is a small sample.</div></div>`;
+}
+function rsSubLine(sc, R) {
+  if (!R || rsRunning[sc.id]) return `${(RS_MARKETS[sc.market] || RS_MARKETS.crypto).label} \u00b7 ${sc.symbols.length} coin${sc.symbols.length === 1 ? '' : 's'} \u00b7 ${RS_TF_LABEL[rsBaseTf(sc.rules)]} \u00b7 ${sc.rules.length} rule${sc.rules.length === 1 ? '' : 's'}`;
+  let n = 0, last = 0; R.results.forEach(r => { if (r.err) return; n += rsInWin(r.triggers).length; r.triggers.forEach(t => { if (t.ts > last) last = t.ts; }); });
+  const yrs = R.results.some(r => !r.err && r.to - r.from > 300 * 86400);
+  return (last ? 'Last fired ' + rsFmt(last, R.baseTf, yrs) : 'Not fired in available data') + ` \u00b7 ${n} in ${rsWin === 'all' ? 'all data' : rsWin + 'D'}`;
+}
+function rsCardHtml(sc, meta) {
+  const R = rscanResults[sc.id], running = !!rsRunning[sc.id], ci = scCatInfo(sc.cat), rows = R ? R.results : [];
+  const hit = rows.filter(x => x && x.now === true).map(x => x.sym);
+  let best = null; rows.forEach(x => { if (x && x.det && x.det.length) { const n = x.det.filter(d => d === true).length; if (!best || n > best.n) best = { n, t: x.det.length }; } });
+  meta.match = hit.length > 0;
+  const dots = best ? Array.from({ length: Math.min(best.t, 6) }, (_, k) => `<i class="sc2-dot${best.t <= 6 ? (k < best.n ? ' f' : '') : (k < Math.round(best.n / best.t * 6) ? ' f' : '')}"></i>`).join('') : '';
+  const chip = running ? '<span class="sc2-st n">Scanning\u2026</span>' : !R ? '<span class="sc2-st n">Not scanned</span>' : hit.length ? `<span class="sc2-st m">Match \u00b7 ${hit.length > 2 ? hit.length + ' coins' : hit.join(' + ')}</span>` : `<span class="sc2-st n">${best && best.n ? best.n + ' of ' + best.t : 'No match'}</span>`;
+  const key = 'r:' + sc.id;
+  return `<details class="sc2-row" data-k="${sscanEsc(key)}" ${scOpen[key] ? 'open' : ''} ontoggle="scToggle(this)">
+    <summary><span class="sc2-rbar" style="background:${ci.col}"></span>
+      <span class="sc2-main"><span class="sc2-name">${sscanEsc(sc.name)}</span><span class="sc2-sub">${sscanEsc(rsSubLine(sc, R))}</span></span>
+      <span class="sc2-dots">${dots}</span>${chip}${SC_CHEV}</summary>
+    <div class="sc2-body">
+      <div class="strat-legs">${sc.mode === 'any' ? 'Triggers when ANY rule is true' : 'Triggers when ALL rules are true'} \u00b7 checked on every ${RS_TF_LABEL[rsBaseTf(sc.rules)].toLowerCase()} candle close \u00b7 ${sc.vis === 'public' ? 'Public' : 'Private'}</div>
+      <ul class="sc2-conds">${sc.rules.map(r => `<li>${sscanEsc(rsRuleText(r))}</li>`).join('')}</ul>
+      ${R ? rsResultsHtml(R) : '<div class="strat-legs">Not scanned yet. Tap Scan now to check it and see its history.</div>'}
+      <div class="sc2-acts">
+        <button class="btn-primary" onclick="rsRunOne('${sc.id}')">${running ? 'Scanning\u2026' : 'Scan now'}</button>
+        <button class="btn-ghost" onclick="rbOpen(${rscans.indexOf(sc)})">Edit</button>
+        <button class="btn-ghost danger" onclick="scDelete('custom',${rscans.indexOf(sc)})">Delete</button>
+      </div>
+    </div></details>`;
+}
+
+/* ---- builder ---- */
+var rbDraft = null, rbEditing = null, rbPreviewHtml = '', rbTesting = false;
+function rbBlankRule() { return rR(rP('close', '1d', 0), '>', rI('ema', 10, '1d', 0)); }
+function rbNewDraft() { return { name: '', cat: 'neutral', vis: 'private', market: 'crypto', symbols: RS_MARKETS.crypto.symbols.slice(), mode: 'all', rules: [rbBlankRule()], alerts: null }; }
+function rbOpen(idx) {
+  rbEditing = idx == null || idx < 0 ? null : idx;
+  rbDraft = rbEditing == null ? rbNewDraft() : JSON.parse(JSON.stringify(rscans[rbEditing]));
+  rbPreviewHtml = ''; rbRender();
+  document.getElementById('rb-title').textContent = rbEditing == null ? 'New scanner' : 'Edit scanner';
+  document.getElementById('rb-overlay').classList.add('open');
+}
+function rbOpenPreset(id) {
+  const p = RS_PRESETS.find(x => x.id === id); if (!p) return;
+  rbEditing = null; rbDraft = rbNewDraft(); rbApplyPreset(p); rbPreviewHtml = ''; rbRender();
+  document.getElementById('rb-title').textContent = 'New scanner';
+  document.getElementById('rb-overlay').classList.add('open');
+}
+function rbApplyPreset(p) { rbDraft.name = rbDraft.name || p.name; rbDraft.cat = p.cat; rbDraft.mode = p.mode || 'all'; rbDraft.rules = JSON.parse(JSON.stringify(p.rules)); }
+function rbPreset(id) { const p = RS_PRESETS.find(x => x.id === id); if (!p) return; rbDraft.name = ''; rbApplyPreset(p); rbPreviewHtml = ''; rbRender(); }
+function rbClose() { document.getElementById('rb-overlay').classList.remove('open'); }
+function rbSelHtml(opts, cur, onch) { return `<select class="field-input rb-sel" onchange="${onch}">${opts.map(([v, l]) => `<option value="${v}"${String(v) === String(cur) ? ' selected' : ''}>${l}</option>`).join('')}</select>`; }
+function rbSrcHtml(ri, side) {
+  const s = rbDraft.rules[ri][side], tfs = RS_MARKETS[rbDraft.market].tfs, set = k => `rbSet(${ri},'${side}','${k}',this.value)`;
+  const type = rbSelHtml([['price', 'Price'], ['ind', 'Indicator'], ['num', 'Number']], s.type, `rbType(${ri},'${side}',this.value)`);
+  const tf = rbSelHtml(tfs.map(t => [t, RS_TF_LABEL[t]]), s.tf, set('tf'));
+  const back = rbSelHtml(Array.from({ length: 11 }, (_, k) => [k, k === 0 ? 'Current candle' : k + (k === 1 ? ' candle ago' : ' candles ago')]), s.back | 0, set('back'));
+  if (s.type === 'num') return `<div class="rb-src">${type}<input class="field-input rb-sel" type="number" step="any" value="${s.value === '' ? '' : s.value}" placeholder="Value" oninput="rbSet(${ri},'${side}','value',this.value)"></div>`;
+  if (s.type === 'price') return `<div class="rb-src">${type}${rbSelHtml(Object.keys(RS_FIELDS).map(f => [f, f[0].toUpperCase() + f.slice(1)]), s.field, set('field'))}${tf}${back}</div>`;
+  const hasLen = s.ind !== 'macd' && s.ind !== 'macdsig';
+  return `<div class="rb-src">${type}${rbSelHtml(Object.keys(RS_IND_LABEL).map(k => [k, RS_IND_LABEL[k]]), s.ind, `rbSet(${ri},'${side}','ind',this.value,true)`)}
+    ${hasLen ? `<label class="rb-pre"><span>Length</span><input type="number" min="1" step="1" value="${s.len | 0}" oninput="rbSet(${ri},'${side}','len',this.value)"></label>` : ''}${tf}${back}
+    <label class="rb-pre"><span>Multiplier \u00d7</span><input type="number" step="any" value="${s.mult == null || s.mult === '' ? '' : s.mult}" placeholder="1" oninput="rbSet(${ri},'${side}','mult',this.value)"></label></div>`;
+}
+function rbRender() {
+  const d = rbDraft, el = document.getElementById('rb-body'); if (!el) return;
+  const mk = RS_MARKETS.crypto, allOn = d.symbols.length === mk.symbols.length;
+  const seg = (items, cur, fn) => `<div class="seg">${items.map(([v, l]) => `<button type="button" class="seg-btn${cur === v ? ' active' : ''}" onclick="${fn}('${v}')">${l}</button>`).join('')}</div>`;
+  el.innerHTML = `
+    <select class="field-input rb-sel" onchange="rbPreset(this.value); this.value=''"><option value="">Start from a preset\u2026</option>${RS_PRESETS.map(p => `<option value="${p.id}">${sscanEsc(p.name)}</option>`).join('')}</select>
+    <label class="field-label">Scanner name</label>
+    <input class="field-input" type="text" value="${sscanEsc(d.name)}" placeholder="e.g. Gap down, then rally" oninput="rbDraft.name=this.value">
+    <label class="field-label">Market</label>
+    <div class="rb-chiprow">${Object.keys(RS_MARKETS).map(k => { const m = RS_MARKETS[k]; return m.active ? `<button class="sc2-chip on" type="button">${m.label}</button>` : `<button class="sc2-chip" type="button" disabled title="Coming soon">${m.label} <span class="sc2-n">Soon</span></button>`; }).join('')}</div>
+    <label class="field-label">Coins to scan</label>
+    <div class="rb-chiprow"><button type="button" class="sc2-chip${allOn ? ' on' : ''}" onclick="rbAllSyms()">All ${mk.symbols.length}</button>${mk.symbols.map(s => `<button type="button" class="sc2-chip${d.symbols.indexOf(s) >= 0 ? ' on' : ''}" onclick="rbToggleSym('${s}')">${s}</button>`).join('')}</div>
+    <div class="rb-sec"><span>Rules</span><select class="field-input rb-sel rb-tfall" onchange="rbApplyTf(this.value); this.value=''"><option value="">Set all timeframes\u2026</option>${mk.tfs.map(t => `<option value="${t}">${RS_TF_LABEL[t]}</option>`).join('')}</select></div>
+    <div class="rb-hint">Each rule compares two things. "Current candle" is the candle being checked; on a higher timeframe it is the candle so far.</div>
+    ${d.rules.map((r, i) => `<div class="rb-rule"><div class="rb-rhead"><b>Rule ${i + 1}</b>${d.rules.length > 1 ? `<button class="rb-x" type="button" aria-label="Remove rule" onclick="rbRemoveRule(${i})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>` : ''}</div>
+      ${rbSrcHtml(i, 'a')}
+      ${rbSelHtml(Object.keys(RS_OPS).map(o => [o, RS_OPS[o]]), r.op, `rbOp(${i},this.value)`)}
+      ${rbSrcHtml(i, 'b')}
+      <div class="rb-human" id="rb-h-${i}">${sscanEsc(rsRuleText(r))}</div></div>`).join('')}
+    <button type="button" class="btn-ghost" onclick="rbAddRule()">+ Add rule</button>
+    <label class="field-label">Trigger when</label>${seg([['all', 'All rules are true'], ['any', 'Any rule is true']], d.mode, 'rbSetMode')}
+    <label class="field-label">Tag</label>${seg([['bullish', 'Bullish'], ['bearish', 'Bearish'], ['neutral', 'Neutral']], d.cat, 'rbSetCat')}
+    <label class="field-label">Visibility</label>${seg([['private', 'Private'], ['public', 'Public']], d.vis, 'rbSetVis')}
+    <div class="rb-hint">${d.vis === 'public' ? 'Public scanners can be seen and copied by others once accounts launch. Until then this only marks the scanner and stays on your device.' : 'Only you can see a private scanner.'}</div>
+    <div class="rb-alerts"><span>Alerts</span><span>Coming soon</span></div>
+    <div id="rb-preview">${rbPreviewHtml}</div>`;
+}
+function rbSet(ri, side, key, val, rerender) {
+  const s = rbDraft.rules[ri][side];
+  if (key === 'back' || key === 'len') s[key] = Math.max(key === 'len' ? 1 : 0, parseInt(val, 10) || 0);
+  else if (key === 'value' || key === 'mult') s[key] = val === '' ? '' : parseFloat(val);
+  else s[key] = val;
+  if (rerender) rbRender(); else { const h = document.getElementById('rb-h-' + ri); if (h) h.textContent = rsRuleText(rbDraft.rules[ri]); }
+}
+function rbType(ri, side, t) {
+  const old = rbDraft.rules[ri][side], tf = old.tf || '1d';
+  rbDraft.rules[ri][side] = t === 'num' ? rN(0) : t === 'ind' ? rI('ema', 10, tf, 0) : rP('close', tf, 0); rbRender();
+}
+function rbOp(ri, v) { rbDraft.rules[ri].op = v; const h = document.getElementById('rb-h-' + ri); if (h) h.textContent = rsRuleText(rbDraft.rules[ri]); }
+function rbAddRule() { rbDraft.rules.push(rbBlankRule()); rbRender(); }
+function rbRemoveRule(i) { rbDraft.rules.splice(i, 1); rbRender(); }
+function rbApplyTf(tf) { if (!tf) return; rbDraft.rules.forEach(r => { ['a', 'b'].forEach(sd => { if (r[sd].type !== 'num') r[sd].tf = tf; }); }); rbRender(); }
+function rbToggleSym(s) { const i = rbDraft.symbols.indexOf(s); if (i >= 0) rbDraft.symbols.splice(i, 1); else rbDraft.symbols.push(s); rbDraft.symbols.sort((a, b) => RS_MARKETS.crypto.symbols.indexOf(a) - RS_MARKETS.crypto.symbols.indexOf(b)); rbRender(); }
+function rbAllSyms() { rbDraft.symbols = RS_MARKETS.crypto.symbols.slice(); rbRender(); }
+function rbSetMode(v) { rbDraft.mode = v; rbRender(); }
+function rbSetCat(v) { rbDraft.cat = v; rbRender(); }
+function rbSetVis(v) { rbDraft.vis = v; rbRender(); }
+function rbValidate() {
+  const d = rbDraft;
+  if (!d.symbols.length) return 'Pick at least one coin.';
+  if (!d.rules.length) return 'Add at least one rule.';
+  for (const r of d.rules) for (const sd of ['a', 'b']) {
+    const s = r[sd];
+    if (s.type === 'num' && !isFinite(parseFloat(s.value))) return 'Enter a number in every Number box.';
+    if (s.type === 'ind' && s.ind !== 'macd' && s.ind !== 'macdsig' && !(s.len >= 1)) return 'Every indicator needs a length of 1 or more.';
+    if (s.type === 'ind' && s.mult !== '' && s.mult != null && !isFinite(+s.mult)) return 'A multiplier must be a number.';
+  }
+  return '';
+}
+function rbPreviewRefresh() { const el = document.getElementById('rb-preview'); if (el && rbPreviewHtml) el.innerHTML = rbPreviewHtml; }
+async function rbTest() {
+  const err = rbValidate(), el = document.getElementById('rb-preview'); if (!el) return;
+  if (err) { rbPreviewHtml = `<div class="rs-line" style="color:var(--red)">${sscanEsc(err)}</div>`; el.innerHTML = rbPreviewHtml; return; }
+  if (rbTesting) return; rbTesting = true;
+  el.innerHTML = '<div class="rs-line">Testing against the latest candles\u2026</div>';
+  try { const R = await rsRun(JSON.parse(JSON.stringify(rbDraft))); rbDraftR = R; rbPreviewHtml = rsResultsHtml(R); } catch (e) { rbPreviewHtml = `<div class="rs-line" style="color:var(--red)">${sscanEsc(String(e && e.message || e))}</div>`; }
+  rbTesting = false; const el2 = document.getElementById('rb-preview'); if (el2) el2.innerHTML = rbPreviewHtml;
+}
+var rbDraftR = null;
+function rbSave() {
+  const err = rbValidate(); if (err) { rbPreviewHtml = `<div class="rs-line" style="color:var(--red)">${sscanEsc(err)}</div>`; rbPreviewRefresh(); return; }
+  const d = JSON.parse(JSON.stringify(rbDraft));
+  d.name = (d.name || '').trim() || (RS_PRESETS.some(p => JSON.stringify(p.rules) === JSON.stringify(d.rules)) ? RS_PRESETS.find(p => JSON.stringify(p.rules) === JSON.stringify(d.rules)).name : scCatInfo(d.cat).label + ' scanner');
+  d.owner = SC_USER.id; d.alerts = null;
+  if (rbEditing == null) { d.id = 'r' + Date.now().toString(36); d.created = Date.now(); rscans.unshift(d); }
+  else { d.id = rscans[rbEditing].id; d.created = rscans[rbEditing].created || Date.now(); rscans[rbEditing] = d; }
+  delete rscanResults[d.id]; rsPersist(); rbClose();
+  scOpen['r:' + d.id] = 1; scLiveFilter = 'all'; scTab('live'); renderSScans(); rsRunOne(d.id);
+}
+
+function sscanDeriveCat(sc, ignoreStored) {
+  if (!ignoreStored && sc && (sc.cat === 'bullish' || sc.cat === 'bearish' || sc.cat === 'neutral')) return sc.cat;
+  const n = String((sc && sc.name) || '').toLowerCase();
+  if (/^bullish\b/.test(n)) return 'bullish';
+  if (/^bearish\b/.test(n)) return 'bearish';
+  return sc && sc.side === 'Sell' ? 'bearish' : 'bullish';
+}
+function scSyncCatSeg() { document.querySelectorAll('#sscan-cat .seg-btn').forEach(b => b.classList.toggle('active', !!sscanDraft && b.dataset.cat === sscanDraft.cat)); }
+function setSScanCat(cat) { sscanDraft.cat = cat; sscanDraft.catManual = true; scSyncCatSeg(); }
+function scToggle(d) { const k = d.dataset.k; if (d.open) scOpen[k] = 1; else delete scOpen[k]; }
+
+function scTab(t) {
+  scTabNow = t;
+  try { localStorage.setItem('tradepro_sc_tab', t); } catch (e) { /* ignore */ }
+  ['live', 'perf', 'lib'].forEach(k => {
+    const pane = document.getElementById('sc2-' + k), tab = document.getElementById('sc2-tab-' + k);
+    if (pane) pane.style.display = k === t ? '' : 'none';
+    if (tab) { tab.classList.toggle('active', k === t); tab.setAttribute('aria-selected', k === t ? 'true' : 'false'); }
+  });
+  if (t === 'perf') { try { renderSPerf(); } catch (e) { /* not ready */ } }
+  if (t === 'lib') renderScLib();
+}
+function scNewMenu(ev) { ev.stopPropagation(); const m = document.getElementById('sc2-newmenu'); if (m) m.hidden = !m.hidden; }
+document.addEventListener('click', () => { const m = document.getElementById('sc2-newmenu'); if (m) m.hidden = true; });
+function scSetLive(k) { scLiveFilter = k; renderSScans(); }
+
+/* ---- Library: default + mine, tagged Bullish / Bearish ---- */
+function scLibItems() {
+  const out = [], condTxt = c => `${c.ind} ${c.op} ${c.val}`, plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  rscans.forEach((sc, i) => out.push({ scope: 'mine', kind: 'custom', ref: i, cat: sc.cat || 'neutral', name: sc.name, vis: sc.vis,
+    desc: `${(RS_MARKETS[sc.market] || RS_MARKETS.crypto).label} \u00b7 ${plural(sc.symbols.length, 'coin')} \u00b7 ${RS_TF_LABEL[rsBaseTf(sc.rules)]} \u00b7 ${plural(sc.rules.length, 'rule')}`,
+    conds: sc.rules.map(rsRuleText), assets: sc.symbols }));
+  sscans.forEach((sc, i) => out.push({ scope: 'mine', kind: 'strategy', ref: i, cat: sscanDeriveCat(sc), name: sc.name,
+    desc: `${sc.side === 'Sell' ? 'Sell' : 'Buy'} ${sc.strat} \u00b7 ${String(sc.und).replace(/,/g, ' + ')} \u00b7 ${sc.tf}`,
+    conds: sc.conds.map(c => { try { return 'Close ' + c.op + ' ' + sscanRefLabel(c); } catch (e) { return c.k || 'condition'; } }), assets: String(sc.und).split(',') }));
+  savedScanners.forEach((s2, i) => { const a = ASSETS.find(x => x.id === s2.asset); out.push({ scope: 'mine', kind: 'indicator', ref: i, cat: s2.cat === 'bearish' ? 'bearish' : s2.cat === 'neutral' ? 'neutral' : 'bullish', name: s2.name,
+    desc: `Older indicator scanner \u00b7 ${a ? a.name : s2.asset} \u00b7 ${plural(s2.conds.length, 'condition')}`, conds: s2.conds.map(condTxt), assets: [a ? a.name : s2.asset] }); });
+  RS_PRESETS.forEach((p, i) => out.push({ scope: 'default', kind: 'preset', ref: i, cat: p.cat, name: p.name, desc: p.desc, conds: p.rules.map(rsRuleText), assets: ['Crypto'] }));
+  return out;
+}
+function scLibSearch(v) { scLibQuery = v || ''; renderScLib(); }
+function scLibSet(kind, v) { if (kind === 'scope') scLibScope = v; else scLibCat = v; renderScLib(); }
+function scLibRow(it) {
+  const key = 'l:' + it.scope + ':' + it.kind + ':' + it.name, ci = scCatInfo(it.cat);
+  const catTag = `<span class="sc2-tag ${ci.cls}">${ci.label}</span>`;
+  const chips = it.assets.map(a => `<span class="asset-chip">${sscanEsc(a)}</span>`).join('');
+  const tagRow = it.scope === 'mine' ? `<div class="sc2-tagrow"><span>Tag</span><div class="seg">${['bullish', 'bearish', 'neutral'].map(c => `<button type="button" class="seg-btn${it.cat === c ? ' active' : ''}" onclick="scSetCat('${it.kind}',${it.ref},'${c}')">${scCatInfo(c).label}</button>`).join('')}</div></div>` : '';
+  const acts = it.kind === 'preset' ? `<button class="btn-primary" onclick="scUseDefault(${it.ref})">Use this scanner</button>`
+    : it.kind === 'custom' ? `<button class="btn-primary" onclick="scShowLive('custom',${it.ref})">Show in Live</button><button class="btn-ghost" onclick="rbOpen(${it.ref})">Edit</button><button class="btn-ghost" onclick="scDuplicate('custom',${it.ref})">Duplicate</button><button class="btn-ghost danger" onclick="scDelete('custom',${it.ref})">Delete</button>`
+    : it.kind === 'strategy' ? `<button class="btn-primary" onclick="scShowLive('strategy',${it.ref})">Show in Live</button><button class="btn-ghost" onclick="openSScan(${it.ref})">Edit</button><button class="btn-ghost danger" onclick="scDelete('strategy',${it.ref})">Delete</button>`
+    : `<button class="btn-ghost danger" onclick="scDelete('indicator',${it.ref})">Delete</button>`;
+  const who = it.scope === 'default' ? 'Default scanner, same for everyone.' : it.vis === 'public' ? 'Marked public. Sharing starts when accounts launch; for now it stays on this device.' : 'Private to you.';
+  const what = it.kind === 'preset' ? 'Opens in the builder so you can adjust it.' : it.kind === 'indicator' ? 'Saved indicator conditions (older scanner).' : 'Runs in the Live tab.';
+  return `<details class="sc2-row" data-k="${sscanEsc(key)}" ${scOpen[key] ? 'open' : ''} ontoggle="scToggle(this)">
+    <summary><span class="sc2-rbar" style="background:${ci.col}"></span>
+      <span class="sc2-main"><span class="sc2-name">${sscanEsc(it.name)}</span><span class="sc2-sub">${sscanEsc(it.desc)}</span></span>
+      ${catTag}${SC_CHEV}</summary>
+    <div class="sc2-body">
+      <div class="strat-legs">${who} ${what}</div>
+      <ul class="sc2-conds">${it.conds.map(c => `<li>${sscanEsc(c)}</li>`).join('')}</ul>
+      <div class="strat-assets">${chips}</div>
+      ${tagRow}
+      <div class="sc2-acts">${acts}</div>
+    </div></details>`;
+}
+function renderScLib() {
+  const el = document.getElementById('sc2-lib-list'); if (!el) return;
+  const all = scLibItems(), q = scLibQuery.trim().toLowerCase();
+  const hay = it => (it.name + ' ' + it.desc + ' ' + it.conds.join(' ') + ' ' + it.assets.join(' ')).toLowerCase();
+  const okQ = it => !q || hay(it).indexOf(q) >= 0, okScope = it => scLibScope === 'all' || it.scope === scLibScope, okCat = it => scLibCat === 'all' || it.cat === scLibCat;
+  const nScope = k => all.filter(it => okQ(it) && okCat(it) && (k === 'all' || it.scope === k)).length;
+  const nCat = k => all.filter(it => okQ(it) && okScope(it) && (k === 'all' || it.cat === k)).length;
+  const chip = (kind, k, label, n, dot) => `<button class="sc2-chip${(kind === 'scope' ? scLibScope : scLibCat) === k ? ' on' : ''}" onclick="scLibSet('${kind}','${k}')">${dot ? `<i class="sc2-cdot" style="background:${dot}"></i>` : ''}${label} <span class="sc2-n">${n}</span></button>`;
+  const se = document.getElementById('sc2-lib-scope'); if (se) se.innerHTML = chip('scope', 'all', 'All', nScope('all')) + chip('scope', 'default', 'Default', nScope('default')) + chip('scope', 'mine', 'Mine', nScope('mine'));
+  const ce = document.getElementById('sc2-lib-cats'); if (ce) ce.innerHTML = chip('cat', 'all', 'Any tag', nCat('all')) + chip('cat', 'bullish', 'Bullish', nCat('bullish'), 'var(--green)') + chip('cat', 'bearish', 'Bearish', nCat('bearish'), 'var(--red)') + chip('cat', 'neutral', 'Neutral', nCat('neutral'), 'var(--text-muted)');
+  const list = all.filter(it => okQ(it) && okScope(it) && okCat(it));
+  const mine = list.filter(it => it.scope === 'mine'), def = list.filter(it => it.scope === 'default');
+  const sec = (title, note, items) => items.length ? `<div class="sc2-sec"><span>${title}</span><span class="sc2-n">${items.length}</span><span class="sc2-secnote">${note}</span></div><div class="sc2-list">${items.map(scLibRow).join('')}</div>` : '';
+  let html = sec('Mine', SC_LOCK + 'Only you can see these', mine) + sec('Default', 'Read-only, shared with everyone', def);
+  if (!html) {
+    html = q ? `<div class="sc2-empty"><b>No scanners match “${sscanEsc(scLibQuery.trim())}”</b>Try a different word, or clear the filters.<div class="sc2-acts"><button class="btn-ghost" onclick="scLibReset()">Clear search and filters</button></div></div>`
+      : scLibScope === 'mine' && !all.some(it => it.scope === 'mine' && okCat(it)) ? `<div class="sc2-empty"><b>Nothing saved yet</b>Start from a default and make it yours, or build your own from scratch.<div class="sc2-acts"><button class="btn-primary" onclick="scLibSet('scope','default')">Browse defaults</button><button class="btn-ghost" onclick="rbOpen()">Build a scanner</button></div></div>`
+      : '<div class="sc2-empty"><b>Nothing here</b>No scanners with this tag.</div>';
+  }
+  el.innerHTML = html;
+  const pv = document.getElementById('sc2-privacy');
+  if (pv) pv.innerHTML = SC_LOCK.replace('width="11" height="11"', 'width="13" height="13"') + '<span>' + (SC_USER.signedIn ? 'Signed in as ' + sscanEsc(SC_USER.name || 'you') + '. Your scanners are private to your account.' : 'Mine is saved on this device and visible only to you. Sign in to keep your scanners private across devices.') + '</span>';
+}
+function scLibReset() { scLibQuery = ''; scLibScope = 'all'; scLibCat = 'all'; const q = document.getElementById('sc2-q'); if (q) q.value = ''; renderScLib(); }
+function scSetCat(kind, ref, cat) {
+  if (kind === 'strategy' && sscans[ref]) { sscans[ref].cat = cat; persistSScans(); renderSScans(); }
+  else if (kind === 'custom' && rscans[ref]) { rscans[ref].cat = cat; rsPersist(); renderSScans(); }
+  else if (savedScanners[ref]) { savedScanners[ref].cat = cat; persistSaved(); }
+  renderScLib();
+}
+function scUseDefault(ref) { const p = RS_PRESETS[ref]; if (p) rbOpenPreset(p.id); }
+function scDuplicate(kind, ref) {
+  if (kind !== 'custom' || !rscans[ref]) return;
+  const c = JSON.parse(JSON.stringify(rscans[ref])); c.name += ' (copy)'; c.id = 'r' + Date.now().toString(36); c.created = Date.now();
+  rscans.unshift(c); rsPersist(); renderSScans(); rbOpen(0);
+}
+function scShowLive(kind, ref) {
+  const sc = kind === 'custom' ? rscans[ref] : sscans[ref]; if (!sc) return;
+  scOpen[(kind === 'custom' ? 'r:' + sc.id : 's:' + sc.name)] = 1; scLiveFilter = 'all'; renderSScans(); scTab('live');
+  if (kind === 'custom' && !rscanResults[sc.id]) rsRunOne(sc.id);
+}
+function scDelete(kind, ref) {
+  const nm = (kind === 'strategy' ? sscans[ref] : kind === 'custom' ? rscans[ref] : savedScanners[ref]) || {};
+  if (!confirm('Delete \u201c' + (nm.name || 'this scanner') + '\u201d?')) return;
+  if (kind === 'strategy') removeSScan(ref);
+  else if (kind === 'custom') { delete rscanResults[nm.id]; rscans.splice(ref, 1); rsPersist(); renderSScans(); }
+  else removeSavedScanner(ref);
+  renderScLib();
+}
+
 renderSScans();
+scTab(scTabNow);
 
 function spark(points, color) {
   const w = 64, h = 24;
