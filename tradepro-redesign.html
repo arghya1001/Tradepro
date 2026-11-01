@@ -11007,7 +11007,7 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
   /* ===== Embedded copy (pane 2) ===== */
   if (EMBED) {
     const st = document.createElement('style');
-    st.textContent = '.sidebar,.topbar{display:none!important}.app{display:block!important}main{margin:0!important;padding:0!important;width:100%!important;max-width:none!important}.content{padding:4px!important}';
+    st.textContent = '.sidebar,.topbar{display:none!important}.app{display:block!important}main{margin:0!important;padding:0!important;width:100%!important;max-width:none!important}.content{padding:4px!important}#quick-trade-bar{display:none!important}';
     document.head.appendChild(st);
     try { showView('replay'); } catch (e) {}
     try {
@@ -11042,6 +11042,17 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
     }
     window.addEventListener('message', e => { if (e.source === parent && e.data && e.data.tp === 'sync') apply(e.data.state); });
     window.addEventListener('load', () => parent.postMessage({ tp: 'ready' }, '*'));
+    window.addEventListener('message', e => {
+      if (e.source !== parent || !e.data || e.data.tp !== 'exec') return;
+      if (/^(submitOrder\('(long|short)'\)|closePosition\('[\w ]*'\)|cancelPendingOrder\(\))$/.test(e.data.code)) { try { (new Function(e.data.code))(); } catch (x) { console.warn(x); } }
+    });
+    document.addEventListener('pointerdown', () => parent.postMessage({ tp: 'activate' }, '*'), true);
+    let lastInfo = '';
+    setInterval(() => {
+      const bar = $('quick-trade-bar'), inf = $('qtb-info'), act = $('qtb-actions'); if (!bar || !inf || !act) return;
+      const m = { tp: 'info', open: bar.classList.contains('open'), info: inf.innerHTML, actions: act.innerHTML };
+      const j = JSON.stringify(m); if (j !== lastInfo) { lastInfo = j; parent.postMessage(m, '*'); }
+    }, 600);
     return;
   }
 
@@ -11066,12 +11077,12 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
   }
   const barCss = 'display:none;align-items:center;gap:8px;padding:6px 4px;font-size:13px';
   const bar1 = document.createElement('div'); bar1.id = 'tp-bar1'; bar1.style.cssText = barCss;
-  bar1.innerHTML = '<b>Chart 1</b><select id="tp-t0" class="field-input" aria-label="Chart 1 type" style="width:auto;padding:2px 6px;font-size:12px">' + opts() + '</select>';
+  bar1.innerHTML = '<b>Chart 1</b><span id="tp-a0" style="color:#3b82f6;font-size:11px"></span><select id="tp-t0" class="field-input" aria-label="Chart 1 type" style="width:auto;padding:2px 6px;font-size:12px">' + opts() + '</select>';
   chartPanel.before(bar1);
 
   const pane2 = document.createElement('div');
   pane2.className = 'panel'; pane2.id = 'tp-pane2'; pane2.style.display = 'none';
-  pane2.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px"><b>Chart 2</b><select id="tp-t1" class="field-input" aria-label="Chart 2 type" style="width:auto;padding:2px 6px;font-size:12px">' + opts(S.t1) + '</select></div><div class="panel-body" style="padding:0"></div>';
+  pane2.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px"><b>Chart 2</b><span id="tp-a1" style="color:#3b82f6;font-size:11px"></span><select id="tp-t1" class="field-input" aria-label="Chart 2 type" style="width:auto;padding:2px 6px;font-size:12px">' + opts(S.t1) + '</select></div><div class="panel-body" style="padding:0"></div>';
   chartPanel.after(pane2);
   let frame = null, ready = false;
 
@@ -11119,8 +11130,38 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
   window.addEventListener('message', e => { if (frame && e.source === frame.contentWindow && e.data && e.data.tp === 'ready') { ready = true; fitFrame(); push(true); } });
   window.addEventListener('resize', fitFrame);
   if (window.ResizeObserver) new ResizeObserver(fitFrame).observe(chartPanel);
-  setInterval(refresh, 800);
-  refresh();
+  /* ----- One shared Buy/Sell bar: it trades whichever chart is active (tap a chart to select it) ----- */
+  S.active = 0; let remote = null;
+  const isTwo = () => typeof liveMode !== 'undefined' && liveMode && S.count === 2;
+  function paintActive() {
+    const two = isTwo(); if (!two) S.active = 0;
+    chartPanel.style.boxShadow = two && S.active === 0 ? '0 0 0 2px #3b82f6' : '';
+    pane2.style.boxShadow = two && S.active === 1 ? '0 0 0 2px #3b82f6' : '';
+    const a0 = $('tp-a0'), a1 = $('tp-a1');
+    if (a0) a0.textContent = two && S.active === 0 ? '● trading' : '';
+    if (a1) a1.textContent = two && S.active === 1 ? '● trading' : '';
+  }
+  function setActive(n) { if (S.active === n) return; S.active = n; paintActive(); try { renderQuickTradeBar(); } catch (e) {} }
+  window.tpExec = code => { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ tp: 'exec', code: code }, '*'); };
+  const origQT = renderQuickTradeBar;
+  renderQuickTradeBar = function () {
+    if (isTwo() && S.active === 1 && remote) {
+      const bar = $('quick-trade-bar'); if (!bar) return;
+      bar.classList.toggle('open', !!remote.open);
+      $('qtb-info').innerHTML = remote.info;
+      $('qtb-actions').innerHTML = String(remote.actions || '').replace(/onclick="([^"]*)"/g, 'onclick="tpExec(this.dataset.c)" data-c="$1"');
+    } else { origQT.apply(this, arguments); }
+  };
+  chartPanel.addEventListener('pointerdown', () => setActive(0), true);
+  bar1.addEventListener('pointerdown', () => setActive(0), true);
+  pane2.addEventListener('pointerdown', () => setActive(1), true);
+  window.addEventListener('message', e => {
+    if (!frame || e.source !== frame.contentWindow || !e.data) return;
+    if (e.data.tp === 'activate') setActive(1);
+    if (e.data.tp === 'info') { remote = e.data; if (isTwo() && S.active === 1) { try { renderQuickTradeBar(); } catch (x) {} } }
+  });
+  setInterval(() => { refresh(); paintActive(); }, 800);
+  refresh(); paintActive();
 })();
 </script>
 
