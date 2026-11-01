@@ -10988,5 +10988,126 @@ function selectContract(sym) {
 /* Replay mode also offers the scanner Signal dropdown (e.g. Guppy crossover), so show it on first load. */
 try { liveApplyKindUi(); } catch (e) { /* not ready */ }
 </script>
+<script>
+/* ---------- Split chart view: 1 chart (default) or 2 charts, each pane picks Perpetual / Option / Combined ----------
+   Pane 2 is a second copy of this page running inside an iframe (window.name = 'tp-embed') with its own chart state.
+   It follows pane 1's symbol / expiry / strike selection but has its own product type. Only active in Paper (live) mode. */
+(function () {
+  const EMBED = window.name === 'tp-embed';
+  const KEY = 'tradepro_chart_layout_v1';
+  const TYPES = [['perp', 'Perpetual'], ['options', 'Option'], ['strategy', 'Combined']];
+  const FIELDS = ['kind', 'symbol', 'und', 'exp', 'optype', 'strike', 'strat', 'center', 'sw', 'timeframe'];
+  const WRAP = { kind: 'kind', symbol: 'symbol', und: 'und', exp: 'exp', optype: 'ot', strike: 'strike', strat: 'strat', center: 'center', sw: 'sw', timeframe: 'tf' };
+  const $ = id => document.getElementById(id);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const opts = sel => TYPES.map(t => '<option value="' + t[0] + '"' + (t[0] === sel ? ' selected' : '') + '>' + t[1] + '</option>').join('');
+
+  /* ===== Embedded copy (pane 2) ===== */
+  if (EMBED) {
+    const st = document.createElement('style');
+    st.textContent = '.sidebar,.topbar{display:none!important}.app{display:block!important}main{margin:0!important;padding:0!important;width:100%!important;max-width:none!important}.content{padding:4px!important}';
+    document.head.appendChild(st);
+    try { showView('replay'); } catch (e) {}
+    try {
+      let n = $('chart-canvas');
+      while (n && n.id !== 'view-replay') {
+        const p = n.parentElement;
+        if (p) [...p.children].forEach(c => { if (c !== n && !c.contains($('chart-canvas')) && c.tagName !== 'SCRIPT') c.style.display = 'none'; });
+        n = p;
+      }
+    } catch (e) {}
+    let busy = false, pending = null;
+    async function waitFor(el, v) {
+      for (let i = 0; i < 12; i++) { if ([...el.options].some(o => o.value === v)) return true; await sleep(150); }
+      return false;
+    }
+    async function apply(m) {
+      if (busy) { pending = m; return; }
+      busy = true;
+      try {
+        if (!liveMode) { try { await setDataMode('live'); } catch (e) {} }
+        for (const f of FIELDS) {
+          const v = m[f]; if (v == null || v === '') continue;
+          const el = $('live-' + f); if (!el) continue;
+          const wrap = $('rc-live-' + WRAP[f] + '-wrap');
+          if (f !== 'kind' && wrap && wrap.style.display === 'none') continue;
+          if (!(await waitFor(el, v))) continue;
+          if (el.value !== v || f === 'kind') { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await sleep(300); }
+        }
+      } catch (e) { console.warn('chart 2 sync failed', e); }
+      busy = false;
+      if (pending) { const p = pending; pending = null; apply(p); }
+    }
+    window.addEventListener('message', e => { if (e.source === parent && e.data && e.data.tp === 'sync') apply(e.data.state); });
+    window.addEventListener('load', () => parent.postMessage({ tp: 'ready' }, '*'));
+    return;
+  }
+
+  /* ===== Main page (pane 1 + controls) ===== */
+  const canvas = $('chart-canvas'); if (!canvas) return;
+  const chartPanel = canvas.closest('.panel'), head = chartPanel && chartPanel.querySelector('.panel-head'); if (!head) return;
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+  const S = { count: saved.count === 2 ? 2 : 1, t1: saved.t1 || 'strategy' };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+  const ctl = document.createElement('div');
+  ctl.id = 'tp-ctl'; ctl.style.cssText = 'display:none;gap:6px;align-items:center;margin-left:auto';
+  ctl.innerHTML = '<select id="tp-count" class="field-input" aria-label="Number of charts" style="width:auto;padding:2px 6px;font-size:12px"><option value="1">1 chart</option><option value="2">2 charts</option></select>' +
+    '<select id="tp-t0" class="field-input" aria-label="Chart 1 type" style="display:none;width:auto;padding:2px 6px;font-size:12px">' + opts() + '</select>';
+  head.insertBefore(ctl, head.querySelector('.zoom-cluster'));
+
+  const pane2 = document.createElement('div');
+  pane2.className = 'panel'; pane2.id = 'tp-pane2'; pane2.style.display = 'none';
+  pane2.innerHTML = '<div class="panel-head"><div class="panel-title">Chart 2</div><select id="tp-t1" class="field-input" aria-label="Chart 2 type" style="width:auto;padding:2px 6px;font-size:12px;margin-left:auto">' + opts(S.t1) + '</select></div><div class="panel-body" style="padding:0"></div>';
+  chartPanel.after(pane2);
+  let frame = null, ready = false;
+
+  function state() {
+    const m = { kind: S.t1 };
+    FIELDS.forEach(f => { if (f !== 'kind') { const el = $('live-' + f); if (el && el.value) m[f] = el.value; } });
+    return m;
+  }
+  let tmr = null;
+  function push(now) { clearTimeout(tmr); tmr = setTimeout(() => { if (frame && ready && frame.contentWindow) frame.contentWindow.postMessage({ tp: 'sync', state: state() }, '*'); }, now ? 0 : 400); }
+  function fitFrame() { if (frame) frame.style.height = Math.max(360, Math.round(chartPanel.getBoundingClientRect().height - head.getBoundingClientRect().height)) + 'px'; }
+
+  function refresh() {
+    const live = typeof liveMode !== 'undefined' && liveMode;
+    ctl.style.display = live ? 'flex' : 'none';
+    const two = live && S.count === 2;
+    $('tp-count').value = String(S.count);
+    $('tp-t0').style.display = two ? '' : 'none';
+    pane2.style.display = two ? '' : 'none';
+    const k = $('live-kind'); if (k && k.value) $('tp-t0').value = k.value;
+    if (two && !frame) {
+      frame = document.createElement('iframe');
+      frame.name = 'tp-embed'; frame.title = 'Second chart'; frame.style.cssText = 'width:100%;border:0;display:block';
+      frame.src = location.href.split('#')[0];
+      pane2.querySelector('.panel-body').appendChild(frame);
+    }
+    if (two) fitFrame();
+  }
+  function otherType(used) { const t = TYPES.find(x => x[0] !== used); return t[0]; }
+
+  $('tp-count').addEventListener('change', e => { S.count = +e.target.value; if (S.count === 2 && $('live-kind') && $('live-kind').value === S.t1) { S.t1 = otherType($('live-kind').value); $('tp-t1').value = S.t1; } save(); refresh(); push(true); });
+  $('tp-t0').addEventListener('change', e => {
+    const k = $('live-kind'); if (!k) return;
+    k.value = e.target.value; try { onLiveKindChange(); } catch (x) {}
+    if (S.t1 === e.target.value) { S.t1 = otherType(e.target.value); $('tp-t1').value = S.t1; save(); push(true); }
+  });
+  $('tp-t1').addEventListener('change', e => {
+    S.t1 = e.target.value; const k = $('live-kind');
+    if (k && k.value === S.t1) { k.value = otherType(S.t1); try { onLiveKindChange(); } catch (x) {} }
+    save(); refresh(); push(true);
+  });
+  document.addEventListener('change', e => { const id = e.target && e.target.id; if (id && id.indexOf('live-') === 0) { if (id !== 'live-kind') push(); refresh(); } });
+  window.addEventListener('message', e => { if (frame && e.source === frame.contentWindow && e.data && e.data.tp === 'ready') { ready = true; fitFrame(); push(true); } });
+  window.addEventListener('resize', fitFrame);
+  if (window.ResizeObserver) new ResizeObserver(fitFrame).observe(chartPanel);
+  setInterval(refresh, 800);
+  refresh();
+})();
+</script>
+
 </body>
 </html>
