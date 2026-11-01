@@ -7094,7 +7094,7 @@ function renderChart(forceEnd) {
     return;
   }
 
-  const BASE_H0 = window.innerWidth <= 700 ? Math.round(Math.max(320, Math.min(780, window.innerHeight - 260))) : 340;
+  const BASE_H0 = window.innerWidth <= 700 ? (window.TP_SPLIT ? Math.round(Math.max(200, ((window.tpVH ? window.tpVH() : window.innerHeight) - 330) / 2)) : Math.round(Math.max(320, Math.min(780, window.innerHeight - 260)))) : 340;
   const volOn = activeIndicators.some(i => i.key === 'volume');   // volume bars only when the user adds the Volume indicator
   const VOLH = volOn ? 56 : 0, PAD = 10, GAP = PAD + 16;
   const OSC_GAP = oscGap(), OSC_H = oscDefaultH(), effH = {};
@@ -10994,6 +10994,8 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
    It follows pane 1's symbol / expiry / strike selection but has its own product type. Only active in Paper (live) mode. */
 (function () {
   const EMBED = window.name === 'tp-embed';
+  window.tpVH = function () { try { return EMBED ? parent.innerHeight : window.innerHeight; } catch (e) { return window.innerHeight; } };
+  if (EMBED) window.TP_SPLIT = true;
   const KEY = 'tradepro_chart_layout_v1';
   const TYPES = [['perp', 'Perpetual'], ['options', 'Option'], ['strategy', 'Combined']];
   const FIELDS = ['kind', 'symbol', 'und', 'exp', 'optype', 'strike', 'strat', 'center', 'sw', 'timeframe'];
@@ -11052,13 +11054,24 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
 
   const ctl = document.createElement('div');
   ctl.id = 'tp-ctl'; ctl.style.cssText = 'display:none;gap:6px;align-items:center;margin-left:auto';
-  ctl.innerHTML = '<select id="tp-count" class="field-input" aria-label="Number of charts" style="width:auto;padding:2px 6px;font-size:12px"><option value="1">1 chart</option><option value="2">2 charts</option></select>' +
-    '<select id="tp-t0" class="field-input" aria-label="Chart 1 type" style="display:none;width:auto;padding:2px 6px;font-size:12px">' + opts() + '</select>';
+  ctl.innerHTML = '<select class="tp-count field-input" aria-label="Number of charts" style="width:auto;padding:2px 6px;font-size:12px"><option value="1">1 chart</option><option value="2">2 charts</option></select>';
   head.insertBefore(ctl, head.querySelector('.zoom-cluster'));
+  /* Phone layout hides the panel header, so also put the selector in the top bar next to the gear */
+  const mtop = $('m-top'); let mcount = null;
+  if (mtop) {
+    mcount = document.createElement('select'); mcount.className = 'tp-count'; mcount.setAttribute('aria-label', 'Number of charts');
+    mcount.style.cssText = 'display:none;margin-left:auto;background:transparent;color:inherit;border:1px solid var(--border-soft,#2a3140);border-radius:999px;font-size:13px;padding:4px 8px';
+    mcount.innerHTML = '<option value="1">1 chart</option><option value="2">2 charts</option>';
+    mtop.insertBefore(mcount, $('m-gear'));
+  }
+  const barCss = 'display:none;align-items:center;gap:8px;padding:6px 4px;font-size:13px';
+  const bar1 = document.createElement('div'); bar1.id = 'tp-bar1'; bar1.style.cssText = barCss;
+  bar1.innerHTML = '<b>Chart 1</b><select id="tp-t0" class="field-input" aria-label="Chart 1 type" style="width:auto;padding:2px 6px;font-size:12px">' + opts() + '</select>';
+  chartPanel.before(bar1);
 
   const pane2 = document.createElement('div');
   pane2.className = 'panel'; pane2.id = 'tp-pane2'; pane2.style.display = 'none';
-  pane2.innerHTML = '<div class="panel-head"><div class="panel-title">Chart 2</div><select id="tp-t1" class="field-input" aria-label="Chart 2 type" style="width:auto;padding:2px 6px;font-size:12px;margin-left:auto">' + opts(S.t1) + '</select></div><div class="panel-body" style="padding:0"></div>';
+  pane2.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px"><b>Chart 2</b><select id="tp-t1" class="field-input" aria-label="Chart 2 type" style="width:auto;padding:2px 6px;font-size:12px">' + opts(S.t1) + '</select></div><div class="panel-body" style="padding:0"></div>';
   chartPanel.after(pane2);
   let frame = null, ready = false;
 
@@ -11069,15 +11082,17 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
   }
   let tmr = null;
   function push(now) { clearTimeout(tmr); tmr = setTimeout(() => { if (frame && ready && frame.contentWindow) frame.contentWindow.postMessage({ tp: 'sync', state: state() }, '*'); }, now ? 0 : 400); }
-  function fitFrame() { if (frame) frame.style.height = Math.max(360, Math.round(chartPanel.getBoundingClientRect().height - head.getBoundingClientRect().height)) + 'px'; }
+  function fitFrame() { if (frame) frame.style.height = Math.max(240, Math.round(chartPanel.getBoundingClientRect().height)) + 'px'; }
 
   function refresh() {
     const live = typeof liveMode !== 'undefined' && liveMode;
     ctl.style.display = live ? 'flex' : 'none';
+    if (mcount) mcount.style.display = live ? '' : 'none';
     const two = live && S.count === 2;
-    $('tp-count').value = String(S.count);
-    $('tp-t0').style.display = two ? '' : 'none';
+    document.querySelectorAll('.tp-count').forEach(sel => { sel.value = String(S.count); });
+    bar1.style.display = two ? 'flex' : 'none';
     pane2.style.display = two ? '' : 'none';
+    if (!!window.TP_SPLIT !== two) { window.TP_SPLIT = two; try { renderChart(); } catch (e) {} }
     const k = $('live-kind'); if (k && k.value) $('tp-t0').value = k.value;
     if (two && !frame) {
       frame = document.createElement('iframe');
@@ -11089,7 +11104,7 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
   }
   function otherType(used) { const t = TYPES.find(x => x[0] !== used); return t[0]; }
 
-  $('tp-count').addEventListener('change', e => { S.count = +e.target.value; if (S.count === 2 && $('live-kind') && $('live-kind').value === S.t1) { S.t1 = otherType($('live-kind').value); $('tp-t1').value = S.t1; } save(); refresh(); push(true); });
+  document.querySelectorAll('.tp-count').forEach(sel => sel.addEventListener('change', e => { S.count = +e.target.value; if (S.count === 2 && $('live-kind') && $('live-kind').value === S.t1) { S.t1 = otherType($('live-kind').value); $('tp-t1').value = S.t1; } save(); refresh(); push(true); }));
   $('tp-t0').addEventListener('change', e => {
     const k = $('live-kind'); if (!k) return;
     k.value = e.target.value; try { onLiveKindChange(); } catch (x) {}
