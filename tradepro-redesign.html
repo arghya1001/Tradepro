@@ -1200,6 +1200,56 @@
   .lay-save input { flex: 1; min-width: 0; }
   .lay-err { font-size: 12px; color: var(--red); margin-top: 6px; min-height: 0; }
   .lay-note { font-size: 11.5px; color: var(--text-muted); margin-top: 12px; line-height: 1.5; }
+
+/* ---------- Markets tab: Pulse / Options / Calendar ---------- */
+.mkt-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.mkt-title{font-size:18px;font-weight:500}
+.mkt-stamp{font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px}
+.mkt-stamp i{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+.mkt-stamp.stale i{background:#F5A524}
+.mkt-seg{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:12px}
+.mkt-seg button{flex:1;border:0;background:none;color:var(--text-muted);font:500 13px var(--sans);padding:8px 0;border-radius:8px;cursor:pointer}
+.mkt-seg button.on{background:var(--surface-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+.mkt-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.mkt-chips button{border:1px solid var(--border);background:none;color:var(--text-muted);font:12px var(--sans);padding:5px 11px;border-radius:14px;cursor:pointer}
+.mkt-chips button.on{background:rgba(23,195,178,.14);color:var(--accent);border-color:transparent}
+.mkt-chips .sp{margin-left:auto}
+.mkt-heat{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:54px;gap:4px}
+.mkt-tile{border:0;border-radius:8px;color:var(--text);text-align:left;padding:8px;font:13px var(--sans);display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;min-width:0}
+.mkt-tile b{font-weight:500}.mkt-tile span{font:12px var(--mono);color:var(--text)}
+.mkt-tile.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.mkt-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-top:12px}
+.mkt-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}.mkt-row span:first-child{color:var(--text-muted)}
+.mkt-acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.mkt-btn{flex:1;min-width:110px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font:500 13px var(--sans);padding:10px;border-radius:8px;cursor:pointer;text-align:center}
+.mkt-btn.pri{background:var(--accent);border-color:var(--accent);color:#04201D}
+.mkt-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+.mkt-stats div{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:12px;color:var(--text-muted)}
+.mkt-stats b{display:block;font:500 16px var(--mono);color:var(--text);margin-top:2px}
+.mkt-stats small{font:12px var(--mono)}
+.mkt-ladder-h,.mkt-oirow{display:grid;grid-template-columns:minmax(0,1fr) 62px minmax(0,1fr);gap:6px;align-items:center}
+.mkt-ladder-h{font-size:12px;color:var(--text-muted);padding:0 4px 4px}
+.mkt-oirow{width:100%;min-height:44px;border:0;background:none;color:var(--text);padding:3px 4px;border-radius:8px;cursor:pointer;font:12px var(--mono)}
+.mkt-oirow.atm{background:rgba(23,195,178,.10)}.mkt-oirow.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.mkt-oirow .k{text-align:center;color:var(--text-muted)}
+.mkt-bar{display:flex;height:18px}.mkt-bar.l{flex-direction:row-reverse}
+.mkt-bar i{height:100%;display:block;box-sizing:border-box}
+.mkt-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-top:8px}
+.mkt-leg span{display:flex;gap:5px;align-items:center}.mkt-leg i{width:14px;height:10px;border-radius:2px;display:inline-block;box-sizing:border-box}
+.mkt-mv{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--border);font-size:13px}
+.mkt-mv p{margin:0;font-size:12px;color:var(--text-muted)}
+.mkt-wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:10px}
+.mkt-wk button{border:1px solid var(--border);background:none;color:var(--text-muted);border-radius:10px;padding:7px 0;font:12px var(--sans);cursor:pointer}
+.mkt-wk button b{display:block;font:500 15px var(--sans);color:var(--text)}
+.mkt-wk button.on{background:rgba(23,195,178,.14);border-color:var(--accent)}
+.mkt-dot{display:block;width:6px;height:6px;border-radius:50%;margin:3px auto 0}
+.mkt-ban{background:rgba(245,165,36,.12);color:#F5C469;border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:10px}
+.mkt-ev{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--border);font-size:14px}
+.mkt-ev .t{width:58px;font:12px var(--mono);color:var(--text-muted)}.mkt-ev .n{flex:1}.mkt-ev small{display:block;font-size:12px;color:var(--text-muted)}
+.mkt-tag{font-size:12px;padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--text-muted)}
+.mkt-tag.hi{background:rgba(255,93,93,.15);color:var(--red)}.mkt-tag.ex{background:rgba(245,165,36,.15);color:#F5C469}
+.mkt-empty{padding:28px 12px;text-align:center;color:var(--text-muted);font-size:13px;grid-column:1/-1}
+.mkt-note{font-size:12px;color:var(--text-faint);margin-top:10px}
 </style>
 </head>
 <body>
@@ -1216,7 +1266,7 @@
 
     <nav>
       <div class="nav-item active" id="nav-home" onclick="showView('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5M5 10v9h5v-5h4v5h5v-9"/></svg>Home</div>
-      <div class="nav-item" id="nav-markets" onclick="showView('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20V8"/></svg>Markets</div>
+      <div class="nav-item" id="nav-markets" onclick="showView('markets')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20V8"/></svg>Markets</div>
       <div class="nav-item" id="nav-scanner" onclick="showView('scanner')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Scanner</div>
       <div class="nav-item" id="nav-strategies" onclick="showView('strategies')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17l5-5 4 4 7-8"/><path d="M15 8h5v5"/></svg>Strategies</div>
       <div class="nav-item" id="nav-replay" onclick="showView('replay')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Trade</div>
@@ -1330,6 +1380,18 @@
         </div>
       </div>
 
+      </div>
+
+      <div id="view-markets" class="view" style="display:none">
+        <div class="mkt-head"><div class="mkt-title">Markets</div><div class="mkt-stamp" id="mkt-stamp"><i></i>Loading</div></div>
+        <div class="mkt-seg"><button id="mkt-b-pulse" class="on" onclick="mktSeg('pulse')">Pulse</button><button id="mkt-b-options" onclick="mktSeg('options')">Options</button><button id="mkt-b-calendar" onclick="mktSeg('calendar')">Calendar</button></div>
+        <div id="mkt-pulse">
+          <div class="mkt-chips" id="mkt-cols"></div>
+          <div class="mkt-heat" id="mkt-heat"></div>
+          <div id="mkt-sheet"></div>
+        </div>
+        <div id="mkt-options" style="display:none"><div id="mkt-opt"></div></div>
+        <div id="mkt-calendar" style="display:none"><div id="mkt-cal"></div></div>
       </div>
 
       <div id="view-strategies" class="view" style="display:none">
@@ -2165,13 +2227,15 @@ function togglePanel(btn) {
 
 function showView(name) {
   document.getElementById('view-home').style.display = name === 'home' ? '' : 'none';
+  document.getElementById('view-markets').style.display = name === 'markets' ? '' : 'none';
   document.getElementById('view-strategies').style.display = name === 'strategies' ? '' : 'none';
   document.getElementById('view-scanner').style.display = name === 'scanner' ? '' : 'none';
   document.getElementById('view-replay').style.display = name === 'replay' ? '' : 'none';
   ['home','markets','scanner','strategies','replay'].forEach(id => {
     const el = document.getElementById('nav-' + id);
-    if (el) el.classList.toggle('active', id === name || (!['strategies','scanner','replay'].includes(name) && id === 'home'));
+    if (el) el.classList.toggle('active', id === name || (!['strategies','scanner','replay','markets'].includes(name) && id === 'home'));
   });
+  if (name === 'markets') { try { mktEnter(); } catch (e) { /* not ready */ } }
   if (name === 'scanner') { try { renderSPerf(); } catch (e) { /* not ready */ } }
   if (name === 'replay' && !replayInited) { initReplay(); replayInited = true; }
   renderQuickTradeBar();
@@ -11171,5 +11235,167 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
 })();
 </script>
 
+<script>
+/* ---------- Markets tab logic. Reuses MK (tickers), oi (OI baseline + chart highlight), LIVE (Trade) ---------- */
+const MKT = { seg: 'pulse', col: 'chg', pt: {}, ptAt: 0, ptErr: null, sym: null, und: 'BTC', exp: null, raw: null, base: null, spot: null, oat: 0, strike: null, busy: false, err: null, timer: null, day: 0 };
+// Sample macro list: edit or replace with a real feed. Times are UTC.
+const MKT_EVENTS = [{ at: '2026-11-06T13:30:00Z', n: 'US jobs report', imp: 'hi' }];
+const mktFmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-US');
+const mktCompact = n => n >= 1e9 ? (n / 1e9).toFixed(1) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(0) + 'K' : String(Math.round(n));
+const mktSgn = (v, d) => (v >= 0 ? '+' : '') + v.toFixed(d == null ? 1 : d) + '%';
+function mktAge(t) { return t ? Math.max(0, Math.round((Date.now() - t) / 1000)) : null; }
+function mktStamp() {
+  const el = document.getElementById('mkt-stamp'); if (!el) return;
+  const t = MKT.seg === 'options' ? MKT.oat : MKT.seg === 'pulse' ? MKT.ptAt : 0, a = mktAge(t);
+  if (MKT.seg === 'calendar') { el.className = 'mkt-stamp'; el.innerHTML = 'Times in IST'; return; }
+  el.className = 'mkt-stamp' + (a == null || a > 60 ? ' stale' : '');
+  el.innerHTML = a == null ? '<i></i>Loading' : '<i></i>' + (a > 60 ? 'Stale · ' : 'Live · ') + a + 's ago';
+}
+function mktEnter() { mktSeg(MKT.seg); clearInterval(MKT.timer); MKT.timer = setInterval(mktTick, 5000); }
+function mktTick() {
+  const v = document.getElementById('view-markets');
+  if (document.hidden || !v || v.style.display === 'none') return;
+  if (MKT.seg === 'pulse' && mktAge(MKT.ptAt) > 20) mktPulseLoad();
+  else if (MKT.seg === 'options' && mktAge(MKT.oat) > 30) mktOptLoad();
+  else if (MKT.seg === 'calendar') mktCalRender();
+  mktStamp();
+}
+function mktSeg(name) {
+  MKT.seg = name;
+  ['pulse', 'options', 'calendar'].forEach(n => { document.getElementById('mkt-' + n).style.display = n === name ? '' : 'none'; document.getElementById('mkt-b-' + n).classList.toggle('on', n === name); });
+  if (name === 'pulse') { mktPulseRender(); mktPulseLoad(); } else if (name === 'options') { mktOptRender(); mktOptLoad(); } else mktCalRender();
+  mktStamp();
+}
+/* ----- Pulse ----- */
+async function mktPulseLoad() {
+  try {
+    const json = await liveFetchJson('/v2/tickers?contract_types=perpetual_futures'), out = {};
+    (json.result || []).forEach(t => { if (!t || !/^[A-Z0-9]+USD$/.test(t.symbol || '')) return; const q = mkParseTicker(t); if (q.price == null) return; q.fund = liveNum(t.funding_rate); q.turn = q.turnover || 0; out[t.symbol] = q; });
+    if (!Object.keys(out).length) throw new Error('no tickers');
+    MKT.pt = out; MKT.ptAt = Date.now(); MKT.ptErr = null;
+  } catch (e) { MKT.ptErr = true; }
+  mktPulseRender(); mktStamp();
+}
+function mktSetCol(c) { MKT.col = c; mktPulseRender(); }
+function mktTint(v, scale) { const a = Math.min(1, Math.abs(v) / scale); return `rgba(${v >= 0 ? '53,214,140' : '255,93,93'},${(0.14 + a * 0.5).toFixed(2)})`; }
+function mktPulseRender() {
+  const cols = [['chg', 'Change'], ['fund', 'Funding'], ['vol', 'Volume']];
+  document.getElementById('mkt-cols').innerHTML = cols.map(c => `<button class="${MKT.col === c[0] ? 'on' : ''}" onclick="mktSetCol('${c[0]}')">${c[1]}</button>`).join('');
+  const el = document.getElementById('mkt-heat'), rows = Object.entries(MKT.pt).filter(([s, q]) => q.turn >= 50000 && q.chg != null).sort((a, b) => b[1].turn - a[1].turn).slice(0, 17);
+  if (!rows.length) { el.innerHTML = `<div class="mkt-empty">${MKT.ptErr ? 'Live prices are unavailable. Check your connection.<br><br><button class="mkt-btn" style="flex:none" onclick="mktPulseLoad()">Retry</button>' : 'Loading prices…'}</div>`; mktSheet(); return; }
+  const mx = rows[0][1].turn;
+  el.innerHTML = rows.map(([s, q], i) => {
+    const span = i < 2 ? 'grid-column:span 3;grid-row:span 2;' : i < 5 ? 'grid-column:span 2;grid-row:span 2;' : '';
+    let txt, bg;
+    if (MKT.col === 'chg') { txt = mkPct(q.chg); bg = mktTint(q.chg, 6); }
+    else if (MKT.col === 'fund') { txt = q.fund == null ? '–' : q.fund.toFixed(4) + '%'; bg = q.fund == null ? 'var(--surface)' : mktTint(q.fund, 0.05); }
+    else { txt = '$' + mktCompact(q.turn); bg = `rgba(23,195,178,${(0.12 + 0.5 * Math.sqrt(q.turn / mx)).toFixed(2)})`; }
+    return `<button class="mkt-tile${MKT.sym === s ? ' sel' : ''}" style="${span}background:${bg}" onclick="mktPick('${s}')"><b>${s.replace(/USD$/, '')}</b><span>${txt}</span></button>`;
+  }).join('');
+  mktSheet();
+}
+function mktPick(s) { MKT.sym = MKT.sym === s ? null : s; mktPulseRender(); }
+function mktSheet() {
+  const el = document.getElementById('mkt-sheet'), q = MKT.sym && MKT.pt[MKT.sym];
+  if (!q) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="mkt-card"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">${MKT.sym.replace(/USD$/, '')}/USD</b><b style="font-weight:500">${mkUsd(q.price)}</b></div>
+  <div class="mkt-row"><span>24h change</span><span style="color:${q.chg >= 0 ? 'var(--green)' : 'var(--red)'}">${mkPct(q.chg)}</span></div>
+  <div class="mkt-row"><span>Funding</span><span>${q.fund == null ? '–' : q.fund.toFixed(4) + '%'}</span></div>
+  <div class="mkt-row"><span>24h volume</span><span>$${mktCompact(q.turn)}</span></div>
+  <div class="mkt-acts"><button class="mkt-btn pri" onclick="mkPractice('${MKT.sym}')">Open in Trade</button></div></div>`;
+}
+/* ----- Options: shares the 17:30 IST baseline with the chart OI layer, so both show the same numbers ----- */
+async function mktOptLoad() {
+  if (MKT.busy) return; MKT.busy = true;
+  const und = MKT.und;
+  try {
+    const json = await liveFetchJson('/v2/tickers?contract_types=call_options,put_options&underlying_asset_symbols=' + und), raw = {}; let spot = null;
+    (json.result || []).forEach(t => { const o = liveParseOptSymbol(t && t.symbol); if (!o || o.und !== und) return; const v = liveNum(t.oi_contracts != null ? t.oi_contracts : t.oi); if (v) raw[o.exp + '|' + o.strike + '|' + o.type] = v; const sp = liveNum(t.spot_price); if (sp) spot = sp; });
+    if (!Object.keys(raw).length) throw new Error('No option data returned');
+    const now = Date.now(), d = new Date(now); let ss = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); if (ss > now) ss -= 86400000;
+    let b = null; try { b = JSON.parse(localStorage.getItem(OI_KEY + '_base_' + und) || 'null'); } catch (e) { /* ignore */ }
+    if (!b || b.ss !== ss) { b = { ss, at: now, raw }; try { localStorage.setItem(OI_KEY + '_base_' + und, JSON.stringify(b)); } catch (e) { /* ignore */ } }
+    MKT.raw = raw; MKT.base = b; MKT.spot = spot || (MKT.pt[und + 'USD'] || {}).price || null; MKT.err = null;
+  } catch (e) { MKT.err = liveErrText(e); }
+  MKT.oat = Date.now(); MKT.busy = false; mktOptRender(); mktStamp();
+}
+function mktUnd(u) { MKT.und = u; MKT.raw = null; MKT.exp = null; MKT.strike = null; mktOptRender(); mktOptLoad(); }
+function mktExp(e) { MKT.exp = e; MKT.strike = null; mktOptRender(); }
+function mktStrike(k) { MKT.strike = MKT.strike === k ? null : k; mktOptRender(); }
+function mktExps() { const t = new Date().toISOString().slice(0, 10); return Array.from(new Set(Object.keys(MKT.raw).map(k => k.split('|')[0]))).filter(e => e >= t).sort().slice(0, 4); }
+function mktOptRender() {
+  const el = document.getElementById('mkt-opt');
+  const head = `<div class="mkt-chips"><button class="${MKT.und === 'BTC' ? 'on' : ''}" onclick="mktUnd('BTC')">BTC</button><button class="${MKT.und === 'ETH' ? 'on' : ''}" onclick="mktUnd('ETH')">ETH</button>`;
+  if (!MKT.raw) { el.innerHTML = head + '</div><div class="mkt-card" style="text-align:center;color:var(--text-muted);font-size:13px">' + (MKT.err ? 'Option data is unavailable: ' + mktEsc(MKT.err) + '<br><br><button class="mkt-btn" style="flex:none" onclick="mktOptLoad()">Retry</button>' : 'Loading option data…') + '</div>'; return; }
+  const exps = mktExps(); if (!exps.length) { el.innerHTML = head + '</div><div class="mkt-card">No live expiries found.</div>'; return; }
+  if (!exps.includes(MKT.exp)) MKT.exp = exps[0];
+  const rows = {}, put = (m, f) => { for (const k in m) { const [e, s, t] = k.split('|'); if (e !== MKT.exp) continue; const r = rows[s] || (rows[s] = { k: +s, C: 0, P: 0, bC: 0, bP: 0 }); r[f + t] += m[k]; } };
+  put(MKT.raw, ''); put(MKT.base.raw, 'b');
+  const all = Object.values(rows).sort((a, b) => a.k - b.k), sum = f => all.reduce((a, r) => a + r[f], 0);
+  const tc = sum('C'), tp = sum('P'), btc = sum('bC'), btp = sum('bP');
+  let mp = null, best = Infinity; all.forEach(c => { const pain = all.reduce((a, r) => a + r.C * Math.max(0, c.k - r.k) + r.P * Math.max(0, r.k - c.k), 0); if (pain < best) { best = pain; mp = c.k; } });
+  const spot = MKT.spot; let ai = 0; if (spot) all.forEach((r, i) => { if (Math.abs(r.k - spot) < Math.abs(all[ai].k - spot)) ai = i; });
+  const lo = Math.max(0, Math.min(ai - 3, all.length - 7)), shown = all.slice(lo, lo + 7);
+  const mx = Math.max(1, ...shown.map(r => Math.max(r.C, r.bC, r.P, r.bP)));
+  const bar = (cur, bas, c, cls) => { const w = v => (v / mx * 100).toFixed(1) + '%', S = OI_SH[c]; return `<div class="mkt-bar ${cls}"><i style="width:${w(Math.min(cur, bas))};background:${S.base}59"></i><i style="width:${w(Math.max(0, cur - bas))};background:${S.add};border:1px solid ${S.edge}"></i><i style="width:${w(Math.max(0, bas - cur))};background:${S.rem}22;border:1px dashed ${S.edge}"></i></div>`; };
+  const chg = (c, b) => b ? `<small style="color:${c >= b ? 'var(--green)' : 'var(--red)'}">${mktSgn((c - b) / b * 100)}</small>` : '';
+  const d = []; all.forEach(r => { d.push({ k: r.k, t: 'CE', v: r.C - r.bC }, { k: r.k, t: 'PE', v: r.P - r.bP }); }); d.sort((a, b) => b.v - a.v);
+  const up = d.slice(0, 2), dn = d[d.length - 1];
+  const mv = (x, lab) => x && x.v ? `<div class="mkt-mv"><div>${lab}<p>${mktFmt(x.k)} ${x.t}</p></div><b style="font:500 13px var(--mono);color:${x.v > 0 ? 'var(--green)' : 'var(--red)'}">${x.v > 0 ? '+' : ''}${mktFmt(x.v)}</b></div>` : '';
+  const sel = MKT.strike != null && rows[MKT.strike], sr = sel ? rows[MKT.strike] : null;
+  el.innerHTML = head + `<span class="sp"></span>` + exps.map(e => `<button class="${e === MKT.exp ? 'on' : ''}" onclick="mktExp('${e}')">${liveExpLabel(e).slice(0, 6)}</button>`).join('') + `</div>
+  <div class="mkt-stats"><div>Call OI<b>${mktFmt(tc)}</b>${chg(tc, btc)}</div><div>Put OI<b>${mktFmt(tp)}</b>${chg(tp, btp)}</div><div>PCR<b>${tc ? (tp / tc).toFixed(2) : '–'}</b></div><div>Max pain<b>${mp == null ? '–' : mktFmt(mp)}</b></div></div>
+  <div class="mkt-ladder-h"><span style="text-align:right">Puts</span><span style="text-align:center">Strike</span><span>Calls</span></div>
+  ${shown.map(r => `<button class="mkt-oirow${r === all[ai] ? ' atm' : ''}${MKT.strike === r.k ? ' sel' : ''}" onclick="mktStrike(${r.k})">${bar(r.P, r.bP, 'g', 'l')}<span class="k">${mktFmt(r.k)}</span>${bar(r.C, r.bC, 'r', 'r')}</button>`).join('')}
+  <div class="mkt-leg"><span><i style="background:${OI_SH.g.base}59"></i>Existing OI</span><span><i style="background:${OI_SH.g.add};border:1px solid ${OI_SH.g.edge}"></i>New buildup</span><span><i style="border:1px dashed ${OI_SH.g.edge}"></i>Unwinding</span></div>
+  <div class="mkt-note">Violet = puts, amber = calls. Change is measured since 17:30 IST. Spot ${spot ? mktFmt(spot) : '–'}.</div>
+  ${sr ? `<div class="mkt-card"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">${mktFmt(sr.k)} strike</b><span>${liveExpLabel(MKT.exp)}</span></div>
+  <div class="mkt-row"><span>Call OI</span><span>${mktFmt(sr.C)} ${chg(sr.C, sr.bC)}</span></div><div class="mkt-row"><span>Put OI</span><span>${mktFmt(sr.P)} ${chg(sr.P, sr.bP)}</span></div>
+  <div class="mkt-acts"><button class="mkt-btn pri" onclick="mktShowOnChart()">Show on ${MKT.und} chart</button></div>
+  <div class="mkt-acts" style="margin-top:6px"><button class="mkt-btn" onclick="mktTradeOpt('C')">Trade ${mktFmt(sr.k)} CE</button><button class="mkt-btn" onclick="mktTradeOpt('P')">Trade ${mktFmt(sr.k)} PE</button></div></div>` : ''}
+  <div style="margin-top:10px">${mv(up[0], 'Biggest buildup')}${mv(up[1], 'Next buildup')}${mv(dn && dn.v < 0 ? dn : null, 'Biggest unwinding')}</div>`;
+}
+async function mktShowOnChart() {
+  if (MKT.strike == null) return;
+  oi.exp = MKT.exp; oi.sel = MKT.strike; oi.on = true; oiSave();
+  await mkPractice(MKT.und + 'USD');
+  try { await oiFetch(); } catch (e) { /* chart will refresh on its own */ }
+}
+async function mktTradeOpt(type) {
+  if (MKT.strike == null) return;
+  const d = MKT.exp, sym = `${type}-${MKT.und}-${MKT.strike}-${d.slice(8)}${d.slice(5, 7)}${d.slice(2, 4)}`;
+  try {
+    await mkPractice(MKT.und + 'USD');
+    const k = document.getElementById('live-kind'); if (k) { k.value = 'options'; await onLiveKindChange(); }
+    liveRenderOptionSelectors(sym); liveSwitch('Opened from Markets');
+  } catch (e) { /* stays on the perp chart if the contract can't load */ }
+}
+/* ----- Calendar (all times IST) ----- */
+function mktIst(ms) { const d = new Date(ms + 19800000); return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); }
+function mktEvents(dayUtc) {
+  const out = [], d = new Date(dayUtc), wd = d.getUTCDay(), exp = dayUtc + 12 * 3600000;
+  const lastFri = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)); while (lastFri.getUTCDay() !== 5) lastFri.setUTCDate(lastFri.getUTCDate() - 1);
+  if (wd === 5 && lastFri.getTime() === dayUtc) out.push({ at: exp, n: 'Monthly expiry', sub: 'BTC, ETH options', tag: 'ex', lab: 'Expiry', w: 1 });
+  else if (wd === 5) out.push({ at: exp, n: 'Weekly expiry', sub: 'BTC, ETH options', tag: 'ex', lab: 'Expiry', w: 1 });
+  else out.push({ at: exp, n: 'Daily expiry', sub: 'BTC, ETH options', tag: '', lab: 'Expiry' });
+  MKT_EVENTS.forEach(e => { const t = Date.parse(e.at); if (t >= dayUtc && t < dayUtc + 86400000) out.push({ at: t, n: e.n, sub: 'Sample data', tag: e.imp === 'hi' ? 'hi' : '', lab: e.imp === 'hi' ? 'High' : 'Info', hi: e.imp === 'hi' }); });
+  return out.sort((a, b) => a.at - b.at);
+}
+function mktCalRender() {
+  const el = document.getElementById('mkt-cal'), n = new Date(), t0 = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+  const days = Array.from({ length: 7 }, (_, i) => t0 + i * 86400000), L = 'SMTWTFS';
+  const nf = 8 * 3600000, nextF = (Math.floor(Date.now() / nf) + 1) * nf, fm = Math.round((nextF - Date.now()) / 60000);
+  let next = null; days.forEach(d => mktEvents(d).forEach(e => { if (e.hi && e.at > Date.now() && !next) next = e; }));
+  const cd = ms => { const m = Math.max(0, Math.round(ms / 60000)); return m >= 1440 ? Math.floor(m / 1440) + 'd ' + Math.floor(m % 1440 / 60) + 'h' : Math.floor(m / 60) + 'h ' + (m % 60) + 'm'; };
+  const ev = mktEvents(days[MKT.day] || t0).filter(e => e.at + 3600000 > Date.now() || MKT.day > 0);
+  el.innerHTML = (next ? `<div class="mkt-ban">${next.n} at ${mktIst(next.at)} IST, in ${cd(next.at - Date.now())}</div>` : '') +
+  `<div class="mkt-wk">${days.map((d, i) => { const es = mktEvents(d), c = es.some(e => e.hi) ? 'var(--red)' : es.some(e => e.w) ? '#F5A524' : 'transparent', dt = new Date(d); return `<button class="${i === MKT.day ? 'on' : ''}" onclick="MKT.day=${i};mktCalRender()">${L[dt.getUTCDay()]}<b>${dt.getUTCDate()}</b><span class="mkt-dot" style="background:${c}"></span></button>`; }).join('')}</div>` +
+  (ev.map(e => `<div class="mkt-ev"><div class="t">${mktIst(e.at)}</div><div class="n">${e.n}<small>${e.sub}</small></div><span class="mkt-tag ${e.tag}">${e.lab}</span></div>`).join('') || '<div class="mkt-empty">Nothing left today.</div>') +
+  `<div class="mkt-ev"><div class="t">${mktIst(nextF)}</div><div class="n">Funding settlement<small>in ${cd(nextF - Date.now())}</small></div><span class="mkt-tag">Info</span></div>` +
+  `<div class="mkt-note">Red dot = high-impact event, amber = weekly or monthly expiry. The macro list is sample data (MKT_EVENTS); holidays aren't added yet.</div>`;
+}
+function mktEsc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+</script>
 </body>
 </html>
