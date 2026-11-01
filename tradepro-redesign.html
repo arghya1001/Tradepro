@@ -11077,12 +11077,15 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
   }
   const barCss = 'display:none;align-items:center;gap:8px;padding:6px 4px;font-size:13px';
   const bar1 = document.createElement('div'); bar1.id = 'tp-bar1'; bar1.style.cssText = barCss;
-  bar1.innerHTML = '<b>Chart 1</b><span id="tp-a0" style="color:#3b82f6;font-size:11px"></span><select id="tp-t0" class="field-input" aria-label="Chart 1 type" style="width:auto;padding:2px 6px;font-size:12px">' + opts() + '</select>';
+  const selCss = 'width:auto;padding:2px 6px;font-size:12px';
+  bar1.style.gap = '10px'; bar1.style.flexWrap = 'wrap';
+  bar1.innerHTML = '<span id="tp-g0" style="display:flex;align-items:center;gap:6px"><b>Top</b><span id="tp-a0" style="color:#3b82f6;font-size:12px"></span><select id="tp-t0" class="field-input" aria-label="Top chart type" style="' + selCss + '">' + opts() + '</select></span>' +
+    '<span id="tp-g1" style="display:flex;align-items:center;gap:6px"><b>Bottom</b><span id="tp-a1" style="color:#3b82f6;font-size:12px"></span><select id="tp-t1" class="field-input" aria-label="Bottom chart type" style="' + selCss + '">' + opts(S.t1) + '</select></span>';
   chartPanel.before(bar1);
 
   const pane2 = document.createElement('div');
   pane2.className = 'panel'; pane2.id = 'tp-pane2'; pane2.style.display = 'none';
-  pane2.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px"><b>Chart 2</b><span id="tp-a1" style="color:#3b82f6;font-size:11px"></span><select id="tp-t1" class="field-input" aria-label="Chart 2 type" style="width:auto;padding:2px 6px;font-size:12px">' + opts(S.t1) + '</select></div><div class="panel-body" style="padding:0"></div>';
+  pane2.innerHTML = '<div class="panel-body" style="padding:0"></div>';
   chartPanel.after(pane2);
   let frame = null, ready = false;
 
@@ -11105,6 +11108,8 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
     pane2.style.display = two ? '' : 'none';
     if (!!window.TP_SPLIT !== two) { window.TP_SPLIT = two; try { renderChart(); } catch (e) {} }
     const k = $('live-kind'); if (k && k.value) $('tp-t0').value = k.value;
+    if (two && k && k.value && k.value === S.t1) { S.t1 = otherType(k.value); save(); push(true); }
+    if ($('tp-t1')) $('tp-t1').value = S.t1;
     if (two && !frame) {
       frame = document.createElement('iframe');
       frame.name = 'tp-embed'; frame.title = 'Second chart'; frame.style.cssText = 'width:100%;border:0;display:block';
@@ -11138,8 +11143,8 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
     chartPanel.style.boxShadow = two && S.active === 0 ? '0 0 0 2px #3b82f6' : '';
     pane2.style.boxShadow = two && S.active === 1 ? '0 0 0 2px #3b82f6' : '';
     const a0 = $('tp-a0'), a1 = $('tp-a1');
-    if (a0) a0.textContent = two && S.active === 0 ? '● trading' : '';
-    if (a1) a1.textContent = two && S.active === 1 ? '● trading' : '';
+    if (a0) a0.textContent = two && S.active === 0 ? '●' : '';
+    if (a1) a1.textContent = two && S.active === 1 ? '●' : '';
   }
   function setActive(n) { if (S.active === n) return; S.active = n; paintActive(); try { renderQuickTradeBar(); } catch (e) {} }
   window.tpExec = code => { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ tp: 'exec', code: code }, '*'); };
@@ -11153,7 +11158,8 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
     } else { origQT.apply(this, arguments); }
   };
   chartPanel.addEventListener('pointerdown', () => setActive(0), true);
-  bar1.addEventListener('pointerdown', () => setActive(0), true);
+  $('tp-g0').addEventListener('pointerdown', () => setActive(0), true);
+  $('tp-g1').addEventListener('pointerdown', () => setActive(1), true);
   pane2.addEventListener('pointerdown', () => setActive(1), true);
   window.addEventListener('message', e => {
     if (!frame || e.source !== frame.contentWindow || !e.data) return;
