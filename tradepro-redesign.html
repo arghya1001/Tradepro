@@ -1259,6 +1259,12 @@
 .mkt-seg button{font-size:12px!important}
 .alr-f{display:grid;grid-template-columns:1fr 1fr;gap:8px}.alr-f select,.alr-f input{width:100%;box-sizing:border-box;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:11px 10px;font:14px var(--sans)}
 .mkt-chipbtn{border:1px solid var(--border);background:none;color:var(--text-muted);font:12px var(--sans);padding:6px 10px;border-radius:8px;cursor:pointer}
+.mkt-lad{position:relative;max-height:380px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.mkt-lad .mkt-ladder-h{position:sticky;top:0;z-index:1;background:var(--bg);padding-top:2px}
+.mkt-oirow.fr{opacity:.6}.mkt-spot{font-size:11px;color:var(--accent);text-align:center;padding:1px 0}
+.mkt-mm{position:relative;display:flex;gap:2px;align-items:flex-end;height:34px;margin-bottom:8px}.mkt-mm i{flex:1;background:rgba(139,108,240,.4);border-radius:2px 2px 0 0}.mkt-mm i.c{background:rgba(245,165,36,.45)}
+.mkt-mm .vw{position:absolute;top:0;bottom:0;border:1.5px solid var(--accent);border-radius:4px;background:rgba(23,195,178,.08);pointer-events:none}
+.rsk-lb{background:rgba(255,93,93,.1);border:1px solid rgba(255,93,93,.4);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;margin:6px 0}
 </style>
 </head>
 <body>
@@ -1328,6 +1334,8 @@
         </div>
       </section>
 
+      <div id="home-risk" class="mkt-card" style="margin:0 0 16px"></div>
+      <div id="home-review" class="mkt-card" style="margin:0 0 16px"></div>
       <div id="home-journal" class="mkt-card" style="margin:0 0 16px"></div>
 
       <div class="tabs">
@@ -1838,6 +1846,7 @@
                 </div>
               </div>
               <div class="ticket-estimate" id="ticket-estimate"></div>
+              <div class="ticket-estimate" id="rsk-preview"></div><div id="focus-strip"></div><div id="rsk-lock"></div>
               <div class="ticket-msg" id="ticket-msg"></div>
               <div class="ticket-row">
                 <button class="btn-sell" id="btn-sell" onclick="submitOrder('short')">Sell</button>
@@ -2247,7 +2256,7 @@ function showView(name) {
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.toggle('active', id === name || (!['strategies','scanner','replay','markets'].includes(name) && id === 'home'));
   });
-  if (name === 'home') { try { jrnRender(); } catch (e) { /* not ready */ } }
+  if (name === 'home') { try { rskRender(); wkRender(); jrnRender(); } catch (e) { /* not ready */ } }
   if (name === 'markets') { try { mktEnter(); } catch (e) { /* not ready */ } }
   if (name === 'scanner') { try { renderSPerf(); } catch (e) { /* not ready */ } }
   if (name === 'replay' && !replayInited) { initReplay(); replayInited = true; }
@@ -10301,7 +10310,7 @@ function slaPreview() {
     return `<div><b>${lbl}</b> SL ${f(a.sl)} <span style="color:var(--text-faint)">(${word} of last ${a.n}${sla.buf ? ' ' + (side === 'short' ? '+' : '−') + sla.buf + (sla.unit === 'pct' ? '%' : ' pts') : ''})${d != null ? ' · risk ' + d.toFixed(2) + '%' : ''}</span></div>`; };
   el.innerHTML = one('short', 'Sell', 'highest high') + one('long', 'Buy', 'lowest low');
 }
-function submitOrder(side) {
+function submitOrderCore(side) {
   if (position || pendingOrder || !replayCandles.length) return;
   const msgEl = document.getElementById('ticket-msg');
   msgEl.textContent = '';
@@ -10501,10 +10510,11 @@ function closePositionAt(exitPriceRaw, reason, exitTime, exitIndex) {
   tradeHistory.unshift({
     symbol: position.symbol, side: position.side, qty: position.qty,
     entryPrice: position.entryPrice, exitPrice, pnl: netPnl,
-    fees: position.entryFee + exitFee, reason, risk: position.sl ? Math.abs(positionPnl(position.sl)) : null,
+    fees: position.entryFee + exitFee, reason, closedAt: Date.now(), risk: position.sl ? Math.abs(positionPnl(position.sl)) : null,
     entryTime: position.entryTime, exitTime, diag,
   });
   sessionTradesSincePopup++;
+  try { rskOnClose(tradeHistory[0], position); } catch (e) { /* ignore */ }
   position = null;
   try { jrnRender(); } catch (e) { /* journal not loaded */ }
   renderAccountBalance();
@@ -11251,7 +11261,7 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
 
 <script>
 /* ---------- Markets tab logic. Reuses MK (tickers), oi (OI baseline + chart highlight), LIVE (Trade) ---------- */
-const MKT = { seg: 'pulse', col: 'chg', pt: {}, ptAt: 0, ptErr: null, sym: null, und: 'BTC', exp: null, raw: null, base: null, spot: null, oat: 0, strike: null, busy: false, err: null, timer: null, day: 0 };
+const MKT = { seg: 'pulse', col: 'chg', pt: {}, ptAt: 0, ptErr: null, sym: null, und: 'BTC', exp: null, raw: null, base: null, spot: null, oat: 0, strike: null, busy: false, err: null, timer: null, day: 0, rng: 7, nokeep: false };
 // Sample macro list: edit or replace with a real feed. Times are UTC.
 const MKT_EVENTS = [{ at: '2026-11-06T13:30:00Z', n: 'US jobs report', imp: 'hi' }];
 // Market holidays, from the NSE 2026 circular (equity and derivatives) and the NYSE calendar. Confirm against the exchange before trading around a date.
@@ -11366,12 +11376,15 @@ function mktOptRender() {
   const tc = sum('C'), tp = sum('P'), btc = sum('bC'), btp = sum('bP');
   let mp = null, best = Infinity; if (!ALL) all.forEach(c => { const pain = all.reduce((a, r) => a + r.C * Math.max(0, c.k - r.k) + r.P * Math.max(0, r.k - c.k), 0); if (pain < best) { best = pain; mp = c.k; } });
   const spot = MKT.spot; let ai = 0; if (spot) all.forEach((r, i) => { if (Math.abs(r.k - spot) < Math.abs(all[ai].k - spot)) ai = i; });
-  const lo = Math.max(0, Math.min(ai - 3, all.length - 7)), shown = all.slice(lo, lo + 7);
+  const hw = MKT.rng === 'all' ? all.length : MKT.rng, lo = Math.max(0, ai - hw), shown = all.slice(lo, Math.min(all.length, ai + hw + 1));
+  const prevL = document.getElementById('mkt-lad'), keep = prevL && !MKT.nokeep ? prevL.scrollTop : null; MKT.nokeep = false;
   const mx = Math.max(1, ...shown.map(r => Math.max(r.C, r.bC, r.P, r.bP)));
   const bar = (cur, bas, c, cls) => { const w = v => (v / mx * 100).toFixed(1) + '%', S = OI_SH[c]; return `<div class="mkt-bar ${cls}"><i style="width:${w(Math.min(cur, bas))};background:${S.base}59"></i><i style="width:${w(Math.max(0, cur - bas))};background:${S.add};border:1px solid ${S.edge}"></i><i style="width:${w(Math.max(0, bas - cur))};background:${S.rem}22;border:1px dashed ${S.edge}"></i></div>`; };
   const chg = (c, b) => b ? `<small style="color:${c >= b ? 'var(--green)' : 'var(--red)'}">${mktSgn((c - b) / b * 100)}</small>` : '';
   const d = []; all.forEach(r => { d.push({ k: r.k, t: 'CE', v: r.C - r.bC }, { k: r.k, t: 'PE', v: r.P - r.bP }); }); d.sort((a, b) => b.v - a.v);
   const up = d.slice(0, 2), dn = d[d.length - 1];
+  const mmx = Math.max(1, ...all.map(r => Math.max(r.C, r.P)));
+  let spotDone = !spot; const ladder = shown.map(r => { let mk = ''; if (!spotDone && r.k > spot) { mk = `<div class="mkt-spot">▼ Spot ${mktFmt(spot)}</div>`; spotDone = true; } return mk + `<button class="mkt-oirow${r === all[ai] ? ' atm' : ''}${Math.abs(all.indexOf(r) - ai) > 3 ? ' fr' : ''}${MKT.strike === r.k ? ' sel' : ''}" onclick="mktStrike(${r.k})">${bar(r.P, r.bP, 'g', 'l')}<span class="k">${mktFmt(r.k)}</span>${bar(r.C, r.bC, 'r', 'r')}</button>`; }).join('');
   const mv = (x, lab) => x && x.v ? `<div class="mkt-mv"><div>${lab}<p>${mktFmt(x.k)} ${x.t}</p></div><b style="font:500 13px var(--mono);color:${x.v > 0 ? 'var(--green)' : 'var(--red)'}">${x.v > 0 ? '+' : ''}${mktFmt(x.v)}</b></div>` : '';
   const sel = MKT.strike != null && rows[MKT.strike], sr = sel ? rows[MKT.strike] : null;
   const pcr = tc ? tp / tc : null, lbl = pcr == null ? '' : pcr < 0.7 ? 'Call-heavy' : pcr > 1.3 ? 'Put-heavy' : 'Balanced';
@@ -11385,8 +11398,9 @@ function mktOptRender() {
   const read = rd.length ? `<div class="mkt-card mkt-read"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">Reading the data</b></div>${rd.map(x => `<p>${x}</p>`).join('')}<p class="mkt-disc">Rule-of-thumb reading of open interest, not financial advice or a trade signal. OI shows positions, not who is long or short, and crypto behaves differently from index options. Use it alongside your own analysis.</p></div>` : '';
   el.innerHTML = head + `</div><div class="mkt-chips mkt-scroll"><button class="${ALL ? 'on' : ''}" onclick="mktExp('ALL')">All</button>` + exps.map(e => `<button class="${e === MKT.exp ? 'on' : ''}" onclick="mktExp('${e}')">${liveExpLabel(e).slice(0, 6)}</button>`).join('') + `</div>
   <div class="mkt-stats"><div>Call OI<b>${mktFmt(tc)}</b>${chg(tc, btc)}</div><div>Put OI<b>${mktFmt(tp)}</b>${chg(tp, btp)}</div><div>PCR<b>${pcr == null ? '–' : pcr.toFixed(2)}</b><small>${lbl}</small></div><div>Max pain<b>${ALL ? 'Per expiry' : mp == null ? '–' : mktFmt(mp)}</b></div><div>Total OI value<b>${spot ? '≈ $' + mktCompact((tc + tp) * MKT_CS[MKT.und] * spot) : '–'}</b><small>${mktFmt(tc + tp)} contracts</small></div></div>
-  <div class="mkt-ladder-h"><span style="text-align:right">Puts</span><span style="text-align:center">Strike</span><span>Calls</span></div>
-  ${shown.map(r => `<button class="mkt-oirow${r === all[ai] ? ' atm' : ''}${MKT.strike === r.k ? ' sel' : ''}" onclick="mktStrike(${r.k})">${bar(r.P, r.bP, 'g', 'l')}<span class="k">${mktFmt(r.k)}</span>${bar(r.C, r.bC, 'r', 'r')}</button>`).join('')}
+  <div class="mkt-chips">${[3, 7, 15, 'all'].map(v => `<button class="${MKT.rng === v ? 'on' : ''}" onclick="mktRng(${typeof v === 'string' ? "'all'" : v})">${v === 'all' ? 'All' : '±' + v}</button>`).join('')}<button class="sp" style="color:var(--accent)" onclick="mktJump()">Jump to ATM</button></div>
+  <div class="mkt-mm">${all.map(r => `<i class="${r.C >= r.P ? 'c' : ''}" style="height:${Math.max(6, Math.round(Math.max(r.C, r.P) / mmx * 100))}%"></i>`).join('')}<div class="vw" style="left:${(lo / all.length * 100).toFixed(1)}%;width:${(shown.length / all.length * 100).toFixed(1)}%"></div></div>
+  <div class="mkt-lad" id="mkt-lad"><div class="mkt-ladder-h"><span style="text-align:right">Puts</span><span style="text-align:center">Strike</span><span>Calls</span></div>${ladder}</div>
   <div class="mkt-leg"><span><i style="background:${OI_SH.g.base}59"></i>Existing OI</span><span><i style="background:${OI_SH.g.add};border:1px solid ${OI_SH.g.edge}"></i>New buildup</span><span><i style="border:1px dashed ${OI_SH.g.edge}"></i>Unwinding</span></div>
   <div class="mkt-note">Violet = puts, amber = calls. Change is measured from your first load after 17:30 IST, stored on this device. Value is contracts × contract size × spot, approximate. Spot ${spot ? mktFmt(spot) : '–'}.</div>
   ${sr ? `<div class="mkt-card"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">${mktFmt(sr.k)} strike</b><span>${ALL ? 'All expiries' : liveExpLabel(MKT.exp)}</span></div>
@@ -11394,7 +11408,10 @@ function mktOptRender() {
   <div class="mkt-acts"><button class="mkt-btn pri" onclick="mktShowOnChart()">Show on ${MKT.und} chart</button></div>
   ${ALL ? '<div class="mkt-note">Pick a single expiry to trade a contract.</div>' : `<div class="mkt-acts" style="margin-top:6px"><button class="mkt-btn" onclick="mktTradeOpt('C')">Trade ${mktFmt(sr.k)} CE</button><button class="mkt-btn" onclick="mktTradeOpt('P')">Trade ${mktFmt(sr.k)} PE</button></div>`}</div>` : ''}
   <div style="margin-top:10px">${mv(up[0], 'Biggest buildup')}${mv(up[1], 'Next buildup')}${mv(dn && dn.v < 0 ? dn : null, 'Biggest unwinding')}</div>${read}`;
+  const LD = document.getElementById('mkt-lad'); if (LD) { if (keep != null) LD.scrollTop = keep; else mktJump(); }
 }
+function mktRng(v) { MKT.rng = v; MKT.nokeep = true; mktOptRender(); }
+function mktJump() { const L = document.getElementById('mkt-lad'), a = L && L.querySelector('.atm'); if (a) L.scrollTop = a.offsetTop - L.clientHeight / 2 + a.offsetHeight / 2; }
 async function mktShowOnChart() {
   if (MKT.strike == null) return;
   oi.exp = MKT.exp; oi.sel = MKT.strike; oi.on = true; oiSave();
@@ -11550,6 +11567,101 @@ function alrRender() {
 }
 setInterval(alrCheck, 30000); setTimeout(alrCheck, 4000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) alrCheck(); });
+
+</script>
+<script>
+/* ---------- Risk guard (limits and unlock wait are all set by the user; blank = off) ---------- */
+const RSK_KEY = 'tradepro_risk_v1', FOCUS_KEY = 'tradepro_focus_v1';
+const RSK = { cfg: { loss: null, trades: null, pct: null, wait: 10 }, st: { day: null, unlockAt: null }, edit: false, tags: [], force: false, tick: 0 };
+try { const s = JSON.parse(localStorage.getItem(RSK_KEY) || 'null'); if (s) { RSK.cfg = Object.assign(RSK.cfg, s.cfg); RSK.st = Object.assign(RSK.st, s.st); } } catch (e) { /* storage unavailable */ }
+['Override', 'No stop'].forEach(t => { if (typeof JRN_TAGS !== 'undefined' && !JRN_TAGS.includes(t)) JRN_TAGS.push(t); });
+const rskDay = () => new Date().toLocaleDateString('en-CA'), rskGv = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+const rskSave = () => { try { localStorage.setItem(RSK_KEY, JSON.stringify({ cfg: RSK.cfg, st: RSK.st })); } catch (e) { /* storage unavailable */ } };
+function rskToday() { const d = rskDay(), ts = (typeof tradeHistory !== 'undefined' && replayInited ? tradeHistory : ((loadState() || {}).tradeHistory || [])).filter(t => t.closedAt && new Date(t.closedAt).toLocaleDateString('en-CA') === d); const p = ts.reduce((a, t) => a + t.pnl, 0); return { n: ts.length, loss: Math.max(0, -p) }; }
+function rskStatus() {
+  if (RSK.st.day !== rskDay()) { RSK.st = { day: rskDay(), unlockAt: null }; rskSave(); }
+  const c = RSK.cfg, t = rskToday(), hitLoss = c.loss > 0 && t.loss >= c.loss, hitN = c.trades > 0 && t.n >= c.trades, locked = hitLoss || hitN;
+  const mode = !locked ? 'ok' : !RSK.st.unlockAt ? 'locked' : Date.now() >= RSK.st.unlockAt ? 'unlocked' : 'waiting';
+  return { t, hitLoss, hitN, mode };
+}
+function rskUnlock() { RSK.st.unlockAt = Date.now() + (RSK.cfg.wait || 0) * 60000; rskSave(); rskTick(); }
+function rskPreview() {
+  try {
+    const qty = parseFloat(rskGv('ticket-qty')); if (!(qty > 0) || (typeof sla !== 'undefined' && sla.mode === 'candles')) return null;
+    const ty = currentOrderType(), ref = ty === 'limit' ? parseFloat(rskGv('ticket-limit')) : ty === 'stop' ? parseFloat(rskGv('ticket-stop')) : currentPrice(); if (!(ref > 0)) return null;
+    const sl = parseFloat(rskGv('ticket-sl')); if (isNaN(sl)) return { nosl: true };
+    const per = Math.abs(ref - sl) * fxRateForInstrument(currentInstrument), risk = per * qty, bal = account.balance, cap = RSK.cfg.pct > 0 ? bal * RSK.cfg.pct / 100 : null;
+    return { risk, pct: risk / bal * 100, cap, over: cap != null && risk > cap, fit: cap != null && per > 0 ? Math.floor(cap / per * 1e4) / 1e4 : 0 };
+  } catch (e) { return null; }
+}
+function rskGate(side) {
+  const s = rskStatus(), m = document.getElementById('ticket-msg');
+  if (s.mode === 'locked' || s.mode === 'waiting') { m.innerHTML = 'Entries are locked by your own limit. Use the banner above to unlock.'; return false; }
+  const tags = RSK.force ? RSK.tags : [];
+  if (RSK.cfg.pct > 0 && !RSK.force) {
+    const p = rskPreview();
+    if (p && p.nosl) { m.innerHTML = `No stop-loss set, so risk can't be checked against your ${RSK.cfg.pct}% cap. <div class="mkt-acts"><button class="mkt-btn pri" onclick="rskForce('${side}','No stop')">Place anyway</button></div>`; return false; }
+    if (p && p.over) { m.innerHTML = `Risk if stopped: ${fmtMoney(p.risk)} (${p.pct.toFixed(2)}% of balance), over your ${RSK.cfg.pct}% cap of ${fmtMoney(p.cap)}.${p.fit > 0 ? ' A size of ' + p.fit + ' fits.' : ''}<div class="mkt-acts">${p.fit > 0 ? `<button class="mkt-btn" onclick="rskReduce(${p.fit})">Reduce size to ${p.fit}</button>` : ''}<button class="mkt-btn pri" onclick="rskForce('${side}','Oversized')">Place anyway</button></div>`; return false; }
+  }
+  RSK.tags = tags.slice(); if (s.mode === 'unlocked' && !RSK.tags.includes('Override')) RSK.tags.push('Override');
+  return true;
+}
+function submitOrder(side) { if (!rskGate(side)) return; RSK.force = false; submitOrderCore(side); if (typeof position !== 'undefined' && position && !position.rskTags) position.rskTags = RSK.tags.slice(); RSK.tags = []; }
+function rskForce(side, tag) { RSK.force = true; RSK.tags = [tag]; submitOrder(side); RSK.force = false; }
+function rskReduce(n) { const q = document.getElementById('ticket-qty'); if (q) { q.value = n; q.dispatchEvent(new Event('input', { bubbles: true })); } const m = document.getElementById('ticket-msg'); if (m) m.textContent = ''; }
+function rskOnClose(t, pos) {
+  const tags = (pos && pos.rskTags) || []; if (tags.length && typeof JRN !== 'undefined') { const id = jrnId(t), m = JRN.meta[id] || (JRN.meta[id] = { tags: [], note: '' }); tags.forEach(g => { if (!m.tags.includes(g)) m.tags.push(g); }); jrnSave(); }
+  try { wkRender(); } catch (e) { /* not ready */ } rskRender();
+}
+function rskCfgSave(clear) { const n = id => { const v = parseFloat(rskGv(id)); return v > 0 ? v : null; }; RSK.cfg = clear ? { loss: null, trades: null, pct: null, wait: 10 } : { loss: n('rk-loss'), trades: n('rk-trades'), pct: n('rk-pct'), wait: Math.max(0, parseFloat(rskGv('rk-wait')) || 0) }; RSK.edit = false; rskSave(); rskRender(); rskTick(); }
+function rskEdit(v) { RSK.edit = v; rskRender(); }
+function rskRender() {
+  const el = document.getElementById('home-risk'); if (!el) return; const c = RSK.cfg, s = rskStatus(), any = c.loss > 0 || c.trades > 0 || c.pct > 0;
+  const fld = (id, lab, v, ph) => `<div style="margin-bottom:8px"><label class="field-label">${lab}</label><input class="field-input" style="width:100%" id="${id}" type="number" min="0" step="any" inputmode="decimal" placeholder="${ph}" value="${v == null ? '' : v}"></div>`;
+  if (RSK.edit || !any) { el.innerHTML = `<div class="mkt-row" style="font-size:16px"><b style="font-weight:500">Risk guard</b></div><p style="margin:6px 0 10px;font-size:13px;color:var(--text-muted)">You choose every limit. Leave a field blank to turn it off.</p>${fld('rk-loss', 'Daily loss limit (₹)', c.loss, 'Off')}${fld('rk-trades', 'Max trades per day', c.trades, 'Off')}${fld('rk-pct', 'Max risk per trade (% of balance)', c.pct, 'Off')}${fld('rk-wait', 'Unlock wait after a limit is hit (minutes, 0 for none)', c.wait, '10')}<div class="mkt-acts"><button class="mkt-btn pri" onclick="rskCfgSave(false)">Save limits</button>${any ? '<button class="mkt-btn" onclick="rskCfgSave(true)">Clear all</button>' : ''}</div>`; return; }
+  const pct = c.loss > 0 ? Math.min(100, s.t.loss / c.loss * 100) : 0, op = (typeof position !== 'undefined' && position && position.sl) ? Math.abs(positionPnl(position.sl)) : 0;
+  el.innerHTML = `<div class="mkt-head" style="margin-bottom:6px"><div class="mkt-title" style="font-size:16px">Risk today</div><span class="mkt-tag ${s.mode === 'ok' ? '' : 'hi'}">${s.mode === 'ok' ? 'Within limits' : 'Limit reached'}</span></div>
+  ${c.loss > 0 ? `<div class="mkt-row"><span>Daily loss</span><span>${fmtMoney(s.t.loss)} of ${fmtMoney(c.loss)}</span></div><div style="height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden;margin:2px 0 8px"><i style="display:block;height:100%;width:${pct}%;background:${pct >= 100 ? 'var(--red)' : pct >= 70 ? '#F5A524' : 'var(--green)'}"></i></div>` : ''}
+  <div class="mkt-stats"><div>Open risk<b>${fmtMoney(op)}</b></div><div>Trades today<b>${s.t.n}${c.trades > 0 ? ' of ' + c.trades : ''}</b></div>${c.pct > 0 ? `<div>Per-trade cap<b>${c.pct}%</b><small>${fmtMoney(account.balance * c.pct / 100)}</small></div>` : ''}</div>
+  <button class="mkt-chipbtn" onclick="rskEdit(true)">Edit limits</button>`;
+}
+function rskTick() {
+  RSK.tick++; const s = rskStatus(), lk = document.getElementById('rsk-lock'), pv = document.getElementById('rsk-preview');
+  if (lk) { const why = s.hitLoss ? `Daily loss limit reached (${fmtMoney(s.t.loss)} of ${fmtMoney(RSK.cfg.loss)})` : `Daily trade limit reached (${s.t.n} of ${RSK.cfg.trades})`, left = Math.max(0, Math.ceil(((RSK.st.unlockAt || 0) - Date.now()) / 1000));
+    lk.innerHTML = s.mode === 'locked' ? `<div class="rsk-lb"><b>${why}.</b> New entries are locked until midnight. Exits still work.<div class="mkt-acts"><button class="mkt-btn" onclick="rskUnlock()">${RSK.cfg.wait > 0 ? 'Unlock after ' + RSK.cfg.wait + ' min wait' : 'Unlock now'}</button></div></div>` : s.mode === 'waiting' ? `<div class="rsk-lb"><b>${why}.</b> Unlocks in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}.</div>` : s.mode === 'unlocked' ? '<div class="rsk-lb" style="border-color:#F5A524">Override active. Your next trade will be tagged Override in the Journal.</div>' : ''; }
+  const blocked = s.mode === 'locked' || s.mode === 'waiting'; ['btn-buy', 'btn-sell'].forEach(i => { const b = document.getElementById(i); if (b) b.style.opacity = blocked ? '.45' : ''; });
+  if (pv) { const p = RSK.cfg.pct > 0 ? rskPreview() : null; pv.innerHTML = !p ? '' : p.nosl ? 'No stop-loss set, so risk is not measured.' : `<span style="color:${p.over ? '#F5C469' : 'inherit'}">Risk if stopped: ${fmtMoney(p.risk)} (${p.pct.toFixed(2)}% of balance)${p.over ? ', over your cap' : ''}</span>`; }
+  if (RSK.tick % 5 === 0 && !RSK.edit) { rskRender(); }
+}
+/* ---------- Weekly review ---------- */
+const WKR = { off: 0 }, WK_HABIT = { 'Moved SL': 'Moving your stop-loss', 'FOMO': 'Chasing trades (FOMO)', 'Oversized': 'Trading too large', 'Early exit': 'Exiting too early', 'Override': 'Overriding your own limits', 'No stop': 'Trading without a stop' };
+function wkNav(d) { WKR.off += d; wkRender(); }
+function wkFocus(tag) { try { localStorage.setItem(FOCUS_KEY, JSON.stringify({ tag })); } catch (e) { /* ignore */ } wkRender(); wkStrip(); }
+function wkClear() { try { localStorage.removeItem(FOCUS_KEY); } catch (e) { /* ignore */ } wkRender(); wkStrip(); }
+function wkStrip() { const el = document.getElementById('focus-strip'); if (!el) return; let f = null; try { f = JSON.parse(localStorage.getItem(FOCUS_KEY) || 'null'); } catch (e) { /* ignore */ } el.innerHTML = f ? `<div class="mkt-ban" style="margin:6px 0;display:flex;justify-content:space-between;gap:8px"><span>Focus: ${mktEsc(WK_HABIT[f.tag] || f.tag)}</span><button class="mkt-chipbtn" onclick="wkClear()">Clear</button></div>` : ''; }
+function wkRender() {
+  const el = document.getElementById('home-review'); if (!el) return; const all = jrnTrades(); if (!all.length) { el.innerHTML = ''; return; }
+  const last = all.map(t => t.exitTime.slice(0, 10)).sort().pop(), m0 = new Date(last + 'T00:00:00Z'); m0.setUTCDate(m0.getUTCDate() - (m0.getUTCDay() + 6) % 7 + 7 * WKR.off);
+  const from = m0.toISOString().slice(0, 10), to = new Date(m0.getTime() + 6 * 864e5).toISOString().slice(0, 10), wt = all.filter(t => { const d = t.exitTime.slice(0, 10); return d >= from && d <= to; });
+  const nav = `<div class="mkt-chips" style="margin:0"><button onclick="wkNav(-1)" aria-label="Previous week">‹</button><span style="font-size:12px">${from.slice(5)} to ${to.slice(5)}</span><button onclick="wkNav(1)" aria-label="Next week">›</button></div>`;
+  const head = `<div class="mkt-head" style="margin-bottom:8px"><div class="mkt-title" style="font-size:16px">Your week</div>${nav}</div>`;
+  if (wt.length < 5) { el.innerHTML = head + `<p style="margin:0;font-size:13px;color:var(--text-muted)">The review needs at least 5 trades in the week (${wt.length} so far).</p>`; return; }
+  const net = wt.reduce((a, t) => a + t.pnl, 0), wins = wt.filter(t => t.pnl >= 0).length, day = [0, 0, 0, 0, 0, 0, 0]; wt.forEach(t => { day[(new Date(t.exitTime.slice(0, 10) + 'T00:00:00Z').getUTCDay() + 6) % 7] += t.pnl; });
+  const mx = Math.max(1, ...day.map(Math.abs)), tg = t => (JRN.meta[jrnId(t)] || { tags: [] }).tags, S = {};
+  wt.forEach(t => tg(t).forEach(g => { const s = S[g] || (S[g] = { n: 0, p: 0 }); s.n++; s.p += t.pnl; }));
+  const bad = Object.entries(S).filter(([g, s]) => g !== 'Followed plan' && s.n >= 2 && s.p < 0).sort((a, b) => a[1].p - b[1].p)[0], good = S['Followed plan'];
+  let foc = null; try { foc = JSON.parse(localStorage.getItem(FOCUS_KEY) || 'null'); } catch (e) { /* ignore */ }
+  const oth = bad ? wt.filter(t => !tg(t).includes(bad[0])) : [], hr = {}; wt.forEach(t => { if (t.exitTime.length > 10) { const h = Math.floor(+t.exitTime.slice(11, 13) / 2) * 2, b = hr[h] || (hr[h] = { n: 0, p: 0 }); b.n++; b.p += t.pnl; } });
+  const bh = Object.entries(hr).filter(([h, b]) => b.n >= 2 && b.p > 0).sort((a, b) => b[1].p / b[1].n - a[1].p / a[1].n)[0];
+  el.innerHTML = head + `<div class="mkt-stats"><div>Net P&amp;L<b style="color:${net >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(net)}</b></div><div>Win rate<b>${Math.round(wins / wt.length * 100)}%</b><small>${wt.length} trades</small></div></div>
+  <div style="display:flex;gap:3px;align-items:flex-end;height:44px">${day.map(v => `<i style="flex:1;height:${Math.max(6, Math.abs(v) / mx * 100)}%;border-radius:3px 3px 0 0;background:${v === 0 ? 'var(--surface-2)' : v > 0 ? 'rgba(53,214,140,.55)' : 'rgba(255,93,93,.55)'}"></i>`).join('')}</div><div style="display:flex;gap:3px;font-size:11px;color:var(--text-faint);margin-bottom:8px">${'MTWTFSS'.split('').map(c => `<span style="flex:1;text-align:center">${c}</span>`).join('')}</div>
+  <div class="mkt-card" style="border-color:rgba(245,165,36,.4)"><div style="font-size:11px;color:#F5C469;text-transform:uppercase;letter-spacing:.04em">One habit to fix</div>${bad ? `<div style="font-size:15px;font-weight:500;margin:4px 0">${mktEsc(WK_HABIT[bad[0]] || bad[0])}</div><div class="mkt-row"><span>Trades with this tag</span><span>${bad[1].n}</span></div><div class="mkt-row"><span>Their combined result</span><span style="color:var(--red)">${fmtMoney(bad[1].p)}</span></div>${oth.length ? `<div class="mkt-row"><span>Average on your other trades</span><span>${fmtMoney(oth.reduce((a, t) => a + t.pnl, 0) / oth.length)}</span></div>` : ''}${foc && foc.tag === bad[0] ? '<div class="mkt-note">This is your focus. It shows on the Trade tab.</div>' : `<div class="mkt-acts"><button class="mkt-btn pri" onclick="wkFocus('${bad[0]}')">Make this my focus</button></div>`}` : '<p style="margin:6px 0 0;font-size:13px;color:var(--text-muted)">No clear habit yet. Tag your trades (FOMO, Moved SL and so on) and one will show here once a tag costs you money on 2 or more trades.</p>'}</div>
+  ${good && good.n >= 2 ? `<div class="mkt-card"><div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.04em">What worked</div><div style="font-size:15px;font-weight:500;margin:4px 0">Following your plan</div><div class="mkt-row"><span>Trades with this tag</span><span>${good.n}</span></div><div class="mkt-row"><span>Their combined result</span><span style="color:${good.p >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(good.p)}</span></div>${bh ? `<div class="mkt-row"><span>Best time (exit)</span><span>${String(bh[0]).padStart(2, '0')}:00 to ${String(+bh[0] + 2).padStart(2, '0')}:00</span></div>` : ''}</div>` : ''}
+  <div class="mkt-note">Based only on your own trades and tags. Not a prediction.</div>`;
+}
+document.addEventListener('input', () => { try { rskTick(); } catch (e) { /* not ready */ } });
+setInterval(rskTick, 1000);
+try { rskRender(); wkRender(); wkStrip(); rskTick(); } catch (e) { /* not ready */ }
 
 </script>
 </body>
