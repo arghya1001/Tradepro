@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TradePro — Dashboard</title>
+<meta name="theme-color" content="#0A0D12">
+<script>(function(){var t='dark';try{t=localStorage.getItem('tp-theme')||'dark';}catch(e){}if(['dark','daylight','navygold'].indexOf(t)<0)t='dark';document.documentElement.setAttribute('data-theme',t);window.DRAW_INK=function(){return document.documentElement.getAttribute('data-theme')==='daylight'?'#1F2D3D':DRAW_INK();};})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -29,7 +31,38 @@
     --accent-dim: #0E6E67;
     --sans: "IBM Plex Sans", -apple-system, sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --on-accent: #06201D;
+    --on-red: #1A0808;
+    --warn: #F5C469;
   }
+  :root[data-theme="daylight"] {
+    color-scheme: light;
+    --bg: #F5F7FA; --surface: #FFFFFF; --surface-2: #EEF2F6;
+    --border: #D6DDE6; --border-soft: #E4E9F0;
+    --text: #12202E; --text-muted: #5A6878; --text-faint: #7B889A;
+    --green: #13995F; --green-dim: #BFE6D3;
+    --red: #D93F3F; --red-dim: #F3C5C5;
+    --accent: #0F9D8F; --accent-dim: #0B6E65;
+    --on-accent: #FFFFFF; --on-red: #FFFFFF; --warn: #9A6400;
+  }
+  :root[data-theme="navygold"] {
+    color-scheme: dark;
+    --bg: #0E1A2E; --surface: #162540; --surface-2: #1D2F50;
+    --border: #2A3F63; --border-soft: #213556;
+    --text: #F1F4FA; --text-muted: #9AA9C2; --text-faint: #6A7C98;
+    --green: #3DDC97; --green-dim: #1E7A52;
+    --red: #FF7A7A; --red-dim: #7A2B2B;
+    --accent: #D4A93A; --accent-dim: #8A6D1E;
+    --on-accent: #0E1A2E; --on-red: #1A0808; --warn: #F5C469;
+  }
+  button.icon-btn { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
+  .theme-wrap { position: relative; flex-shrink: 0; }
+  .theme-menu { position: absolute; right: 0; top: 40px; z-index: 50; min-width: 196px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: 0 10px 28px rgba(0,0,0,0.25); }
+  .theme-menu[hidden] { display: none; }
+  .theme-menu button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 7px; font-size: 13px; color: var(--text); cursor: pointer; }
+  .theme-menu button:hover, .theme-menu button:focus-visible { background: var(--surface); }
+  .theme-menu button.active::after { content: "\2713"; margin-left: auto; color: var(--accent); }
+  .th-dot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border); flex-shrink: 0; }
   html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
   * { box-sizing: border-box; }
   body {
@@ -59,9 +92,9 @@
   .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
   .brand-mark {
     width: 30px; height: 30px; border-radius: 7px;
-    background: linear-gradient(155deg, var(--accent), #0B5C56);
+    background: linear-gradient(155deg, var(--accent), var(--accent-dim));
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--mono); font-weight: 600; font-size: 15px; color: #06201D;
+    font-family: var(--mono); font-weight: 600; font-size: 15px; color: var(--on-accent);
     flex-shrink: 0;
   }
   .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
@@ -90,7 +123,7 @@
     display: flex; flex-direction: column; gap: 8px;
   }
   .status-row { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-muted); padding: 0 8px; }
-  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(53,214,140,0.15); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 15%, transparent); }
 
   /* ---------- Main ---------- */
   main { display: flex; flex-direction: column; min-width: 0; }
@@ -185,7 +218,7 @@
   .oc-table td.oc-p { color: var(--red); }
   .oc-table td.oc-oi { color: var(--text-faint); }
   .oc-table tr.oc-atm td.oc-k { color: var(--accent); }
-  .oc-table td.oc-sel { outline: 2px solid var(--accent); outline-offset: -2px; background: rgba(23,195,178,.12); }
+  .oc-table td.oc-sel { outline: 2px solid var(--accent); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
   .strat-chart-btn { margin-top: 8px; background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 5px 10px; font-size: 12px; font-family: inherit; cursor: pointer; }
   .cl-head, .cl-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) 66px 56px 30px; gap: 6px; align-items: center; }
   .cl-head { font-size: 11px; color: var(--text-faint); margin-bottom: 4px; }
@@ -298,7 +331,7 @@
   .sc2-icon, .sc2-plus { all: unset; cursor: pointer; box-sizing: border-box; width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .sc2-icon { border: 1px solid var(--border); color: var(--text-muted); }
   .sc2-icon:hover { color: var(--text); border-color: var(--text-faint); }
-  .sc2-newwrap .sc2-plus { all: unset; cursor: pointer; box-sizing: border-box; width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--accent); color: #06201D; }
+  .sc2-newwrap .sc2-plus { all: unset; cursor: pointer; box-sizing: border-box; width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--accent); color: var(--on-accent); }
   .sc2-newwrap .sc2-plus:hover { background: #1FD9C6; }
   .sc2-newwrap { position: relative; flex-shrink: 0; }
   .sc2-menu { position: absolute; right: 0; top: 44px; z-index: 30; width: 262px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: 0 10px 28px rgba(0,0,0,.45); }
@@ -340,7 +373,7 @@
   .sc2-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--text-faint); display: inline-block; box-sizing: border-box; }
   .sc2-dot.f { background: var(--green); border-color: var(--green); }
   .sc2-st { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
-  .sc2-st.m { background: rgba(53,214,140,.15); color: var(--green); }
+  .sc2-st.m { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
   .sc2-st.n { color: var(--text-faint); font-weight: 500; padding: 2px 0; }
   .sc2-chev { color: var(--text-faint); flex-shrink: 0; transition: transform .15s; }
   .sc2-row[open] .sc2-chev { transform: rotate(180deg); }
@@ -464,7 +497,7 @@
   .strat-sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
   .btn-primary {
     all: unset; cursor: pointer;
-    background: var(--accent); color: #06201D; font-weight: 600; font-size: 13px;
+    background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 13px;
     padding: 9px 16px; border-radius: 7px;
   }
   .btn-primary:hover { background: #1FD9C6; }
@@ -718,7 +751,7 @@
     border: 1px solid var(--border); border-radius: 6px; padding: 5px 9px; background: var(--surface);
   }
   .color-swatch-trigger:hover { border-color: var(--text-faint); }
-  .color-swatch-dot { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; outline: 1px solid rgba(255,255,255,0.15); }
+  .color-swatch-dot { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; outline: 1px solid var(--border); }
   .color-swatch-hex { font-family: var(--mono); font-size: 11px; color: var(--text-muted); letter-spacing: 0.02em; }
 
   .color-grid-panel { padding: 8px 0 4px; }
@@ -881,7 +914,7 @@
 
   .ccy-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; vertical-align: middle; }
   .ccy-seg button { all: unset; cursor: pointer; padding: 4px 11px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
-  .ccy-seg button.active { background: var(--accent); color: #06201D; }
+  .ccy-seg button.active { background: var(--accent); color: var(--on-accent); }
   .mk-live-row { cursor: pointer; }
   .mk-chev { display: inline-block; margin-left: 6px; color: var(--text-faint); font-size: 10px; transition: transform .15s; }
   .mk-live-row.open .mk-chev, .mk-mover.open .mk-chev { transform: rotate(180deg); }
@@ -893,7 +926,7 @@
   .mk-head { font-size: 12.5px; color: var(--text-muted); margin-bottom: 4px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .mk-svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
   .mk-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 11px; color: var(--text-faint); }
-  .mk-practice { all: unset; cursor: pointer; background: var(--accent); color: #06201D; padding: 7px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; }
+  .mk-practice { all: unset; cursor: pointer; background: var(--accent); color: var(--on-accent); padding: 7px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; }
   .mk-mover { cursor: pointer; }
   .chart-scroll {
     overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; cursor: grab; scrollbar-width: thin; padding-top: 4px;
@@ -907,17 +940,17 @@
   .price-axis { position: absolute; top: 4px; right: 0; width: 68px; pointer-events: none; }
   .price-scale-label {
     position: absolute; right: 4px; transform: translateY(-50%);
-    font-family: var(--mono); font-size: 11px; font-weight: 600; color: #D5DCE6; white-space: nowrap;
-    background: rgba(10,13,18,.88); padding: 1px 4px; border-radius: 3px;
+    font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap;
+    background: color-mix(in srgb, var(--bg) 88%, transparent); padding: 1px 4px; border-radius: 3px;
   }
   .price-tag {
     position: absolute; right: 0; transform: translateY(-50%);
     font-family: var(--mono); font-size: 10.5px; padding: 2px 6px; border-radius: 4px 0 0 4px;
-    color: #06201D; white-space: nowrap;
+    color: var(--on-accent); white-space: nowrap;
   }
-  .price-tag.entry { background: var(--accent); color: #06201D; }
-  .price-tag.sl { background: var(--red); color: #1a0808; }
-  .price-tag.tp { background: var(--green); color: #06201D; }
+  .price-tag.entry { background: var(--accent); color: var(--on-accent); }
+  .price-tag.sl { background: var(--red); color: var(--on-red); }
+  .price-tag.tp { background: var(--green); color: var(--on-accent); }
   .price-tag.order { background: #D9A441; color: #1a1408; }
   /* Reserve a right gutter so price-scale labels sit beside the candles, not on top of them */
   .chart-scroll { margin-right: 60px; }
@@ -932,7 +965,7 @@
       background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px;
       max-height: calc(100% - 52px); overflow-y: auto;
     }
-    .chart-toolbar:not(.open) { background: rgba(20,24,30,.55); }
+    .chart-toolbar:not(.open) { background: color-mix(in srgb, var(--surface) 55%, transparent); }
     .chart-toolbar:not(.open) > *:not(.tool-more) { display: none; }
     .tool-more { display: flex; }
     .tool-more.has-tool { color: var(--accent); }
@@ -990,8 +1023,8 @@
   }
   .pb-btn:hover { color: var(--text); border-color: var(--text-faint); }
   .pb-btn svg { width: 15px; height: 15px; }
-  .pb-play { background: var(--accent); border-color: var(--accent); color: #06201D; }
-  .pb-play:hover { background: #1FD9C6; color: #06201D; }
+  .pb-play { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .pb-play:hover { background: #1FD9C6; color: var(--on-accent); }
   .pb-play svg { width: 16px; height: 16px; }
   .scrubber { flex: 1; accent-color: var(--accent); min-width: 60px; }
   .speed-select { width: 72px; flex-shrink: 0; padding: 6px 8px; font-size: 12px; margin-top: 0; }
@@ -1020,9 +1053,9 @@
     all: unset; cursor: pointer; flex: 1; text-align: center; font-weight: 600; font-size: 13.5px;
     padding: 10px; border-radius: 7px;
   }
-  .btn-buy { background: var(--green); color: #06201D; }
+  .btn-buy { background: var(--green); color: var(--on-accent); }
   .btn-buy:hover { background: #45E89E; }
-  .btn-sell { background: var(--red); color: #1a0808; }
+  .btn-sell { background: var(--red); color: var(--on-red); }
   .btn-sell:hover { background: #FF7575; }
 
   .position-row { display: flex; align-items: center; gap: 12px; }
@@ -1030,8 +1063,8 @@
     font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 5px; letter-spacing: 0.02em;
     flex-shrink: 0;
   }
-  .position-side.long { background: rgba(53,214,140,0.15); color: var(--green); }
-  .position-side.short { background: rgba(255,93,93,0.15); color: var(--red); }
+  .position-side.long { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
+  .position-side.short { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); }
   .position-info { flex: 1; min-width: 0; }
   .position-line { font-size: 13px; font-weight: 500; font-family: var(--mono); }
   .position-sub { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
@@ -1212,7 +1245,7 @@
 .mkt-seg button.on{background:var(--surface-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
 .mkt-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
 .mkt-chips button{border:1px solid var(--border);background:none;color:var(--text-muted);font:12px var(--sans);padding:5px 11px;border-radius:14px;cursor:pointer}
-.mkt-chips button.on{background:rgba(23,195,178,.14);color:var(--accent);border-color:transparent}
+.mkt-chips button.on{background:color-mix(in srgb, var(--accent) 14%, transparent);color:var(--accent);border-color:transparent}
 .mkt-chips .sp{margin-left:auto}.mkt-scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.mkt-scroll button{flex:none}
 .mkt-heat{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:54px;gap:4px}
 .mkt-tile{border:0;border-radius:8px;color:var(--text);text-align:left;padding:8px;font:13px var(--sans);display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;min-width:0}
@@ -1230,7 +1263,7 @@
 .mkt-ladder-h,.mkt-oirow{display:grid;grid-template-columns:minmax(0,1fr) 62px minmax(0,1fr);gap:6px;align-items:center}
 .mkt-ladder-h{font-size:12px;color:var(--text-muted);padding:0 4px 4px}
 .mkt-oirow{width:100%;min-height:44px;border:0;background:none;color:var(--text);padding:3px 4px;border-radius:8px;cursor:pointer;font:12px var(--mono)}
-.mkt-oirow.atm{background:rgba(23,195,178,.10)}.mkt-oirow.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.mkt-oirow.atm{background:color-mix(in srgb, var(--accent) 10%, transparent)}.mkt-oirow.sel{outline:2px solid var(--accent);outline-offset:-2px}
 .mkt-oirow .k{text-align:center;color:var(--text-muted)}
 .mkt-bar{display:flex;height:18px}.mkt-bar.l{flex-direction:row-reverse}
 .mkt-bar i{height:100%;display:block;box-sizing:border-box}
@@ -1241,13 +1274,13 @@
 .mkt-wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:10px}
 .mkt-wk button{border:1px solid var(--border);background:none;color:var(--text-muted);border-radius:10px;padding:7px 0;font:12px var(--sans);cursor:pointer}
 .mkt-wk button b{display:block;font:500 15px var(--sans);color:var(--text)}
-.mkt-wk button.on{background:rgba(23,195,178,.14);border-color:var(--accent)}
+.mkt-wk button.on{background:color-mix(in srgb, var(--accent) 14%, transparent);border-color:var(--accent)}
 .mkt-dot{display:block;width:6px;height:6px;border-radius:50%;margin:3px auto 0}
-.mkt-ban{background:rgba(245,165,36,.12);color:#F5C469;border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:10px}
+.mkt-ban{background:rgba(245,165,36,.12);color:var(--warn);border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:10px}
 .mkt-ev{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--border);font-size:14px}
 .mkt-ev .t{width:58px;font:12px var(--mono);color:var(--text-muted)}.mkt-ev .n{flex:1}.mkt-ev small{display:block;font-size:12px;color:var(--text-muted)}
 .mkt-tag{font-size:12px;padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--text-muted)}
-.mkt-tag.hol{background:rgba(23,195,178,.15);color:var(--accent)}.mkt-tag.hi{background:rgba(255,93,93,.15);color:var(--red)}.mkt-tag.ex{background:rgba(245,165,36,.15);color:#F5C469}
+.mkt-tag.hol{background:color-mix(in srgb, var(--accent) 15%, transparent);color:var(--accent)}.mkt-tag.hi{background:color-mix(in srgb, var(--red) 15%, transparent);color:var(--red)}.mkt-tag.ex{background:rgba(245,165,36,.15);color:var(--warn)}
 .mkt-empty{padding:28px 12px;text-align:center;color:var(--text-muted);font-size:13px;grid-column:1/-1}
 .mkt-read p{margin:8px 0;font-size:13px;line-height:1.5}.mkt-read b{font-weight:500}.mkt-disc{font-size:12px!important;color:var(--text-faint);border-top:1px solid var(--border);padding-top:8px}
 .mkt-note{font-size:12px;color:var(--text-faint);margin-top:10px}
@@ -1263,8 +1296,8 @@
 .mkt-lad .mkt-ladder-h{position:sticky;top:0;z-index:1;background:var(--bg);padding-top:2px}
 .mkt-oirow.fr{opacity:.6}.mkt-spot{font-size:11px;color:var(--accent);text-align:center;padding:1px 0}
 .mkt-mm{position:relative;display:flex;gap:2px;align-items:flex-end;height:34px;margin-bottom:8px}.mkt-mm i{flex:1;background:rgba(139,108,240,.4);border-radius:2px 2px 0 0}.mkt-mm i.c{background:rgba(245,165,36,.45)}
-.mkt-mm .vw{position:absolute;top:0;bottom:0;border:1.5px solid var(--accent);border-radius:4px;background:rgba(23,195,178,.08);pointer-events:none}
-.rsk-lb{background:rgba(255,93,93,.1);border:1px solid rgba(255,93,93,.4);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;margin:6px 0}
+.mkt-mm .vw{position:absolute;top:0;bottom:0;border:1.5px solid var(--accent);border-radius:4px;background:color-mix(in srgb, var(--accent) 8%, transparent);pointer-events:none}
+.rsk-lb{background:color-mix(in srgb, var(--red) 10%, transparent);border:1px solid color-mix(in srgb, var(--red) 40%, transparent);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;margin:6px 0}
 .hero{padding:14px 16px!important}.hero-label{margin-bottom:4px!important}.hero-value{font-size:28px!important}
 .rvrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 14px;padding:10px 14px;font-size:13px;cursor:pointer}
 .wl-ed{display:flex;gap:6px;margin-top:4px}.wl-ed button{border:1px solid var(--border);background:none;color:var(--text-muted);font:12px var(--sans);padding:3px 8px;border-radius:6px;cursor:pointer}
@@ -1308,7 +1341,7 @@
       </div>
       <div class="topbar-spacer"></div>
       <div class="icon-btn"><span class="ping"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
-      <div class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></div>
+      <div class="theme-wrap"><button class="icon-btn" id="theme-btn" type="button" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button><div class="theme-menu" id="theme-menu" hidden><button type="button" data-t="dark" onclick="setTheme('dark')"><i class="th-dot" style="background:linear-gradient(135deg,#0A0D12 50%,#17C3B2 50%)"></i>Classic dark</button><button type="button" data-t="daylight" onclick="setTheme('daylight')"><i class="th-dot" style="background:linear-gradient(135deg,#F5F7FA 50%,#0F9D8F 50%)"></i>Daylight</button><button type="button" data-t="navygold" onclick="setTheme('navygold')"><i class="th-dot" style="background:linear-gradient(135deg,#0E1A2E 50%,#D4A93A 50%)"></i>Navy and gold</button></div></div>
       <div class="ccy-seg" title="Show money in ₹ or $ (1 USD = ₹85)"><button data-c="INR" onclick="setDisplayCcy('INR')">₹</button><button data-c="USD" onclick="setDisplayCcy('USD')">$</button></div>
       <div class="avatar">AB</div>
       <div class="clock"><strong>09:41</strong><br>Wed, 20 Aug 2026</div>
@@ -3666,7 +3699,7 @@ const OI_SH = { r: { base: '#F5A524', add: '#B86A00', edge: '#FFC85C', rem: '#FF
 function oiLeg() { oi.legend = !oi.legend; oiRender(); }
 function oiLegend(canvas, ready) {
   let el = document.getElementById('oi-leg');
-  if (!el) { el = document.createElement('div'); el.id = 'oi-leg'; el.style.cssText = 'position:absolute;z-index:9;left:6px;bottom:52px;background:rgba(16,20,27,.97);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:11px;line-height:1.75;box-shadow:0 6px 18px rgba(0,0,0,.55);pointer-events:none;color:var(--text-muted)'; canvas.appendChild(el); }
+  if (!el) { el = document.createElement('div'); el.id = 'oi-leg'; el.style.cssText = 'position:absolute;z-index:9;left:6px;bottom:52px;background:color-mix(in srgb, var(--surface) 97%, transparent);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:11px;line-height:1.75;box-shadow:0 6px 18px rgba(0,0,0,.55);pointer-events:none;color:var(--text-muted)'; canvas.appendChild(el); }
   if (!oi.on || !oi.legend || !ready) { el.style.display = 'none'; return; }
   const S = OI_SH, since = new Date(oi.base.at + 19800000).toISOString().slice(11, 16);
   const sw = css => `<span style="display:inline-block;width:20px;height:9px;border-radius:2px;vertical-align:middle;margin-right:8px;box-sizing:border-box;${css}"></span>`;
@@ -3725,7 +3758,7 @@ function oiRender() {
   let wC = null, wP = null; rows.forEach(r => { if (!wC || r.C > wC.C) wC = r; if (!wP || r.P > wP.P) wP = r; });
   const kf = v => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'k' : String(Math.round(v)), same = wC && wP && wC.k === wP.k;
   const wall = (r, side, v, b) => { if (!r || !(v > 0)) return ''; const len = Math.max(v, b) * sc, yy = yAt(r.k) + (same ? (side === 'r' ? -1 : 8.5) : 3.5);
-    return `<text x="${(W - len - 5).toFixed(1)}" y="${yy.toFixed(1)}" text-anchor="end" font-size="9.5" font-weight="700" fill="${SH[side].edge}" stroke="#0A0D12" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${side === 'r' ? 'CE' : 'PE'} ${kf(v)}</text>`; };
+    return `<text x="${(W - len - 5).toFixed(1)}" y="${yy.toFixed(1)}" text-anchor="end" font-size="9.5" font-weight="700" fill="${SH[side].edge}" stroke="var(--bg)" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${side === 'r' ? 'CE' : 'PE'} ${kf(v)}</text>`; };
   const lg = wall(wC, 'r', wC && wC.C, wC && wC.bC) + wall(wP, 'g', wP && wP.P, wP && wP.bP);
   lay.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">${svg}${lg}</svg>`;
   oiCard(lay, rows, yAt, SH);
@@ -3751,7 +3784,7 @@ function oiBindTap(canvas, lay) {
 }
 function oiCard(lay, rows, yAt, SH) {
   const canvas = lay.parentNode; let card = document.getElementById('oi-card');
-  if (!card) { card = document.createElement('div'); card.id = 'oi-card'; card.style.cssText = 'position:absolute;z-index:8;right:62px;display:none;background:rgba(16,20,27,.97);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:11px;line-height:1.55;box-shadow:0 6px 18px rgba(0,0,0,.55);pointer-events:none;min-width:150px'; canvas.appendChild(card); }
+  if (!card) { card = document.createElement('div'); card.id = 'oi-card'; card.style.cssText = 'position:absolute;z-index:8;right:62px;display:none;background:color-mix(in srgb, var(--surface) 97%, transparent);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:11px;line-height:1.55;box-shadow:0 6px 18px rgba(0,0,0,.55);pointer-events:none;min-width:150px'; canvas.appendChild(card); }
   const r = oi.sel != null && oi.on ? rows.find(x => x.k === oi.sel) : null;
   if (!r) { card.style.display = 'none'; return; }
   const n = v => Math.round(v).toLocaleString('en-US'), exp = oi.exp === 'ALL' ? 'All expiries' : liveExpLabel(oi.exp);
@@ -4637,7 +4670,7 @@ function mkDrawChart() {
   const last = cs[cs.length - 1], ly = y(last.c), up = last.c >= last.o;
   body += `<line x1="${padL}" x2="${W - padR}" y1="${ly.toFixed(1)}" y2="${ly.toFixed(1)}" stroke="${up ? 'var(--green)' : 'var(--red)'}" stroke-dasharray="3 3" stroke-width="0.8"/>` +
           `<rect x="${W - padR}" y="${(ly - 8).toFixed(1)}" width="${padR - 2}" height="16" rx="3" fill="${up ? 'var(--green)' : 'var(--red)'}"/>` +
-          `<text x="${W - padR + 4}" y="${(ly + 3.5).toFixed(1)}" font-size="10" fill="#06201D" font-weight="700" font-family="var(--mono)">${last.c >= 1000 ? last.c.toFixed(1) : last.c.toFixed(last.c >= 1 ? 2 : 5)}</text>`;
+          `<text x="${W - padR + 4}" y="${(ly + 3.5).toFixed(1)}" font-size="10" fill="var(--on-accent)" font-weight="700" font-family="var(--mono)">${last.c >= 1000 ? last.c.toFixed(1) : last.c.toFixed(last.c >= 1 ? 2 : 5)}</text>`;
   MK.geo = { W, padL, step };
   el.innerHTML = `<svg class="mk-svg" viewBox="0 0 ${W} ${H}" onclick="mkChartTap(event)">${g}${body}</svg>`;
   mkOhlc(cs.length - 1);
@@ -6425,7 +6458,7 @@ function addIndicator(key) {
   const params = {};
   def.params.forEach(p => { params[p.key] = p.default; });
   const inst = { id: 'ind' + (indicatorSeq++), key, params, color: IND_COLORS[activeIndicators.length % IND_COLORS.length], width: 1.5, opacity: 100, lineStyle: 'solid' };
-  if (def.secondaryLabel) inst.secondaryColor = key === 'rsi' ? '#FFFFFF' : '#D9A441';
+  if (def.secondaryLabel) inst.secondaryColor = key === 'rsi' ? DRAW_INK() : '#D9A441';
   if (key === 'gmma') {
     inst.gmmaShortColor = '#009956'; // base hue each ribbon is shaded from, lightest (period 3) to this (period 15)
     inst.gmmaLongColor = '#FF5723';  // base hue for the long-term ribbon, lightest (period 30) to this (period 60)
@@ -6502,7 +6535,7 @@ function rsiEnsure(inst) {
   if (!inst.midColor) inst.midColor = '#787B86';
   if (!inst.loColor) inst.loColor = '#4DD0E1';
   if (!inst.bgColor) inst.bgColor = '#7E57C2';
-  if (!inst.secondaryColor || inst.secondaryColor === '#D9A441') inst.secondaryColor = '#FFFFFF';
+  if (!inst.secondaryColor || inst.secondaryColor === '#D9A441') inst.secondaryColor = DRAW_INK();
   return inst.rsi;
 }
 function rsiSet(id, key, sub, val) {
@@ -7432,7 +7465,7 @@ function renderChart(forceEnd) {
         }
         const lastVal = lv.arr[replayIndex - 1];
         if (lastVal != null) {
-          oscTagsHtml += `<div class="price-tag" style="top:${clampY(yAt(lastVal)).toFixed(0)}px; background:${lv.color}; color:#06201D; border:none; font-size:9px; padding:2px 5px;">${lv.label}</div>`;
+          oscTagsHtml += `<div class="price-tag" style="top:${clampY(yAt(lastVal)).toFixed(0)}px; background:${lv.color}; color:var(--on-accent); border:none; font-size:9px; padding:2px 5px;">${lv.label}</div>`;
         }
       });
     } else if (inst.key === 'ma_cross') {
@@ -7546,8 +7579,8 @@ function renderChart(forceEnd) {
       const bw = Math.max(candlePx, 6);
       return `<rect x="${(x - bw / 2).toFixed(2)}" y="${top.toFixed(1)}" width="${bw.toFixed(2)}" height="${(bot - top).toFixed(1)}" fill="${col}" fill-opacity="${exit ? .10 : .16}"/>` +   // full-height highlight column
         `<line x1="${x.toFixed(2)}" y1="${top.toFixed(1)}" x2="${x.toFixed(2)}" y2="${bot.toFixed(1)}" stroke="${col}" stroke-width="1" stroke-dasharray="${exit ? '2,4' : '5,3'}" stroke-opacity=".75"/>` +
-        `<polygon points="${pts}" fill="${exit ? '#0A0D12' : col}" stroke="${exit ? col : '#fff'}" stroke-width="${exit ? 2.4 : 1.6}" stroke-linejoin="round"/>` +
-        `<rect x="${(x - pw / 2).toFixed(2)}" y="${py.toFixed(2)}" width="${pw.toFixed(2)}" height="${ph}" rx="4" fill="${exit ? '#0A0D12' : col}" stroke="${exit ? col : '#fff'}" stroke-width="${exit ? 1.8 : 1.2}"/>` +
+        `<polygon points="${pts}" fill="${exit ? 'var(--bg)' : col}" stroke="${exit ? col : '#fff'}" stroke-width="${exit ? 2.4 : 1.6}" stroke-linejoin="round"/>` +
+        `<rect x="${(x - pw / 2).toFixed(2)}" y="${py.toFixed(2)}" width="${pw.toFixed(2)}" height="${ph}" rx="4" fill="${exit ? 'var(--bg)' : col}" stroke="${exit ? col : '#fff'}" stroke-width="${exit ? 1.8 : 1.2}"/>` +
         `<text x="${x.toFixed(2)}" y="${(py + 12.2).toFixed(2)}" font-size="11" font-weight="900" text-anchor="middle" fill="${exit ? col : (isBuy ? '#fff' : '#161200')}" font-family="var(--mono)">${txt}</text>`;
     };
     sig.entries.forEach(i => { if (i >= drawLo && i <= drawHi) signalMarkers += arrow(i, entTag); });
@@ -7597,7 +7630,7 @@ function renderChart(forceEnd) {
       oscSvg += seriesPath(result.macd, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
       oscSvg += seriesPath(result.signal, oY, inst.secondaryColor || '#D9A441', null, inst.width, inst.opacity);
       const lastM = result.macd[replayIndex-1];
-      if (lastM != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastM).toFixed(0)}px; background:${inst.color}; color:#06201D; border:none;">${lastM.toFixed(1)}</div>`;
+      if (lastM != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastM).toFixed(0)}px; background:${inst.color}; color:var(--on-accent); border:none;">${lastM.toFixed(1)}</div>`;
     } else if (def.renderKind === 'stoch') {
       const oY = mkY(0, 100);
       [20, 50, 80].forEach(v => {
@@ -7607,7 +7640,7 @@ function renderChart(forceEnd) {
       oscSvg += seriesPath(result.k, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
       oscSvg += seriesPath(result.d, oY, inst.secondaryColor || '#D9A441', '3,2', inst.width, inst.opacity);
       const lastK = result.k[replayIndex-1];
-      if (lastK != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastK).toFixed(0)}px; background:${inst.color}; color:#06201D; border:none;">${lastK.toFixed(1)}</div>`;
+      if (lastK != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastK).toFixed(0)}px; background:${inst.color}; color:var(--on-accent); border:none;">${lastK.toFixed(1)}</div>`;
     } else if (def.renderKind === 'atr') {
       // Unbounded positive value, so it gets its own auto-scaled 0..max pane rather than
       // the fixed 0-100 scale RSI/Stoch use.
@@ -7617,7 +7650,7 @@ function renderChart(forceEnd) {
       const oY = mkY(0, mx);
       oscSvg += seriesPath(result.line, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
       const lastVal = result.line[replayIndex - 1];
-      if (lastVal != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastVal).toFixed(0)}px; background:${inst.color}; color:#06201D; border:none;">${lastVal.toFixed(2)}${def.unit || ''}</div>`;
+      if (lastVal != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastVal).toFixed(0)}px; background:${inst.color}; color:var(--on-accent); border:none;">${lastVal.toFixed(2)}${def.unit || ''}</div>`;
     } else { // rsi: plot + smoothed MA + limit lines (configurable)
       const cf = rsiEnsure(inst);
       if (cf.shown !== false) {
@@ -7641,9 +7674,9 @@ function renderChart(forceEnd) {
         }
         if (cf.labels !== false) {
           const lastVal = result.line[replayIndex - 1];
-          if (cf.plot && lastVal != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastVal).toFixed(0)}px; background:${inst.color}; color:#06201D; border:none;">${lastVal.toFixed(1)}</div>`;
+          if (cf.plot && lastVal != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastVal).toFixed(0)}px; background:${inst.color}; color:var(--on-accent); border:none;">${lastVal.toFixed(1)}</div>`;
           const lastSm = result.smooth ? result.smooth[replayIndex - 1] : null;
-          if (cf.smooth && lastSm != null && inst.params.smoothType !== 'None') oscTagsHtml += `<div class="price-tag" style="top:${oY(lastSm).toFixed(0)}px; background:${inst.secondaryColor}; color:#06201D; border:none;">${lastSm.toFixed(1)}</div>`;
+          if (cf.smooth && lastSm != null && inst.params.smoothType !== 'None') oscTagsHtml += `<div class="price-tag" style="top:${oY(lastSm).toFixed(0)}px; background:${inst.secondaryColor}; color:var(--on-accent); border:none;">${lastSm.toFixed(1)}</div>`;
         }
       }
     }
@@ -7694,7 +7727,7 @@ function renderChart(forceEnd) {
   const lastY = yAt(lastCandle.c);
   const upNow = revealed.length > 1 ? lastCandle.c >= revealed[revealed.length-2].c : true;
   let priceLines = `<line x1="0" y1="${lastY.toFixed(1)}" x2="${W}" y2="${lastY.toFixed(1)}" stroke="${upNow ? 'var(--green)' : 'var(--red)'}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>`;
-  let axisTags = `<div class="price-tag last" style="top:${clampY(lastY).toFixed(0)}px; background:${upNow ? 'var(--green)' : 'var(--red)'}; color:#06201D; border:none;">${ccy}${fmtPrice(lastCandle.c)}</div>`;
+  let axisTags = `<div class="price-tag last" style="top:${clampY(lastY).toFixed(0)}px; background:${upNow ? 'var(--green)' : 'var(--red)'}; color:var(--on-accent); border:none;">${ccy}${fmtPrice(lastCandle.c)}</div>`;
 
   if (position) {
     // Each marker's line AND tag now share the same clamped Y — when a price (most
@@ -7718,7 +7751,7 @@ function renderChart(forceEnd) {
     if (liqPrice != null) {
       const liqY = clampY(yAt(liqPrice));
       priceLines += `<line x1="0" y1="${liqY.toFixed(1)}" x2="${W}" y2="${liqY.toFixed(1)}" stroke="#FF3B30" stroke-width="1.3" stroke-dasharray="1,3"/>`;
-      axisTags += `<div class="price-tag" style="top:${liqY.toFixed(0)}px; background:#FF3B30; color:#1a0808; border:none;">Liq. ${ccy}${liqPrice.toFixed(2)}</div>`;
+      axisTags += `<div class="price-tag" style="top:${liqY.toFixed(0)}px; background:#FF3B30; color:var(--on-red); border:none;">Liq. ${ccy}${liqPrice.toFixed(2)}</div>`;
     }
   } else if (pendingOrder) {
     const poPrice = pendingOrderPrice(pendingOrder);
@@ -7744,7 +7777,7 @@ function renderChart(forceEnd) {
   const barsBetween = (a, b) => Math.abs(b - a);
   drawings.forEach((d, di) => {
     const sel = di === selectedDrawingIndex;
-    const baseCol = d.color || (d.type === 'fib' || d.type === 'fib_ext' ? '#D9A441' : '#EEF2F6');
+    const baseCol = ((d.color === '#EEF2F6' || d.color === '#1F2D3D') ? DRAW_INK() : d.color) || (d.type === 'fib' || d.type === 'fib_ext' ? '#D9A441' : DRAW_INK());
     const baseW = d.width || 1.6;
     const col = sel ? 'var(--accent)' : baseCol;
     const sw = sel ? Math.max(baseW, 2.4) : baseW;
@@ -7818,8 +7851,8 @@ function renderChart(forceEnd) {
       drawingsLayer += `<circle cx="${x1.toFixed(2)}" cy="${y1.toFixed(2)}" r="3" fill="${mCol}"/><circle cx="${x2.toFixed(2)}" cy="${y2.toFixed(2)}" r="3" fill="${mCol}"/>`;
       const labelX = (x1+x2)/2, labelY = Math.min(y1,y2) - 8;
       drawingsLayer += `<rect x="${(labelX-52).toFixed(2)}" y="${(labelY-28).toFixed(2)}" width="104" height="26" rx="4" fill="${mCol}"/>`;
-      drawingsLayer += `<text x="${labelX.toFixed(2)}" y="${(labelY-16).toFixed(2)}" font-size="10" text-anchor="middle" fill="#06201D" font-family="var(--mono)">${diff>=0?'+':''}${fmtPrice(diff)} (${pct>=0?'+':''}${pct.toFixed(2)}%)</text>`;
-      drawingsLayer += `<text x="${labelX.toFixed(2)}" y="${(labelY-5).toFixed(2)}" font-size="9.5" text-anchor="middle" fill="#06201D" font-family="var(--mono)">${bars} bar${bars===1?'':'s'}</text>`;
+      drawingsLayer += `<text x="${labelX.toFixed(2)}" y="${(labelY-16).toFixed(2)}" font-size="10" text-anchor="middle" fill="var(--on-accent)" font-family="var(--mono)">${diff>=0?'+':''}${fmtPrice(diff)} (${pct>=0?'+':''}${pct.toFixed(2)}%)</text>`;
+      drawingsLayer += `<text x="${labelX.toFixed(2)}" y="${(labelY-5).toFixed(2)}" font-size="9.5" text-anchor="middle" fill="var(--on-accent)" font-family="var(--mono)">${bars} bar${bars===1?'':'s'}</text>`;
     } else if (d.type === 'fib' || d.type === 'fib_ext') {
       const xL = xAt(Math.min(d.i1, d.i2)), xR = xAt(Math.max(d.i1, d.i2));
       const fibCol = sel ? 'var(--accent)' : baseCol;
@@ -8727,7 +8760,7 @@ function showDrawingSettingsPopup(index, clientX, clientY) {
   drawingPopupX = clientX; drawingPopupY = clientY;
   const d = drawings[index];
   if (!d) return;
-  if (!d.color) d.color = (d.type === 'fib' || d.type === 'fib_ext') ? '#D9A441' : (d.type === 'pattern' ? '#9C6ADE' : '#EEF2F6');
+  if (!d.color) d.color = (d.type === 'fib' || d.type === 'fib_ext') ? '#D9A441' : (d.type === 'pattern' ? '#9C6ADE' : DRAW_INK());
   if (!d.width) d.width = 1.6;
   if (!d.lineStyle) d.lineStyle = (d.type === 'hline' || d.type === 'vline') ? 'dashed' : 'solid';
   renderChart();
@@ -8875,17 +8908,17 @@ function onChartClick(clientX, clientY) {
   const price = snapPrice(idx, rawPrice);
 
   if (chartTool === 'hline') {
-    drawings.push({ type: 'hline', price, color: '#EEF2F6', width: 1.6 });
+    drawings.push({ type: 'hline', price, color: DRAW_INK(), width: 1.6 });
     setChartTool('cursor');
   } else if (chartTool === 'vline') {
-    drawings.push({ type: 'vline', i: idx, color: '#EEF2F6', width: 1.6 });
+    drawings.push({ type: 'vline', i: idx, color: DRAW_INK(), width: 1.6 });
     setChartTool('cursor');
   } else if (chartTool === 'ray') {
-    drawings.push({ type: 'ray', i: idx, price, color: '#EEF2F6', width: 1.6 });
+    drawings.push({ type: 'ray', i: idx, price, color: DRAW_INK(), width: 1.6 });
     setChartTool('cursor');
   } else if (chartTool === 'text') {
     const text = window.prompt('Note text:', '');
-    if (text) drawings.push({ type: 'text', i: idx, p: price, text, color: '#EEF2F6' });
+    if (text) drawings.push({ type: 'text', i: idx, p: price, text, color: DRAW_INK() });
     setChartTool('cursor');
   } else if (chartTool === 'emoji') {
     openEmojiPicker(idx, price, clientX, clientY);
@@ -8896,7 +8929,7 @@ function onChartClick(clientX, clientY) {
     const isLong = chartTool === 'longpos';
     const target = price * (isLong ? 1.02 : 0.98);
     const stop = price * (isLong ? 0.99 : 1.01);
-    drawings.push({ type: chartTool, i: idx, barsWidth: 20, entry: price, target, stop, color: '#EEF2F6', width: 1.6 });
+    drawings.push({ type: chartTool, i: idx, barsWidth: 20, entry: price, target, stop, color: DRAW_INK(), width: 1.6 });
     setChartTool('cursor');
   } else if (chartTool === 'avwap') {
     drawings.push({ type: 'avwap', i: idx, color: '#2196F3', width: 1.8 });
@@ -8907,7 +8940,7 @@ function onChartClick(clientX, clientY) {
       renderChart();
     } else {
       const [a, b, c] = pendingTrianglePoints;
-      drawings.push({ type: 'triangle', i1: a.i, p1: a.p, i2: b.i, p2: b.p, i3: c.i, p3: c.p, color: '#EEF2F6', width: 1.6 });
+      drawings.push({ type: 'triangle', i1: a.i, p1: a.p, i2: b.i, p2: b.p, i3: c.i, p3: c.p, color: DRAW_INK(), width: 1.6 });
       pendingTrianglePoints = [];
       setChartTool('cursor');
     }
@@ -8929,7 +8962,7 @@ function onChartClick(clientX, clientY) {
       pendingDrawPoint = { i: idx, p: price };
       renderChart();
     } else {
-      const defaultColor = (chartTool === 'fib' || chartTool === 'fib_ext') ? '#D9A441' : chartTool === 'vp' ? '#9C6ADE' : '#EEF2F6';
+      const defaultColor = (chartTool === 'fib' || chartTool === 'fib_ext') ? '#D9A441' : chartTool === 'vp' ? '#9C6ADE' : DRAW_INK();
       drawings.push({ type: chartTool, i1: pendingDrawPoint.i, p1: pendingDrawPoint.p, i2: idx, p2: price, color: defaultColor, width: 1.6 });
       pendingDrawPoint = null;
       setChartTool('cursor');
@@ -9677,7 +9710,7 @@ function liveCustomRender() {
     ${rows}
     <div class="cl-actions">
       <button class="strat-chart-btn" style="margin:0" onclick="clAdd()">+ Add leg</button>
-      <button class="strat-chart-btn" style="margin:0;background:var(--accent);color:#06201D" onclick="liveCustomApply()">Apply &amp; chart</button>
+      <button class="strat-chart-btn" style="margin:0;background:var(--accent);color:var(--on-accent)" onclick="liveCustomApply()">Apply &amp; chart</button>
     </div>
     <div class="oc-meta" style="margin-top:8px"><span>“Strikes ±” counts listed strikes away from the centre strike (0 = centre, −1 = one strike lower).</span></div>
     <div class="cl-actions">
@@ -11324,7 +11357,7 @@ async function mktPulseLoad() {
   mktPulseRender(); mktStamp();
 }
 function mktSetCol(c) { MKT.col = c; mktPulseRender(); }
-function mktTint(v, scale) { const a = Math.min(1, Math.abs(v) / scale); return `rgba(${v >= 0 ? '53,214,140' : '255,93,93'},${(0.14 + a * 0.5).toFixed(2)})`; }
+function mktTint(v, scale) { const a = Math.min(1, Math.abs(v) / scale); return `color-mix(in srgb, var(${v >= 0 ? '--green' : '--red'}) ${Math.round((0.14 + a * 0.5) * 100)}%, transparent)`; }
 function mktPulseRender() {
   const cols = [['chg', 'Change'], ['fund', 'Funding'], ['oi', 'OI Δ'], ['vol', 'Volume']];
   document.getElementById('mkt-cols').innerHTML = cols.map(c => `<button class="${MKT.col === c[0] ? 'on' : ''}" onclick="mktSetCol('${c[0]}')">${c[1]}</button>`).join('');
@@ -11337,7 +11370,7 @@ function mktPulseRender() {
     if (MKT.col === 'chg') { txt = mkPct(q.chg); bg = mktTint(q.chg, 6); }
     else if (MKT.col === 'fund') { txt = q.fund == null ? '–' : q.fund.toFixed(4) + '%'; bg = q.fund == null ? 'var(--surface)' : mktTint(q.fund, 0.05); }
     else if (MKT.col === 'oi') { txt = q.oiChg == null ? '–' : mktSgn(q.oiChg); bg = q.oiChg == null ? 'var(--surface)' : mktTint(q.oiChg, 10); }
-    else { txt = '$' + mktCompact(q.turn); bg = `rgba(23,195,178,${(0.12 + 0.5 * Math.sqrt(q.turn / mx)).toFixed(2)})`; }
+    else { txt = '$' + mktCompact(q.turn); bg = `color-mix(in srgb, var(--accent) ${Math.round((0.12 + 0.5 * Math.sqrt(q.turn / mx)) * 100)}%, transparent)`; }
     return `<button class="mkt-tile${MKT.sym === s ? ' sel' : ''}" style="${span}background:${bg}" onclick="mktPick('${s}')"><b>${s.replace(/USD$/, '')}</b><span>${txt}</span></button>`;
   }).join('');
   mktSheet();
@@ -11639,7 +11672,7 @@ function rskTick() {
   if (lk) { const why = s.hitLoss ? `Daily loss limit reached (${fmtMoney(s.t.loss)} of ${fmtMoney(RSK.cfg.loss)})` : `Daily trade limit reached (${s.t.n} of ${RSK.cfg.trades})`, left = Math.max(0, Math.ceil(((RSK.st.unlockAt || 0) - Date.now()) / 1000));
     lk.innerHTML = s.mode === 'locked' ? `<div class="rsk-lb"><b>${why}.</b> New entries are locked until midnight. Exits still work.<div class="mkt-acts"><button class="mkt-btn" onclick="rskUnlock()">${RSK.cfg.wait > 0 ? 'Unlock after ' + RSK.cfg.wait + ' min wait' : 'Unlock now'}</button></div></div>` : s.mode === 'waiting' ? `<div class="rsk-lb"><b>${why}.</b> Unlocks in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}.</div>` : s.mode === 'unlocked' ? '<div class="rsk-lb" style="border-color:#F5A524">Override active. Your next trade will be tagged Override in the Journal.</div>' : ''; }
   const blocked = s.mode === 'locked' || s.mode === 'waiting'; ['btn-buy', 'btn-sell'].forEach(i => { const b = document.getElementById(i); if (b) b.style.opacity = blocked ? '.45' : ''; });
-  if (pv) { const p = RSK.cfg.pct > 0 ? rskPreview() : null; pv.innerHTML = !p ? '' : p.nosl ? 'No stop-loss set, so risk is not measured.' : `<span style="color:${p.over ? '#F5C469' : 'inherit'}">Risk if stopped: ${fmtMoney(p.risk)} (${p.pct.toFixed(2)}% of balance)${p.over ? ', over your cap' : ''}</span>`; }
+  if (pv) { const p = RSK.cfg.pct > 0 ? rskPreview() : null; pv.innerHTML = !p ? '' : p.nosl ? 'No stop-loss set, so risk is not measured.' : `<span style="color:${p.over ? 'var(--warn)' : 'inherit'}">Risk if stopped: ${fmtMoney(p.risk)} (${p.pct.toFixed(2)}% of balance)${p.over ? ', over your cap' : ''}</span>`; }
   if (RSK.tick % 5 === 0 && !RSK.edit) { rskRender(); try { homeToday(); } catch (e) { /* not ready */ } }
 }
 /* ---------- Weekly review ---------- */
@@ -11663,8 +11696,8 @@ function wkRender() {
   const oth = bad ? wt.filter(t => !tg(t).includes(bad[0])) : [], hr = {}; wt.forEach(t => { if (t.exitTime.length > 10) { const h = Math.floor(+t.exitTime.slice(11, 13) / 2) * 2, b = hr[h] || (hr[h] = { n: 0, p: 0 }); b.n++; b.p += t.pnl; } });
   const bh = Object.entries(hr).filter(([h, b]) => b.n >= 2 && b.p > 0).sort((a, b) => b[1].p / b[1].n - a[1].p / a[1].n)[0];
   el.innerHTML = head + `<div class="mkt-stats"><div>Net P&amp;L<b style="color:${net >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(net)}</b></div><div>Win rate<b>${Math.round(wins / wt.length * 100)}%</b><small>${wt.length} trades</small></div></div>
-  <div style="display:flex;gap:3px;align-items:flex-end;height:44px">${day.map(v => `<i style="flex:1;height:${Math.max(6, Math.abs(v) / mx * 100)}%;border-radius:3px 3px 0 0;background:${v === 0 ? 'var(--surface-2)' : v > 0 ? 'rgba(53,214,140,.55)' : 'rgba(255,93,93,.55)'}"></i>`).join('')}</div><div style="display:flex;gap:3px;font-size:11px;color:var(--text-faint);margin-bottom:8px">${'MTWTFSS'.split('').map(c => `<span style="flex:1;text-align:center">${c}</span>`).join('')}</div>
-  <div class="mkt-card" style="border-color:rgba(245,165,36,.4)"><div style="font-size:11px;color:#F5C469;text-transform:uppercase;letter-spacing:.04em">One habit to fix</div>${bad ? `<div style="font-size:15px;font-weight:500;margin:4px 0">${mktEsc(WK_HABIT[bad[0]] || bad[0])}</div><div class="mkt-row"><span>Trades with this tag</span><span>${bad[1].n}</span></div><div class="mkt-row"><span>Their combined result</span><span style="color:var(--red)">${fmtMoney(bad[1].p)}</span></div>${oth.length ? `<div class="mkt-row"><span>Average on your other trades</span><span>${fmtMoney(oth.reduce((a, t) => a + t.pnl, 0) / oth.length)}</span></div>` : ''}${foc && foc.tag === bad[0] ? '<div class="mkt-note">This is your focus. It shows on the Trade tab.</div>' : `<div class="mkt-acts"><button class="mkt-btn pri" onclick="wkFocus('${bad[0]}')">Make this my focus</button></div>`}` : '<p style="margin:6px 0 0;font-size:13px;color:var(--text-muted)">No clear habit yet. Tag your trades (FOMO, Moved SL and so on) and one will show here once a tag costs you money on 2 or more trades.</p>'}</div>
+  <div style="display:flex;gap:3px;align-items:flex-end;height:44px">${day.map(v => `<i style="flex:1;height:${Math.max(6, Math.abs(v) / mx * 100)}%;border-radius:3px 3px 0 0;background:${v === 0 ? 'var(--surface-2)' : v > 0 ? 'color-mix(in srgb, var(--green) 55%, transparent)' : 'color-mix(in srgb, var(--red) 55%, transparent)'}"></i>`).join('')}</div><div style="display:flex;gap:3px;font-size:11px;color:var(--text-faint);margin-bottom:8px">${'MTWTFSS'.split('').map(c => `<span style="flex:1;text-align:center">${c}</span>`).join('')}</div>
+  <div class="mkt-card" style="border-color:rgba(245,165,36,.4)"><div style="font-size:11px;color:var(--warn);text-transform:uppercase;letter-spacing:.04em">One habit to fix</div>${bad ? `<div style="font-size:15px;font-weight:500;margin:4px 0">${mktEsc(WK_HABIT[bad[0]] || bad[0])}</div><div class="mkt-row"><span>Trades with this tag</span><span>${bad[1].n}</span></div><div class="mkt-row"><span>Their combined result</span><span style="color:var(--red)">${fmtMoney(bad[1].p)}</span></div>${oth.length ? `<div class="mkt-row"><span>Average on your other trades</span><span>${fmtMoney(oth.reduce((a, t) => a + t.pnl, 0) / oth.length)}</span></div>` : ''}${foc && foc.tag === bad[0] ? '<div class="mkt-note">This is your focus. It shows on the Trade tab.</div>' : `<div class="mkt-acts"><button class="mkt-btn pri" onclick="wkFocus('${bad[0]}')">Make this my focus</button></div>`}` : '<p style="margin:6px 0 0;font-size:13px;color:var(--text-muted)">No clear habit yet. Tag your trades (FOMO, Moved SL and so on) and one will show here once a tag costs you money on 2 or more trades.</p>'}</div>
   ${good && good.n >= 2 ? `<div class="mkt-card"><div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.04em">What worked</div><div style="font-size:15px;font-weight:500;margin:4px 0">Following your plan</div><div class="mkt-row"><span>Trades with this tag</span><span>${good.n}</span></div><div class="mkt-row"><span>Their combined result</span><span style="color:${good.p >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(good.p)}</span></div>${bh ? `<div class="mkt-row"><span>Best time (exit)</span><span>${String(bh[0]).padStart(2, '0')}:00 to ${String(+bh[0] + 2).padStart(2, '0')}:00</span></div>` : ''}</div>` : ''}
   <div class="mkt-note">Based only on your own trades and tags. Not a prediction.</div>`;
 }
@@ -11743,6 +11776,31 @@ function rvSeg(s) { ['week', 'journal', 'limits'].forEach(n => { document.getEle
 function rvOpen(s) { showView('review'); rvSeg(s || 'week'); }
 wlApply(); try { homeToday(); } catch (e) { /* not ready */ }
 
+</script>
+<script>
+var TP_THEMES={dark:'#0A0D12',daylight:'#F5F7FA',navygold:'#0E1A2E'};
+function setTheme(t){
+  if(!TP_THEMES[t])t='dark';
+  document.documentElement.setAttribute('data-theme',t);
+  try{localStorage.setItem('tp-theme',t);}catch(e){}
+  var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',TP_THEMES[t]);
+  document.querySelectorAll('#theme-menu button').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-t')===t);});
+  closeThemeMenu();
+}
+function toggleThemeMenu(e){
+  if(e)e.stopPropagation();
+  var menu=document.getElementById('theme-menu'),btn=document.getElementById('theme-btn');
+  var open=menu.hasAttribute('hidden');
+  if(open)menu.removeAttribute('hidden');else menu.setAttribute('hidden','');
+  btn.setAttribute('aria-expanded',open?'true':'false');
+}
+function closeThemeMenu(){
+  var menu=document.getElementById('theme-menu'),btn=document.getElementById('theme-btn');
+  if(menu)menu.setAttribute('hidden','');if(btn)btn.setAttribute('aria-expanded','false');
+}
+document.addEventListener('click',function(e){if(!e.target.closest||!e.target.closest('.theme-wrap'))closeThemeMenu();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeThemeMenu();});
+setTheme(document.documentElement.getAttribute('data-theme')||'dark');
 </script>
 </body>
 </html>
