@@ -1265,6 +1265,12 @@
 .mkt-mm{position:relative;display:flex;gap:2px;align-items:flex-end;height:34px;margin-bottom:8px}.mkt-mm i{flex:1;background:rgba(139,108,240,.4);border-radius:2px 2px 0 0}.mkt-mm i.c{background:rgba(245,165,36,.45)}
 .mkt-mm .vw{position:absolute;top:0;bottom:0;border:1.5px solid var(--accent);border-radius:4px;background:rgba(23,195,178,.08);pointer-events:none}
 .rsk-lb{background:rgba(255,93,93,.1);border:1px solid rgba(255,93,93,.4);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;margin:6px 0}
+.hero{padding:14px 16px!important}.hero-label{margin-bottom:4px!important}.hero-value{font-size:28px!important}
+.rvrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 14px;padding:10px 14px;font-size:13px;cursor:pointer}
+.wl-ed{display:flex;gap:6px;margin-top:4px}.wl-ed button{border:1px solid var(--border);background:none;color:var(--text-muted);font:12px var(--sans);padding:3px 8px;border-radius:6px;cursor:pointer}
+.wl-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:flex;align-items:flex-end;justify-content:center}.wl-sh{background:var(--surface);border:1px solid var(--border);border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:82vh;overflow:auto;padding:16px 16px 28px}
+#wl-bar{margin-bottom:10px}
+.panel-body{overflow-x:auto}.wl-ed button{padding:2px 7px!important}
 </style>
 </head>
 <body>
@@ -1334,26 +1340,18 @@
         </div>
       </section>
 
-      <div id="home-risk" class="mkt-card" style="margin:0 0 16px"></div>
-      <div id="home-review" class="mkt-card" style="margin:0 0 16px"></div>
-      <div id="home-journal" class="mkt-card" style="margin:0 0 16px"></div>
-
-      <div class="tabs">
-        <div class="tab active">All</div>
-        <div class="tab"><span class="tab-dot" style="background:#F7931A"></span>Crypto</div>
-        <div class="tab"><span class="tab-dot" style="background:#8A5CF6"></span>Nifty</div>
-        <div class="tab"><span class="tab-dot" style="background:#3B6FE0"></span>Sensex</div>
-        <div class="tab"><span class="tab-dot" style="background:#D9A441"></span>Commodities</div>
-      </div>
+      <div id="home-today" class="mkt-card" style="margin:0 0 10px"></div>
+      <div id="home-rv" class="mkt-card rvrow" onclick="rvOpen('week')"></div>
+      <div id="wl-bar"></div>
 
       <div class="grid">
         <div class="panel">
           <div class="panel-head">
             <div class="panel-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-              My watchlist <span style="color:var(--text-faint); font-weight:400;">(5)</span> <span id="mk-status" style="font-size:11px; color:var(--text-faint); font-weight:400; margin-left:6px"></span>
+              <span id="wl-title">My watchlist</span> <span id="mk-status" style="font-size:11px; color:var(--text-faint); font-weight:400; margin-left:6px"></span>
             </div>
-            <div class="panel-action">+ Create watchlist</div>
+            <div class="panel-action" onclick="wlNewOpen()">+ New list</div>
             <button class="collapse-btn" aria-label="Collapse watchlist" onclick="togglePanel(this)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
             </button>
@@ -1399,6 +1397,12 @@
         </div>
       </div>
 
+      </div>
+
+      <div id="view-review" class="view" style="display:none">
+        <div class="mkt-head"><div class="mkt-title"><button class="mkt-chipbtn" onclick="showView('home')">‹ Home</button> Review</div></div>
+        <div class="mkt-seg"><button id="rv-b-week" class="on" onclick="rvSeg('week')">Week</button><button id="rv-b-journal" onclick="rvSeg('journal')">Journal</button><button id="rv-b-limits" onclick="rvSeg('limits')">Limits</button></div>
+        <div id="home-review" class="mkt-card"></div><div id="home-journal" class="mkt-card" style="display:none"></div><div id="home-risk" class="mkt-card" style="display:none"></div>
       </div>
 
       <div id="view-markets" class="view" style="display:none">
@@ -2249,6 +2253,7 @@ function togglePanel(btn) {
 function showView(name) {
   document.getElementById('view-home').style.display = name === 'home' ? '' : 'none';
   document.getElementById('view-markets').style.display = name === 'markets' ? '' : 'none';
+  document.getElementById('view-review').style.display = name === 'review' ? '' : 'none';
   document.getElementById('view-strategies').style.display = name === 'strategies' ? '' : 'none';
   document.getElementById('view-scanner').style.display = name === 'scanner' ? '' : 'none';
   document.getElementById('view-replay').style.display = name === 'replay' ? '' : 'none';
@@ -2256,7 +2261,8 @@ function showView(name) {
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.toggle('active', id === name || (!['strategies','scanner','replay','markets'].includes(name) && id === 'home'));
   });
-  if (name === 'home') { try { rskRender(); wkRender(); jrnRender(); } catch (e) { /* not ready */ } }
+  if (name === 'home') { try { homeToday(); wlBar(); } catch (e) { /* not ready */ } }
+  if (name === 'review') { try { rskRender(); wkRender(); jrnRender(); } catch (e) { /* not ready */ } }
   if (name === 'markets') { try { mktEnter(); } catch (e) { /* not ready */ } }
   if (name === 'scanner') { try { renderSPerf(); } catch (e) { /* not ready */ } }
   if (name === 'replay' && !replayInited) { initReplay(); replayInited = true; }
@@ -4432,12 +4438,13 @@ const watchlist = [
   { sym:"SENSEX", sub:"Index", icon:"S", color:"#3B6FE0", price:"81,324.56", chg:"+0.68%", pos:true, data:[15,16,15,17,16,18,17,19,18,19,20,21] },
 ];
 
-document.getElementById("watchlist-body").innerHTML = watchlist.map(r => `
+function renderWatchlist() {
+document.getElementById("watchlist-body").innerHTML = watchlist.map((r, i) => { if (typeof WL !== 'undefined' && WL.type !== 'all' && r.type !== WL.type) return ''; return `
   <tr ${r.live ? `class="mk-live-row" data-sym="${r.live}" onclick="mkToggleChart('${r.live}','w')"` : ''}>
     <td>
       <div class="sym-cell">
         <div class="sym-icon" style="background:${r.color}">${r.icon}</div>
-        <div><div class="sym-name">${r.sym}${r.live ? '<span class="mk-chev">▼</span>' : ''}</div><div class="sym-sub">${r.sub}</div></div>
+        <div><div class="sym-name">${r.sym}${r.live ? '<span class="mk-chev">▼</span>' : ''}</div><div class="sym-sub">${r.sub}${!r.live ? ' · demo' : ''}</div>${typeof WL !== 'undefined' && WL.edit ? `<div class="wl-ed" onclick="event.stopPropagation()"><button onclick="wlMove(${i},-1)" aria-label="Move up">▲</button><button onclick="wlMove(${i},1)" aria-label="Move down">▼</button><button style="color:var(--red)" onclick="wlRemove(${i})">Remove</button></div>` : ''}</div>
       </div>
     </td>
     <td class="num" ${r.live ? `data-mkp="${r.live}"` : ''}>${r.live ? '…' : '₹' + r.price}</td>
@@ -4445,7 +4452,9 @@ document.getElementById("watchlist-body").innerHTML = watchlist.map(r => `
     <td class="spark-cell" ${r.live ? `data-mks="${r.live}"` : ''}>${spark(r.data, r.pos ? '#35D68C':'#FF5D5D')}</td>
   </tr>
   ${r.live ? `<tr class="mk-chart-tr"><td colspan="4" style="padding:0"><div class="mk-box" id="mk-box-w-${r.live}"></div></td></tr>` : ''}
-`).join("");
+`; }).join("");
+}
+renderWatchlist();
 
 const gainers = [
   { sym:"PEPE/USDT", icon:"P", color:"#4CAF50", price:"₹0.0000123", chg:"+12.45%" },
@@ -11631,7 +11640,7 @@ function rskTick() {
     lk.innerHTML = s.mode === 'locked' ? `<div class="rsk-lb"><b>${why}.</b> New entries are locked until midnight. Exits still work.<div class="mkt-acts"><button class="mkt-btn" onclick="rskUnlock()">${RSK.cfg.wait > 0 ? 'Unlock after ' + RSK.cfg.wait + ' min wait' : 'Unlock now'}</button></div></div>` : s.mode === 'waiting' ? `<div class="rsk-lb"><b>${why}.</b> Unlocks in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}.</div>` : s.mode === 'unlocked' ? '<div class="rsk-lb" style="border-color:#F5A524">Override active. Your next trade will be tagged Override in the Journal.</div>' : ''; }
   const blocked = s.mode === 'locked' || s.mode === 'waiting'; ['btn-buy', 'btn-sell'].forEach(i => { const b = document.getElementById(i); if (b) b.style.opacity = blocked ? '.45' : ''; });
   if (pv) { const p = RSK.cfg.pct > 0 ? rskPreview() : null; pv.innerHTML = !p ? '' : p.nosl ? 'No stop-loss set, so risk is not measured.' : `<span style="color:${p.over ? '#F5C469' : 'inherit'}">Risk if stopped: ${fmtMoney(p.risk)} (${p.pct.toFixed(2)}% of balance)${p.over ? ', over your cap' : ''}</span>`; }
-  if (RSK.tick % 5 === 0 && !RSK.edit) { rskRender(); }
+  if (RSK.tick % 5 === 0 && !RSK.edit) { rskRender(); try { homeToday(); } catch (e) { /* not ready */ } }
 }
 /* ---------- Weekly review ---------- */
 const WKR = { off: 0 }, WK_HABIT = { 'Moved SL': 'Moving your stop-loss', 'FOMO': 'Chasing trades (FOMO)', 'Oversized': 'Trading too large', 'Early exit': 'Exiting too early', 'Override': 'Overriding your own limits', 'No stop': 'Trading without a stop' };
@@ -11640,7 +11649,7 @@ function wkFocus(tag) { try { localStorage.setItem(FOCUS_KEY, JSON.stringify({ t
 function wkClear() { try { localStorage.removeItem(FOCUS_KEY); } catch (e) { /* ignore */ } wkRender(); wkStrip(); }
 function wkStrip() { const el = document.getElementById('focus-strip'); if (!el) return; let f = null; try { f = JSON.parse(localStorage.getItem(FOCUS_KEY) || 'null'); } catch (e) { /* ignore */ } el.innerHTML = f ? `<div class="mkt-ban" style="margin:6px 0;display:flex;justify-content:space-between;gap:8px"><span>Focus: ${mktEsc(WK_HABIT[f.tag] || f.tag)}</span><button class="mkt-chipbtn" onclick="wkClear()">Clear</button></div>` : ''; }
 function wkRender() {
-  const el = document.getElementById('home-review'); if (!el) return; const all = jrnTrades(); if (!all.length) { el.innerHTML = ''; return; }
+  const el = document.getElementById('home-review'); if (!el) return; const all = jrnTrades(); if (!all.length) { el.innerHTML = '<p style="margin:0;font-size:13px;color:var(--text-muted)">Your weekly review appears here once you have closed trades.</p>'; return; }
   const last = all.map(t => t.exitTime.slice(0, 10)).sort().pop(), m0 = new Date(last + 'T00:00:00Z'); m0.setUTCDate(m0.getUTCDate() - (m0.getUTCDay() + 6) % 7 + 7 * WKR.off);
   const from = m0.toISOString().slice(0, 10), to = new Date(m0.getTime() + 6 * 864e5).toISOString().slice(0, 10), wt = all.filter(t => { const d = t.exitTime.slice(0, 10); return d >= from && d <= to; });
   const nav = `<div class="mkt-chips" style="margin:0"><button onclick="wkNav(-1)" aria-label="Previous week">‹</button><span style="font-size:12px">${from.slice(5)} to ${to.slice(5)}</span><button onclick="wkNav(1)" aria-label="Next week">›</button></div>`;
@@ -11662,6 +11671,77 @@ function wkRender() {
 document.addEventListener('input', () => { try { rskTick(); } catch (e) { /* not ready */ } });
 setInterval(rskTick, 1000);
 try { rskRender(); wkRender(); wkStrip(); rskTick(); } catch (e) { /* not ready */ }
+
+</script>
+<script>
+/* ---------- Home: Today card, Review entry, user-created watchlists. Instruments carry a type and a source so stocks and broker feeds can be added later. ---------- */
+const WL_KEY = 'tradepro_lists_v1', WL_MAX_LISTS = 10, WL_MAX_ITEMS = 50;
+const WL = { lists: [], active: null, edit: false, type: 'all' };
+const wlSave = () => { try { localStorage.setItem(WL_KEY, JSON.stringify({ lists: WL.lists, active: WL.active })); } catch (e) { /* storage unavailable */ } };
+const wlCur = () => WL.lists.find(l => l.id === WL.active) || WL.lists[0];
+const WL_TYPES = { crypto: 'Crypto', index: 'Indices', commodity: 'Commodities', stock: 'Stocks' };
+const WL_DEMO = [{ sym: 'NIFTY 50', type: 'index', sub: 'Index', icon: 'N', color: '#8A5CF6', price: '24,872.10', chg: '+0.72%', pos: true, data: [16, 17, 16, 17, 18, 17, 19, 18, 19, 20, 19, 21] },
+  { sym: 'SENSEX', type: 'index', sub: 'Index', icon: 'S', color: '#3B6FE0', price: '81,324.56', chg: '+0.68%', pos: true, data: [15, 16, 15, 17, 16, 18, 17, 19, 18, 19, 20, 21] },
+  { sym: 'GOLD', type: 'commodity', sub: 'Commodity', icon: 'Au', color: '#D9A441', price: '72,860', chg: '+1.45%', pos: true, data: [12, 13, 12, 14, 13, 15, 14, 16, 15, 17, 16, 18] }];
+const wlKey = r => r.live || r.sym;
+try { const s = JSON.parse(localStorage.getItem(WL_KEY) || 'null'); if (s && Array.isArray(s.lists) && s.lists.length) { WL.lists = s.lists; WL.active = s.active; } } catch (e) { /* ignore */ }
+if (!WL.lists.length) WL.lists = [{ id: 'l1', name: 'Favourites', items: watchlist.map(r => Object.assign({ type: r.live ? 'crypto' : (r.sub === 'Commodity' ? 'commodity' : 'index') }, r)) }];
+if (!WL.lists.some(l => l.id === WL.active)) WL.active = WL.lists[0].id;
+function wlApply() {
+  const l = wlCur(); watchlist.length = 0; l.items.forEach(r => watchlist.push(r)); renderWatchlist();
+  try { mkPaintCells(); mkLoadSparks(); } catch (e) { /* prices load on the next refresh */ }
+  const t = document.getElementById('wl-title'); if (t) t.innerHTML = `${mktEsc(l.name)} <span style="color:var(--text-faint);font-weight:400">(${l.items.length})</span>`; wlBar();
+}
+function wlBar() {
+  const el = document.getElementById('wl-bar'); if (!el) return; const l = wlCur(), types = Object.keys(WL_TYPES).filter(t => l.items.some(r => r.type === t));
+  el.innerHTML = `<div class="mkt-chips mkt-scroll">${WL.lists.map(x => `<button class="${x.id === l.id ? 'on' : ''}" onclick="wlSwitch('${x.id}')">${mktEsc(x.name)}</button>`).join('')}${WL.lists.length < WL_MAX_LISTS ? '<button style="border-style:dashed;color:var(--accent)" onclick="wlNewOpen()">+ New</button>' : ''}</div>
+  <div class="mkt-chips">${types.length > 1 ? ['all', ...types].map(t => `<button class="${WL.type === t ? 'on' : ''}" onclick="WL.type='${t}';wlApply()">${t === 'all' ? 'All' : WL_TYPES[t]}</button>`).join('') : ''}<button class="sp" style="color:var(--accent)" onclick="wlAddOpen()">+ Add</button><button onclick="WL.edit=!WL.edit;wlApply()">${WL.edit ? 'Done' : 'Edit'}</button><button onclick="wlMenuOpen()" aria-label="List options">⋯</button></div>`;
+}
+function wlSwitch(id) { WL.active = id; WL.type = 'all'; WL.edit = false; wlSave(); wlApply(); }
+function wlMove(i, d) { const a = wlCur().items, j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; wlSave(); wlApply(); }
+function wlRemove(i) { wlCur().items.splice(i, 1); wlSave(); wlApply(); }
+function wlSheet(html) { wlClose(); const o = document.createElement('div'); o.className = 'wl-ov'; o.id = 'wl-ov'; o.onclick = e => { if (e.target === o) wlClose(); }; o.innerHTML = `<div class="wl-sh" role="dialog">${html}</div>`; document.body.appendChild(o); }
+function wlClose() { const o = document.getElementById('wl-ov'); if (o) o.remove(); }
+function wlNewOpen() { wlSheet(`<div class="mkt-row" style="font-size:16px"><b style="font-weight:500">New list</b><button class="mkt-chipbtn" onclick="wlClose()">Close</button></div><input class="field-input" id="wl-name" style="width:100%;margin:10px 0" maxlength="24" placeholder="List name"><label style="display:flex;gap:8px;font-size:13px;margin:6px 0"><input type="radio" name="wl-from" value="empty" checked>Start empty</label><label style="display:flex;gap:8px;font-size:13px;margin:6px 0"><input type="radio" name="wl-from" value="copy">Copy of ${mktEsc(wlCur().name)}</label><div class="mkt-acts"><button class="mkt-btn pri" onclick="wlCreate()">Create list</button></div><div class="mkt-note">Up to ${WL_MAX_LISTS} lists.</div>`); }
+function wlCreate() { const n = (rskGv('wl-name') || '').trim().slice(0, 24); if (!n) return; const copy = document.querySelector('input[name=wl-from]:checked').value === 'copy', id = 'l' + Date.now(); WL.lists.push({ id, name: n, items: copy ? JSON.parse(JSON.stringify(wlCur().items)) : [] }); WL.active = id; WL.type = 'all'; wlSave(); wlClose(); wlApply(); }
+function wlMenuOpen() { const l = wlCur(); wlSheet(`<div class="mkt-row" style="font-size:16px"><b style="font-weight:500">List options</b><button class="mkt-chipbtn" onclick="wlClose()">Close</button></div><input class="field-input" id="wl-name" style="width:100%;margin:10px 0" maxlength="24" value="${mktEsc(l.name)}"><div class="mkt-acts"><button class="mkt-btn pri" onclick="wlRename()">Rename</button>${WL.lists.length > 1 ? '<button class="mkt-btn" style="color:var(--red)" onclick="wlDelete()">Delete list</button>' : ''}</div>`); }
+function wlRename() { const n = (rskGv('wl-name') || '').trim().slice(0, 24); if (n) { wlCur().name = n; wlSave(); wlClose(); wlApply(); } }
+function wlDelete() { const l = wlCur(); if (WL.lists.length < 2 || !confirm('Delete the list "' + l.name + '"?')) return; WL.lists = WL.lists.filter(x => x.id !== l.id); WL.active = WL.lists[0].id; wlSave(); wlClose(); wlApply(); }
+function wlUniverse(q) {
+  q = (q || '').toLowerCase(); const have = new Set(wlCur().items.map(wlKey)), out = [];
+  Object.keys(MK.tickers || {}).sort().forEach(k => { const b = k.replace(/USD$/, ''); if (!q || b.toLowerCase().includes(q)) out.push({ sec: 'Crypto · live', r: { sym: b + '/USD', live: k, sub: 'Perpetual', icon: b[0], color: 'hsl(' + ([...b].reduce((a, c) => a + c.charCodeAt(0), 0) * 37 % 360) + ' 50% 42%)', type: 'crypto', price: '', chg: '', pos: true, data: [1, 1, 1] } }); });
+  WL_DEMO.forEach(r => { if (!q || r.sym.toLowerCase().includes(q)) out.push({ sec: 'Indices and commodities · demo values', r }); });
+  return out.slice(0, 60).map(o => Object.assign(o, { has: have.has(wlKey(o.r)) }));
+}
+function wlAddOpen() { wlSheet(`<div class="mkt-row" style="font-size:16px"><b style="font-weight:500">Add to ${mktEsc(wlCur().name)}</b><button class="mkt-chipbtn" onclick="wlClose()">Close</button></div><input class="field-input" id="wl-q" style="width:100%;margin:10px 0" placeholder="Search instruments" oninput="wlSearch()"><div id="wl-res"></div>`); wlSearch(); }
+function wlSearch() {
+  const res = document.getElementById('wl-res'); if (!res) return; const u = wlUniverse(rskGv('wl-q')); let sec = '';
+  const empty = !Object.keys(MK.tickers || {}).length ? '<div class="mkt-note">Live crypto prices are unavailable right now, so only demo instruments are listed.</div>' : '';
+  res.innerHTML = empty + u.map((o, i) => { const h = o.sec !== sec ? `<div class="mkt-note" style="text-transform:uppercase;letter-spacing:.04em;margin:10px 0 2px">${o.sec}</div>` : ''; sec = o.sec; return h + `<div class="mkt-ev" style="padding:8px 0"><div class="n">${mktEsc(o.r.sym)}<small>${mktEsc(o.r.sub)}</small></div><button class="mkt-chipbtn" style="${o.has ? 'color:var(--accent)' : ''}" onclick="wlToggle('${mktEsc(wlKey(o.r))}')">${o.has ? 'Added' : 'Add'}</button></div>`; }).join('') + `<div class="mkt-ev" style="opacity:.6;padding:8px 0"><div class="n">Stocks<small>Coming later, once a data source is connected</small></div><span class="mkt-tag">Soon</span></div>`;
+}
+function wlToggle(key) {
+  const l = wlCur(), i = l.items.findIndex(r => wlKey(r) === key);
+  if (i >= 0) l.items.splice(i, 1); else { if (l.items.length >= WL_MAX_ITEMS) { alrToast('A list holds up to ' + WL_MAX_ITEMS + ' instruments.'); return; } const u = wlUniverse('').find(o => wlKey(o.r) === key) || wlUniverse(key.replace(/USD$/, '')).find(o => wlKey(o.r) === key); if (u) l.items.push(JSON.parse(JSON.stringify(u.r))); }
+  wlSave(); wlApply(); wlSearch();
+}
+/* ----- Today card and Review entry ----- */
+function homeToday() {
+  const el = document.getElementById('home-today'), rv = document.getElementById('home-rv'); if (!el) return;
+  const c = RSK.cfg, s = rskStatus(), any = c.loss > 0 || c.trades > 0 || c.pct > 0, cd = ms => { const m = Math.max(0, Math.round(ms / 60000)); return m >= 1440 ? Math.floor(m / 1440) + 'd ' + Math.floor(m % 1440 / 60) + 'h' : Math.floor(m / 60) + 'h ' + (m % 60) + 'm'; };
+  const n = new Date(), t0 = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); let ev = null; for (let i = 0; i < 8 && !ev; i++) ev = mktEvents(t0 + i * 864e5).find(e => e.hi && e.at > Date.now()); if (!ev) for (let i = 0; i < 8 && !ev; i++) ev = mktEvents(t0 + i * 864e5).find(e => !e.allday && e.at > Date.now());
+  let f = null; try { f = JSON.parse(localStorage.getItem(FOCUS_KEY) || 'null'); } catch (e) { /* ignore */ }
+  const pct = c.loss > 0 ? Math.min(100, s.t.loss / c.loss * 100) : 0;
+  el.innerHTML = `<div class="mkt-row" style="font-size:14px"><b style="font-weight:500">Today</b>${any ? `<span class="mkt-tag ${s.mode === 'ok' ? '' : 'hi'}">${s.mode === 'ok' ? 'Within limits' : 'Limit reached'}</span>` : ''}</div>
+  ${any ? (c.loss > 0 ? `<div class="mkt-row"><span>Daily loss</span><span>${fmtMoney(s.t.loss)} of ${fmtMoney(c.loss)}</span></div><div style="height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin-bottom:4px"><i style="display:block;height:100%;width:${pct}%;background:${pct >= 100 ? 'var(--red)' : pct >= 70 ? '#F5A524' : 'var(--green)'}"></i></div>` : '') + (c.trades > 0 ? `<div class="mkt-row"><span>Trades</span><span>${s.t.n} of ${c.trades}</span></div>` : '') : `<div class="mkt-row"><span>Risk limits</span><button class="mkt-chipbtn" style="color:var(--accent)" onclick="rvOpen('limits')">Set limits</button></div>`}
+  ${ev ? `<div class="mkt-row"><span>Next event</span><span>${mktEsc(ev.n)} · in ${cd(ev.at - Date.now())}</span></div>` : ''}${f ? `<div class="mkt-row"><span>Your focus</span><span>${mktEsc(WK_HABIT[f.tag] || f.tag)}</span></div>` : ''}`;
+  const all = jrnTrades(); if (!all.length) { rv.innerHTML = '<span style="color:var(--text-muted)">Review · trades are logged here</span><span style="color:var(--accent);white-space:nowrap">Open ›</span>'; return; }
+  const last = all.map(t => t.exitTime.slice(0, 10)).sort().pop(), m0 = new Date(last + 'T00:00:00Z'); m0.setUTCDate(m0.getUTCDate() - (m0.getUTCDay() + 6) % 7);
+  const a = m0.toISOString().slice(0, 10), b = new Date(m0.getTime() + 6 * 864e5).toISOString().slice(0, 10), w = all.filter(t => { const d = t.exitTime.slice(0, 10); return d >= a && d <= b; }), net = w.reduce((x, t) => x + t.pnl, 0);
+  rv.innerHTML = `<span><b style="font-weight:500;color:${net >= 0 ? 'var(--green)' : 'var(--red)'}">This week ${fmtMoney(net)}</b> · ${w.length} trades · ${Math.round(w.filter(t => t.pnl >= 0).length / w.length * 100)}% win</span><span style="color:var(--accent);white-space:nowrap">Review ›</span>`;
+}
+function rvSeg(s) { ['week', 'journal', 'limits'].forEach(n => { document.getElementById('rv-b-' + n).classList.toggle('on', n === s); document.getElementById({ week: 'home-review', journal: 'home-journal', limits: 'home-risk' }[n]).style.display = n === s ? '' : 'none'; }); }
+function rvOpen(s) { showView('review'); rvSeg(s || 'week'); }
+wlApply(); try { homeToday(); } catch (e) { /* not ready */ }
 
 </script>
 </body>
