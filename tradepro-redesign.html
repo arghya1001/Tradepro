@@ -1256,6 +1256,9 @@
 .jrn-cal button{aspect-ratio:1;border:0;border-radius:5px;color:var(--text);font:11px var(--mono);cursor:pointer}.jrn-cal button:disabled{color:var(--text-faint);cursor:default}.jrn-cal button.sel{outline:2px solid var(--accent)}
 .jrn-tr{border-top:1px solid var(--border)}.jrn-tr>button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;border:0;background:none;color:var(--text);padding:10px 0;font:13px var(--sans);text-align:left;cursor:pointer}
 .jrn-tr b{font-weight:500}.jrn-tr small{display:block;font:12px var(--sans);color:var(--text-muted)}.jrn-det{padding:0 0 12px}
+.mkt-seg button{font-size:12px!important}
+.alr-f{display:grid;grid-template-columns:1fr 1fr;gap:8px}.alr-f select,.alr-f input{width:100%;box-sizing:border-box;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:11px 10px;font:14px var(--sans)}
+.mkt-chipbtn{border:1px solid var(--border);background:none;color:var(--text-muted);font:12px var(--sans);padding:6px 10px;border-radius:8px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -1392,7 +1395,7 @@
 
       <div id="view-markets" class="view" style="display:none">
         <div class="mkt-head"><div class="mkt-title">Markets</div><div class="mkt-stamp" id="mkt-stamp"><i></i>Loading</div></div>
-        <div class="mkt-seg"><button id="mkt-b-pulse" class="on" onclick="mktSeg('pulse')">Pulse</button><button id="mkt-b-options" onclick="mktSeg('options')">Options</button><button id="mkt-b-calendar" onclick="mktSeg('calendar')">Calendar</button></div>
+        <div class="mkt-seg"><button id="mkt-b-pulse" class="on" onclick="mktSeg('pulse')">Pulse</button><button id="mkt-b-options" onclick="mktSeg('options')">Options</button><button id="mkt-b-calendar" onclick="mktSeg('calendar')">Calendar</button><button id="mkt-b-alerts" onclick="mktSeg('alerts')">Alerts</button></div>
         <div id="mkt-pulse">
           <div class="mkt-chips" id="mkt-cols"></div>
           <div class="mkt-heat" id="mkt-heat"></div>
@@ -1400,6 +1403,7 @@
         </div>
         <div id="mkt-options" style="display:none"><div id="mkt-opt"></div></div>
         <div id="mkt-calendar" style="display:none"><div id="mkt-cal"></div></div>
+        <div id="mkt-alerts" style="display:none"><div id="mkt-alr"></div></div>
       </div>
 
       <div id="view-strategies" class="view" style="display:none">
@@ -11259,6 +11263,7 @@ const MKT_HOLIDAYS = [
   { d: '2026-11-27', n: 'US early close', mk: 'US markets, 1 pm ET', kind: 'special' },
   { d: '2026-12-25', n: 'Christmas', mk: 'NSE, BSE, MCX, US closed' }
 ];
+const MKT_CS = { BTC: 0.001, ETH: 0.01 }; // option contract size in the underlying (approximate)
 const mktFmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-US');
 const mktCompact = n => n >= 1e9 ? (n / 1e9).toFixed(1) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(0) + 'K' : String(Math.round(n));
 const mktSgn = (v, d) => (v >= 0 ? '+' : '') + v.toFixed(d == null ? 1 : d) + '%';
@@ -11266,7 +11271,7 @@ function mktAge(t) { return t ? Math.max(0, Math.round((Date.now() - t) / 1000))
 function mktStamp() {
   const el = document.getElementById('mkt-stamp'); if (!el) return;
   const t = MKT.seg === 'options' ? MKT.oat : MKT.seg === 'pulse' ? MKT.ptAt : 0, a = mktAge(t);
-  if (MKT.seg === 'calendar') { el.className = 'mkt-stamp'; el.innerHTML = 'Times in IST'; return; }
+  if (MKT.seg === 'calendar' || MKT.seg === 'alerts') { el.className = 'mkt-stamp'; el.innerHTML = MKT.seg === 'alerts' ? 'Checks every 30s' : 'Times in IST'; return; }
   el.className = 'mkt-stamp' + (a == null || a > 60 ? ' stale' : '');
   el.innerHTML = a == null ? '<i></i>Loading' : '<i></i>' + (a > 60 ? 'Stale · ' : 'Live · ') + a + 's ago';
 }
@@ -11281,16 +11286,20 @@ function mktTick() {
 }
 function mktSeg(name) {
   MKT.seg = name;
-  ['pulse', 'options', 'calendar'].forEach(n => { document.getElementById('mkt-' + n).style.display = n === name ? '' : 'none'; document.getElementById('mkt-b-' + n).classList.toggle('on', n === name); });
-  if (name === 'pulse') { mktPulseRender(); mktPulseLoad(); } else if (name === 'options') { mktOptRender(); mktOptLoad(); } else mktCalRender();
+  ['pulse', 'options', 'calendar', 'alerts'].forEach(n => { document.getElementById('mkt-' + n).style.display = n === name ? '' : 'none'; document.getElementById('mkt-b-' + n).classList.toggle('on', n === name); });
+  if (name === 'pulse') { mktPulseRender(); mktPulseLoad(); } else if (name === 'options') { mktOptRender(); mktOptLoad(); } else if (name === 'alerts') { alrRender(); mktPulseLoad(); } else mktCalRender();
   mktStamp();
 }
 /* ----- Pulse ----- */
 async function mktPulseLoad() {
   try {
     const json = await liveFetchJson('/v2/tickers?contract_types=perpetual_futures'), out = {};
-    (json.result || []).forEach(t => { if (!t || !/^[A-Z0-9]+USD$/.test(t.symbol || '')) return; const q = mkParseTicker(t); if (q.price == null) return; q.fund = liveNum(t.funding_rate); q.turn = q.turnover || 0; out[t.symbol] = q; });
+    (json.result || []).forEach(t => { if (!t || !/^[A-Z0-9]+USD$/.test(t.symbol || '')) return; const q = mkParseTicker(t); if (q.price == null) return; q.fund = liveNum(t.funding_rate); q.turn = q.turnover || 0; q.oi = liveNum(t.oi_contracts); q.oiUsd = liveNum(t.oi_value_usd); out[t.symbol] = q; });
     if (!Object.keys(out).length) throw new Error('no tickers');
+    const nw = Date.now(), dd = new Date(nw); let ss = Date.UTC(dd.getUTCFullYear(), dd.getUTCMonth(), dd.getUTCDate(), 12); if (ss > nw) ss -= 86400000;
+    let pb = null; try { pb = JSON.parse(localStorage.getItem('tradepro_perp_oi_base_v1') || 'null'); } catch (e) { /* ignore */ }
+    if (!pb || pb.ss !== ss) { pb = { ss, raw: {} }; Object.entries(out).forEach(([k, q]) => { if (q.oi) pb.raw[k] = q.oi; }); try { localStorage.setItem('tradepro_perp_oi_base_v1', JSON.stringify(pb)); } catch (e) { /* ignore */ } }
+    Object.entries(out).forEach(([k, q]) => { q.oiChg = q.oi && pb.raw[k] ? (q.oi - pb.raw[k]) / pb.raw[k] * 100 : null; });
     MKT.pt = out; MKT.ptAt = Date.now(); MKT.ptErr = null;
   } catch (e) { MKT.ptErr = true; }
   mktPulseRender(); mktStamp();
@@ -11298,7 +11307,7 @@ async function mktPulseLoad() {
 function mktSetCol(c) { MKT.col = c; mktPulseRender(); }
 function mktTint(v, scale) { const a = Math.min(1, Math.abs(v) / scale); return `rgba(${v >= 0 ? '53,214,140' : '255,93,93'},${(0.14 + a * 0.5).toFixed(2)})`; }
 function mktPulseRender() {
-  const cols = [['chg', 'Change'], ['fund', 'Funding'], ['vol', 'Volume']];
+  const cols = [['chg', 'Change'], ['fund', 'Funding'], ['oi', 'OI Δ'], ['vol', 'Volume']];
   document.getElementById('mkt-cols').innerHTML = cols.map(c => `<button class="${MKT.col === c[0] ? 'on' : ''}" onclick="mktSetCol('${c[0]}')">${c[1]}</button>`).join('');
   const el = document.getElementById('mkt-heat'), rows = Object.entries(MKT.pt).filter(([s, q]) => q.turn >= 50000 && q.chg != null).sort((a, b) => b[1].turn - a[1].turn).slice(0, 17);
   if (!rows.length) { el.innerHTML = `<div class="mkt-empty">${MKT.ptErr ? 'Live prices are unavailable. Check your connection.<br><br><button class="mkt-btn" style="flex:none" onclick="mktPulseLoad()">Retry</button>' : 'Loading prices…'}</div>`; mktSheet(); return; }
@@ -11308,6 +11317,7 @@ function mktPulseRender() {
     let txt, bg;
     if (MKT.col === 'chg') { txt = mkPct(q.chg); bg = mktTint(q.chg, 6); }
     else if (MKT.col === 'fund') { txt = q.fund == null ? '–' : q.fund.toFixed(4) + '%'; bg = q.fund == null ? 'var(--surface)' : mktTint(q.fund, 0.05); }
+    else if (MKT.col === 'oi') { txt = q.oiChg == null ? '–' : mktSgn(q.oiChg); bg = q.oiChg == null ? 'var(--surface)' : mktTint(q.oiChg, 10); }
     else { txt = '$' + mktCompact(q.turn); bg = `rgba(23,195,178,${(0.12 + 0.5 * Math.sqrt(q.turn / mx)).toFixed(2)})`; }
     return `<button class="mkt-tile${MKT.sym === s ? ' sel' : ''}" style="${span}background:${bg}" onclick="mktPick('${s}')"><b>${s.replace(/USD$/, '')}</b><span>${txt}</span></button>`;
   }).join('');
@@ -11320,8 +11330,9 @@ function mktSheet() {
   el.innerHTML = `<div class="mkt-card"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">${MKT.sym.replace(/USD$/, '')}/USD</b><b style="font-weight:500">${mkUsd(q.price)}</b></div>
   <div class="mkt-row"><span>24h change</span><span style="color:${q.chg >= 0 ? 'var(--green)' : 'var(--red)'}">${mkPct(q.chg)}</span></div>
   <div class="mkt-row"><span>Funding</span><span>${q.fund == null ? '–' : q.fund.toFixed(4) + '%'}</span></div>
+  <div class="mkt-row"><span>OI change</span><span>${q.oiChg == null ? '–' : mktSgn(q.oiChg)}</span></div>${q.oiUsd ? `<div class="mkt-row"><span>Open interest</span><span>$${mktCompact(q.oiUsd)}</span></div>` : ''}
   <div class="mkt-row"><span>24h volume</span><span>$${mktCompact(q.turn)}</span></div>
-  <div class="mkt-acts"><button class="mkt-btn pri" onclick="mkPractice('${MKT.sym}')">Open in Trade</button></div></div>`;
+  <div class="mkt-acts"><button class="mkt-btn pri" onclick="mkPractice('${MKT.sym}')">Open in Trade</button><button class="mkt-btn" onclick="alrPrefill('${MKT.sym}')">Set alert</button></div></div>`;
 }
 /* ----- Options: shares the 17:30 IST baseline with the chart OI layer, so both show the same numbers ----- */
 async function mktOptLoad() {
@@ -11368,16 +11379,16 @@ function mktOptRender() {
   const top = (arr, f) => arr.length ? arr.reduce((m, r) => r[f] > m[f] ? r : m) : null, cw = spot ? top(all.filter(r => r.k >= spot), 'C') : null, pw = spot ? top(all.filter(r => r.k < spot), 'P') : null;
   const rd = [];
   if (pcr != null) rd.push(`<b>PCR ${pcr.toFixed(2)} (${lbl.toLowerCase()}).</b> ` + (lbl === 'Put-heavy' ? 'More put OI than call OI. Often read as hedging, or put writers defending support, which leans supportive. Very high readings can also mean fear.' : lbl === 'Call-heavy' ? 'More call OI than put OI. Can mean call writers capping the upside, or a crowd leaning long. Very low readings can signal over-optimism.' : 'Put and call OI are close, so positioning shows no clear lean.'));
-  if (addC + addP > 0) rd.push(`<b>Since 17:30 IST,</b> ${addP > addC * 1.2 ? 'puts are being added faster' : addC > addP * 1.2 ? 'calls are being added faster' : 'puts and calls are being added at a similar pace'} (new put OI +${mktFmt(addP)}, new call OI +${mktFmt(addC)}).`);
+  if (addC + addP > 0) rd.push(`<b>Since the 17:30 IST baseline,</b> ${addP > addC * 1.2 ? 'puts are being added faster' : addC > addP * 1.2 ? 'calls are being added faster' : 'puts and calls are being added at a similar pace'} (new put OI +${mktFmt(addP)}, new call OI +${mktFmt(addC)}).`);
   if (cw || pw) rd.push(`<b>Walls.</b> ${cw ? `Largest call OI above spot: ${mktFmt(cw.k)}, a possible resistance zone.` : ''} ${pw ? `Largest put OI below spot: ${mktFmt(pw.k)}, a possible support zone.` : ''}`);
   if (!ALL && mp != null && spot) { const g = (spot - mp) / mp * 100; rd.push(`<b>Max pain ${mktFmt(mp)}.</b> Spot is ${Math.abs(g).toFixed(1)}% ${g >= 0 ? 'above' : 'below'} it. Price sometimes drifts toward max pain near expiry, but the effect is weak.`); }
   const read = rd.length ? `<div class="mkt-card mkt-read"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">Reading the data</b></div>${rd.map(x => `<p>${x}</p>`).join('')}<p class="mkt-disc">Rule-of-thumb reading of open interest, not financial advice or a trade signal. OI shows positions, not who is long or short, and crypto behaves differently from index options. Use it alongside your own analysis.</p></div>` : '';
   el.innerHTML = head + `</div><div class="mkt-chips mkt-scroll"><button class="${ALL ? 'on' : ''}" onclick="mktExp('ALL')">All</button>` + exps.map(e => `<button class="${e === MKT.exp ? 'on' : ''}" onclick="mktExp('${e}')">${liveExpLabel(e).slice(0, 6)}</button>`).join('') + `</div>
-  <div class="mkt-stats"><div>Call OI<b>${mktFmt(tc)}</b>${chg(tc, btc)}</div><div>Put OI<b>${mktFmt(tp)}</b>${chg(tp, btp)}</div><div>PCR<b>${pcr == null ? '–' : pcr.toFixed(2)}</b><small>${lbl}</small></div><div>Max pain<b>${ALL ? 'Per expiry' : mp == null ? '–' : mktFmt(mp)}</b></div></div>
+  <div class="mkt-stats"><div>Call OI<b>${mktFmt(tc)}</b>${chg(tc, btc)}</div><div>Put OI<b>${mktFmt(tp)}</b>${chg(tp, btp)}</div><div>PCR<b>${pcr == null ? '–' : pcr.toFixed(2)}</b><small>${lbl}</small></div><div>Max pain<b>${ALL ? 'Per expiry' : mp == null ? '–' : mktFmt(mp)}</b></div><div>Total OI value<b>${spot ? '≈ $' + mktCompact((tc + tp) * MKT_CS[MKT.und] * spot) : '–'}</b><small>${mktFmt(tc + tp)} contracts</small></div></div>
   <div class="mkt-ladder-h"><span style="text-align:right">Puts</span><span style="text-align:center">Strike</span><span>Calls</span></div>
   ${shown.map(r => `<button class="mkt-oirow${r === all[ai] ? ' atm' : ''}${MKT.strike === r.k ? ' sel' : ''}" onclick="mktStrike(${r.k})">${bar(r.P, r.bP, 'g', 'l')}<span class="k">${mktFmt(r.k)}</span>${bar(r.C, r.bC, 'r', 'r')}</button>`).join('')}
   <div class="mkt-leg"><span><i style="background:${OI_SH.g.base}59"></i>Existing OI</span><span><i style="background:${OI_SH.g.add};border:1px solid ${OI_SH.g.edge}"></i>New buildup</span><span><i style="border:1px dashed ${OI_SH.g.edge}"></i>Unwinding</span></div>
-  <div class="mkt-note">Violet = puts, amber = calls. Change is measured since 17:30 IST. Spot ${spot ? mktFmt(spot) : '–'}.</div>
+  <div class="mkt-note">Violet = puts, amber = calls. Change is measured from your first load after 17:30 IST, stored on this device. Value is contracts × contract size × spot, approximate. Spot ${spot ? mktFmt(spot) : '–'}.</div>
   ${sr ? `<div class="mkt-card"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">${mktFmt(sr.k)} strike</b><span>${ALL ? 'All expiries' : liveExpLabel(MKT.exp)}</span></div>
   <div class="mkt-row"><span>Call OI</span><span>${mktFmt(sr.C)} ${chg(sr.C, sr.bC)}</span></div><div class="mkt-row"><span>Put OI</span><span>${mktFmt(sr.P)} ${chg(sr.P, sr.bP)}</span></div>
   <div class="mkt-acts"><button class="mkt-btn pri" onclick="mktShowOnChart()">Show on ${MKT.und} chart</button></div>
@@ -11467,6 +11478,78 @@ function jrnRender() {
 }
 document.addEventListener('DOMContentLoaded', () => { try { jrnRender(); } catch (e) { /* fine */ } });
 try { jrnRender(); } catch (e) { /* fine */ }
+
+</script>
+<script>
+/* ---------- Alerts: price, funding and PCR. Checked every 30s while the app is open (no server, so no background push) ---------- */
+const ALR_KEY = 'tradepro_alerts_v1';
+const ALR = { list: [], draft: { type: 'price', sym: 'BTCUSD', op: '>', val: '' }, busy: false, opt: {} };
+try { ALR.list = JSON.parse(localStorage.getItem(ALR_KEY) || '[]') || []; } catch (e) { /* storage unavailable */ }
+const alrSave = () => { try { localStorage.setItem(ALR_KEY, JSON.stringify(ALR.list)); } catch (e) { /* storage unavailable */ } };
+const alrName = a => a.sym.replace(/USD$/, '');
+const alrWall = a => a.type === 'callwall' || a.type === 'putwall';
+const alrLabel = a => alrName(a) + (a.type === 'price' ? ' price' : a.type === 'funding' ? ' funding' : a.type === 'callwall' ? ' call wall' : a.type === 'putwall' ? ' put wall' : ' PCR (all expiries)');
+const alrFmt = (a, v) => v == null ? '–' : alrWall(a) ? mktFmt(v) : a.type === 'price' ? mkUsd(v) : a.type === 'funding' ? v.toFixed(4) + '%' : v.toFixed(2);
+function alrCur(a) { if (a.type === 'pcr') return (ALR.opt[a.sym] || {}).pcr; const q = MKT.pt[a.sym]; return q && mktAge(MKT.ptAt) < 90 ? (a.type === 'price' ? q.price : q.fund) : null; }
+function alrSync() { const g = id => { const e = document.getElementById(id); return e ? e.value : null; }; ALR.draft = { type: g('alr-type') || 'price', sym: g('alr-sym') || ALR.draft.sym, op: g('alr-op') || '>', val: g('alr-val') || '' }; }
+function alrType() { alrSync(); ALR.draft.sym = ['pcr', 'callwall', 'putwall'].includes(ALR.draft.type) ? 'BTC' : 'BTCUSD'; alrRender(); }
+function alrPrefill(sym) { const q = MKT.pt[sym]; ALR.draft = { type: 'price', sym, op: '>', val: q ? String(q.price) : '' }; mktSeg('alerts'); }
+function alrAdd() {
+  alrSync(); const d = ALR.draft, v = parseFloat(d.val);
+  if (d.type === 'callwall' || d.type === 'putwall') { ALR.list.unshift({ id: Date.now(), type: d.type, sym: d.sym, on: true, hit: null, base: null }); alrSave(); alrRender(); alrCheck(); return; }
+  if (!isFinite(v)) { alrToast('Enter a number for the alert level.'); return; }
+  ALR.list.unshift({ id: Date.now(), type: d.type, sym: d.sym, op: d.op, val: v, on: true, hit: null }); ALR.draft.val = ''; alrSave(); alrRender(); alrCheck();
+}
+function alrDel(id) { ALR.list = ALR.list.filter(a => a.id !== id); alrSave(); alrRender(); }
+function alrRearm(id) { const a = ALR.list.find(x => x.id === id); if (a) { a.hit = null; a.base = null; alrSave(); alrRender(); alrCheck(); } }
+function alrToast(msg) {
+  const t = document.createElement('div'); t.textContent = msg; t.setAttribute('role', 'status');
+  t.style.cssText = 'position:fixed;left:16px;right:16px;bottom:90px;z-index:9999;background:var(--surface-2);color:var(--text);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;font:14px var(--sans);box-shadow:0 8px 24px rgba(0,0,0,.4);cursor:pointer';
+  t.onclick = () => t.remove(); document.body.appendChild(t); setTimeout(() => t.remove(), 9000);
+}
+function alrFire(a, c) {
+  const msg = alrWall(a) ? `${alrLabel(a)} moved from ${mktFmt(a.base)} to ${mktFmt(c)}` : `${alrLabel(a)} ${a.op === '>' ? 'rose above' : 'fell below'} ${alrFmt(a, a.val)} (now ${alrFmt(a, c)})`;
+  alrToast(msg);
+  try { if ('Notification' in window && Notification.permission === 'granted') new Notification('TradePro alert', { body: msg }); } catch (e) { /* not supported */ }
+  try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { /* not supported */ }
+}
+async function alrOpt(u) {
+  const json = await liveFetchJson('/v2/tickers?contract_types=call_options,put_options&underlying_asset_symbols=' + u), t = new Date().toISOString().slice(0, 10), rows = []; let c = 0, p = 0, spot = null, near = null;
+  (json.result || []).forEach(x => { const o = liveParseOptSymbol(x && x.symbol); if (!o || o.und !== u || o.exp < t) return; const v = liveNum(x.oi_contracts != null ? x.oi_contracts : x.oi) || 0, sp = liveNum(x.spot_price); if (sp) spot = sp; if (o.type === 'C') c += v; else p += v; rows.push({ e: o.exp, k: +o.strike, t: o.type, v }); if (!near || o.exp < near) near = o.exp; });
+  const best = (ty, f) => { let m = null; rows.forEach(r => { if (r.e === near && r.t === ty && f(r.k) && (!m || r.v > m.v)) m = r; }); return m ? m.k : null; };
+  return { pcr: c ? p / c : null, cw: spot ? best('C', k => k >= spot) : null, pw: spot ? best('P', k => k < spot) : null };
+}
+async function alrCheck() {
+  const act = ALR.list.filter(a => a.on && !a.hit); if (!act.length || ALR.busy) return; ALR.busy = true;
+  try {
+    if (act.some(a => a.type === 'price' || a.type === 'funding')) await mktPulseLoad();
+    for (const u of new Set(act.filter(a => a.type === 'pcr' || alrWall(a)).map(a => a.sym))) ALR.opt[u] = await alrOpt(u);
+  } catch (e) { /* try again next tick */ }
+  ALR.busy = false;
+  act.forEach(a => {
+    if (alrWall(a)) { const w = ALR.opt[a.sym], c = w && (a.type === 'callwall' ? w.cw : w.pw); if (c == null) return; if (a.base == null) { a.base = c; return; } if (c !== a.base) { a.hit = Date.now(); a.at = c; alrFire(a, c); } return; }
+    const c = alrCur(a); if (c == null) return; if (a.op === '>' ? c >= a.val : c <= a.val) { a.hit = Date.now(); a.at = c; alrFire(a, c); }
+  });
+  alrSave(); if (MKT.seg === 'alerts') alrRender();
+}
+function alrRender() {
+  const el = document.getElementById('mkt-alr'); if (!el) return; const d = ALR.draft;
+  const optT = ['pcr', 'callwall', 'putwall'].includes(d.type), wallT = d.type === 'callwall' || d.type === 'putwall';
+  const syms = optT ? ['BTC', 'ETH'] : (Object.keys(MKT.pt).length ? Object.entries(MKT.pt).sort((a, b) => b[1].turn - a[1].turn).slice(0, 25).map(x => x[0]) : ['BTCUSD', 'ETHUSD']);
+  if (!syms.includes(d.sym)) syms.unshift(d.sym);
+  const canNote = 'Notification' in window && Notification.permission === 'default';
+  const rows = ALR.list.map(a => `<div class="mkt-ev"><div class="n">${alrWall(a) ? mktEsc(alrLabel(a)) + ' moves' : mktEsc(alrLabel(a)) + (a.op === '>' ? ' above ' : ' below ') + alrFmt(a, a.val)}<small>${a.hit ? (alrWall(a) ? 'Moved from ' + mktFmt(a.base) + ' to ' + mktFmt(a.at) + ' · ' : 'Triggered at ' + alrFmt(a, a.at) + ' · ') + new Date(a.hit).toLocaleString() : alrWall(a) ? (a.base == null ? 'Reading the current wall…' : 'Watching ' + mktFmt(a.base)) : 'Now ' + alrFmt(a, alrCur(a))}</small></div><span class="mkt-tag ${a.hit ? 'hol' : ''}">${a.hit ? 'Hit' : 'Active'}</span>${a.hit ? `<button class="mkt-chipbtn" onclick="alrRearm(${a.id})">Re-arm</button>` : ''}<button class="mkt-chipbtn" aria-label="Delete alert" onclick="alrDel(${a.id})">Delete</button></div>`).join('');
+  el.innerHTML = `<div class="mkt-card" style="margin-top:0"><div class="alr-f">
+    <select id="alr-type" aria-label="Alert type" onchange="alrType()"><option value="price"${d.type === 'price' ? ' selected' : ''}>Price</option><option value="funding"${d.type === 'funding' ? ' selected' : ''}>Funding %</option><option value="pcr"${d.type === 'pcr' ? ' selected' : ''}>PCR</option><option value="callwall"${d.type === 'callwall' ? ' selected' : ''}>Call wall moves</option><option value="putwall"${d.type === 'putwall' ? ' selected' : ''}>Put wall moves</option></select>
+    <select id="alr-sym" aria-label="Instrument" onchange="alrSync()">${syms.map(s => `<option value="${s}"${s === d.sym ? ' selected' : ''}>${s.replace(/USD$/, '')}</option>`).join('')}</select>
+    ${wallT ? '<div style="grid-column:1/-1;font-size:12px;color:var(--text-muted)">Alerts when the strike with the most OI (nearest expiry, above spot for calls, below for puts) changes.</div>' : `<select id="alr-op" aria-label="Condition" onchange="alrSync()"><option value=">"${d.op === '>' ? ' selected' : ''}>Rises above</option><option value="<"${d.op === '<' ? ' selected' : ''}>Falls below</option></select>
+    <input id="alr-val" inputmode="decimal" placeholder="Level" value="${mktEsc(d.val)}" onchange="alrSync()">`}</div>
+    <div class="mkt-acts"><button class="mkt-btn pri" onclick="alrAdd()">Add alert</button>${canNote ? '<button class="mkt-btn" onclick="Notification.requestPermission().then(alrRender)">Enable notifications</button>' : ''}</div></div>
+  ${rows || '<div class="mkt-empty">No alerts yet. Add one above, or tap a tile in Pulse and choose Set alert.</div>'}
+  <div class="mkt-note">Alerts are checked every 30 seconds, only while TradePro is open in a browser tab. Phones may pause background tabs, so don't rely on this for time-critical exits. Use stop-losses for that.</div>`;
+}
+setInterval(alrCheck, 30000); setTimeout(alrCheck, 4000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) alrCheck(); });
 
 </script>
 </body>
