@@ -1,122 +1,73 @@
 #!/usr/bin/env python3
-"""Daily candles for Nifty 50, Bank Nifty and the Nifty 500 stocks -> JSON files in OUT_DIR
+"""Daily candles for Nifty 50, Bank Nifty and the Nifty 500 stocks, built from NSE's OFFICIAL daily files.
 
-Source of candles : Yahoo Finance chart API (free, unofficial)
-Source of truth   : NSE official end-of-day files (index close + equity bhavcopy)
-A symbol's file is only overwritten when its latest close agrees with NSE's official
-close (tolerance TOL). If NSE can't be reached, files are still written but marked
-unverified in data/meta.json. Standard library only.
+  stocks : sec_bhavdata_full_DDMMYYYY.csv   (open/high/low/close/volume + previous close)
+  indices: ind_close_all_DDMMYYYY.csv       (open/high/low/close)
+
+First run builds about 5 years of history; every later run only adds the new trading days.
+Stock splits / bonus issues are detected from NSE's own "previous close" and old prices are
+adjusted so charts stay continuous. Standard library only.
+Output (in OUT_DIR): <SYMBOL>_1d.json (latest 500 candles), <SYMBOL>_5y.json (everything),
+nifty500.json (symbol list), meta.json.
 """
-import csv, io, json, os, sys, time, urllib.request, urllib.parse
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import csv, io, json, os, sys, time, urllib.error, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 OUT = os.environ.get("OUT_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
-TOL = 0.003            # 0.3 % allowed difference vs NSE official close
-MIN_CANDLES = 60          # recent IPOs in the Nifty 500 have short histories
-SCAN_BARS = 500           # the scanner file keeps the latest 500 candles (small + fast); the 5-year file has everything
 IST = timezone(timedelta(hours=5, minutes=30))
+HISTORY_DAYS = 1830       # about 5 years
+SCAN_BARS = 500           # the scanner file keeps the latest 500 candles (small + fast)
+SPLIT_TOL = 0.005         # previous-close differing from our last close by more than 0.5 % = corporate action
+WORKERS = 10
+INDICES = {"nifty 50": "NIFTY", "nifty bank": "BANKNIFTY"}   # NSE index name (lower case) -> app symbol
 
-# Used only if NSE's Nifty 500 list can't be downloaded AND there is no previous nifty500.json (first run).
-FALLBACK = ("ADANIENT ADANIPORTS APOLLOHOSP ASIANPAINT AXISBANK BAJAJ-AUTO BAJFINANCE BAJAJFINSV BEL BHARTIARTL "
-            "CIPLA COALINDIA DRREDDY EICHERMOT ETERNAL GRASIM HCLTECH HDFCBANK HDFCLIFE HINDALCO HINDUNILVR "
-            "ICICIBANK INDIGO INFY ITC JIOFIN JSWSTEEL KOTAKBANK LT M&M MARUTI NESTLEIND NTPC ONGC POWERGRID "
-            "RELIANCE SBILIFE SBIN SHRIRAMFIN SUNPHARMA TATACONSUM TATASTEEL TCS TECHM TITAN TRENT ULTRACEMCO WIPRO").split()
+EQ_URLS = ["https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_%s.csv",
+           "https://archives.nseindia.com/products/content/sec_bhavdata_full_%s.csv"]
+IDX_URLS = ["https://archives.nseindia.com/content/indices/ind_close_all_%s.csv",
+            "https://nsearchives.nseindia.com/content/indices/ind_close_all_%s.csv"]
+LIST_URL = "https://archives.nseindia.com/content/indices/ind_nifty500list.csv"
 
-INDICES = {  # app symbol -> (yahoo symbol, NSE official index name)
-    "NIFTY": ("^NSEI", "Nifty 50"),
-    "BANKNIFTY": ("^NSEBANK", "Nifty Bank"),
-}
-
-def get(url, tries=3, headers=None):
+def fetch(url, tries=4):
+    """bytes, or None if the file doesn't exist (HTTP 404 = holiday / not published yet). Other errors raise."""
     last = None
     for k in range(tries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*", **(headers or {})})
-            with urllib.request.urlopen(req, timeout=20) as r:
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
+            with urllib.request.urlopen(req, timeout=40) as r:
                 return r.read()
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return None
+            last = e
         except Exception as e:           # noqa: BLE001
             last = e
-            time.sleep(1.5 * (k + 1))
-    raise RuntimeError(f"{url}: {last}")
+        time.sleep(2 * (k + 1))
+    raise RuntimeError("%s: %s" % (url, last))
+
+def fetch_any(urls, d):
+    """Try each mirror; None only if every mirror says 404."""
+    err = None
+    for u in urls:
+        try:
+            b = fetch(u % d)
+            if b is not None:
+                return b
+        except Exception as e:           # noqa: BLE001
+            err = e
+    if err:
+        raise err
+    return None
+
+def num(x):
+    try:
+        return float(str(x).replace(",", "").strip())
+    except ValueError:
+        return None
 
 def file_key(sym):                      # must match the app: replace(/[^A-Z0-9]/g,'_')
     return "".join(ch if ch.isalnum() and ch.isascii() else "_" for ch in sym.upper())
-
-def parse_yahoo(raw):
-    j = json.loads(raw)
-    res = (j.get("chart") or {}).get("result")
-    if not res:
-        raise ValueError("no result: " + str((j.get("chart") or {}).get("error")))
-    r = res[0]
-    q = r["indicators"]["quote"][0]
-    out = []
-    for i, ts in enumerate(r.get("timestamp") or []):
-        o, h, l, c = q["open"][i], q["high"][i], q["low"][i], q["close"][i]
-        if None in (o, h, l, c) or min(o, h, l, c) <= 0:
-            continue
-        v = q["volume"][i] or 0
-        day = datetime.fromtimestamp(ts, IST).strftime("%Y-%m-%d")
-        out.append({"t": day, "o": round(o, 2), "h": round(max(h, o, c), 2), "l": round(min(l, o, c), 2), "c": round(c, 2), "v": int(v)})
-    out.sort(key=lambda x: x["t"])
-    return [c for i, c in enumerate(out) if i == 0 or c["t"] != out[i - 1]["t"]]
-
-def yahoo_candles(ysym):
-    url = "https://query1.finance.yahoo.com/v8/finance/chart/%s?range=5y&interval=1d&includeAdjustedClose=false" % urllib.parse.quote(ysym)
-    return parse_yahoo(get(url))
-
-def nse_stock_list():
-    try:
-        raw = get("https://archives.nseindia.com/content/indices/ind_nifty500list.csv").decode("utf-8-sig")
-        syms = [row["Symbol"].strip() for row in csv.DictReader(io.StringIO(raw)) if row.get("Symbol")]
-        if len(syms) >= 400:
-            return syms, "nse"
-    except Exception as e:               # noqa: BLE001
-        print("WARN constituent list:", e)
-    try:                                 # reuse yesterday's list
-        prev = json.load(open(os.path.join(OUT, "nifty500.json")))
-        if len(prev) >= 400:
-            return prev, "previous"
-    except Exception:                    # noqa: BLE001
-        pass
-    return FALLBACK, "fallback"
-
-def official_closes(day):
-    """-> (index_closes {nse index name: close}, stock_closes {symbol: close}) for date `day`, or ({},{})"""
-    d = day.strftime("%d%m%Y")
-    idx, stk = {}, {}
-    try:
-        raw = get("https://archives.nseindia.com/content/indices/ind_close_all_%s.csv" % d, tries=2).decode("utf-8-sig")
-        for row in csv.DictReader(io.StringIO(raw)):
-            row = {k.strip(): (v or "").strip() for k, v in row.items() if k}
-            try:
-                idx[row["Index Name"]] = float(row["Closing Index Value"])
-            except (KeyError, ValueError):
-                pass
-    except Exception as e:               # noqa: BLE001
-        print("WARN official index file %s: %s" % (d, e))
-    try:
-        raw = get("https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_%s.csv" % d, tries=2).decode("utf-8-sig")
-        for row in csv.DictReader(io.StringIO(raw)):
-            row = {k.strip(): (v or "").strip() for k, v in row.items() if k}
-            if row.get("SERIES") == "EQ":
-                try:
-                    stk[row["SYMBOL"]] = float(row["CLOSE_PRICE"])
-                except (KeyError, ValueError):
-                    pass
-    except Exception as e:               # noqa: BLE001
-        print("WARN official equity file %s: %s" % (d, e))
-    return idx, stk
-
-def latest_official(last_day):
-    """Official files for the candle date we just got."""
-    d = datetime.strptime(last_day, "%Y-%m-%d")
-    idx, stk = official_closes(d)
-    return d.strftime("%Y-%m-%d"), idx, stk
-
-def agree(our, official):
-    return official > 0 and abs(our - official) / official <= TOL
 
 def write_json(path, obj):
     tmp = path + ".tmp"
@@ -124,72 +75,128 @@ def write_json(path, obj):
         json.dump(obj, f, separators=(",", ":"))
     os.replace(tmp, path)
 
+def stock_list():
+    raw = fetch(LIST_URL)
+    if raw:
+        syms = [r["Symbol"].strip() for r in csv.DictReader(io.StringIO(raw.decode("utf-8-sig"))) if r.get("Symbol")]
+        if len(syms) >= 400:
+            return syms, "nse"
+    try:
+        prev = json.load(open(os.path.join(OUT, "nifty500.json")))
+        if len(prev) >= 400:
+            return prev, "previous"
+    except Exception:                    # noqa: BLE001
+        pass
+    sys.exit("Could not get the Nifty 500 list from NSE")
+
+def parse_day(day, want):
+    """-> None (market closed) or ({app_sym: (o,h,l,c,v,prev_close)})"""
+    d = day.strftime("%d%m%Y")
+    eq = fetch_any(EQ_URLS, d)
+    if eq is None:
+        return None
+    rows = {}
+    for r in csv.DictReader(io.StringIO(eq.decode("utf-8-sig"))):
+        r = {(k or "").strip(): (v or "").strip() for k, v in r.items()}
+        s = r.get("SYMBOL")
+        if s not in want or r.get("SERIES") not in ("EQ", "BE", "BZ", "SM", "ST"):
+            continue
+        o, h, l, c = num(r.get("OPEN_PRICE")), num(r.get("HIGH_PRICE")), num(r.get("LOW_PRICE")), num(r.get("CLOSE_PRICE"))
+        if None in (o, h, l, c) or min(o, h, l, c) <= 0:
+            continue
+        if s in rows and r.get("SERIES") != "EQ":
+            continue
+        rows[s] = (o, h, l, c, num(r.get("TTL_TRD_QNTY")) or 0, num(r.get("PREV_CLOSE")))
+    ix = fetch_any(IDX_URLS, d)
+    if ix:
+        for r in csv.DictReader(io.StringIO(ix.decode("utf-8-sig"))):
+            r = {(k or "").strip(): (v or "").strip() for k, v in r.items()}
+            app = INDICES.get(r.get("Index Name", "").lower())
+            if not app:
+                continue
+            o, h, l, c = num(r.get("Open Index Value")), num(r.get("High Index Value")), num(r.get("Low Index Value")), num(r.get("Closing Index Value"))
+            if None not in (o, h, l, c) and min(o, h, l, c) > 0:
+                rows[app] = (o, h, l, c, num(r.get("Volume")) or 0, None)
+    return rows
+
+def load_existing():
+    hist = {}
+    for fn in os.listdir(OUT) if os.path.isdir(OUT) else []:
+        if fn.endswith("_5y.json"):
+            try:
+                hist[fn[:-8]] = json.load(open(os.path.join(OUT, fn)))
+            except Exception:            # noqa: BLE001
+                pass
+    return hist
+
 def main():
     os.makedirs(OUT, exist_ok=True)
-    stocks, list_src = nse_stock_list()
+    stocks, list_src = stock_list()
     print("stock list:", len(stocks), "from", list_src, flush=True)
-    jobs = [(k, v[0], "index", v[1]) for k, v in INDICES.items()] + [(s, s + ".NS", "stock", s) for s in stocks]
+    want = set(stocks) | set(INDICES.values())
 
-    data, fails = {}, []
+    old = load_existing()                                    # keyed by file key
+    key_of = {s: file_key(s) for s in want}
+    hist = {s: old[key_of[s]] for s in want if key_of[s] in old}
+    today = datetime.now(IST).date()
+    last = max((h[-1]["t"] for h in hist.values() if h), default=None)
+    start = datetime.strptime(last, "%Y-%m-%d").date() + timedelta(days=1) if last else today - timedelta(days=HISTORY_DAYS)
+    days = [start + timedelta(days=i) for i in range((today - start).days + 1)]
+    days = [d for d in days if d.weekday() < 5]
+    print("fetching %d weekdays from %s%s" % (len(days), start, "" if last else " (first run: building history)"), flush=True)
 
-    def one(job):
-        app_sym, ysym, kind, key = job
-        c = yahoo_candles(ysym)
-        if len(c) < MIN_CANDLES:
-            raise ValueError("only %d candles" % len(c))
-        return app_sym, (kind, key, c)
+    results, errors = {}, []
+    def job(d):
+        return d, parse_day(d, want)
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        for n, fut in enumerate(ex.map(job, days), 1):
+            try:
+                d, rows = fut
+                results[d] = rows
+            except Exception as e:       # noqa: BLE001
+                errors.append(str(e)[:200])
+            if n % 100 == 0:
+                print("progress %d/%d" % (n, len(days)), flush=True)
+    if errors:
+        sys.exit("NSE download errors (nothing saved, will retry next run): " + "; ".join(errors[:3]))
 
-    done = 0
-    ex = ThreadPoolExecutor(max_workers=6)
-    futs = {ex.submit(one, j): j for j in jobs}
-    for fu in as_completed(futs):
-        done += 1
-        app_sym = futs[fu][0]
-        try:
-            sym, val = fu.result()
-            data[sym] = val
-        except Exception as e:           # noqa: BLE001
-            fails.append((app_sym, str(e)))
-            print("FAIL", app_sym, str(e)[:200], flush=True)
-        if done == 15 and not data:
-            ex.shutdown(wait=False, cancel_futures=True)
-            sys.exit("Stopped early: the first 15 downloads all failed. Yahoo is probably blocking GitHub. Last error: " + (fails[-1][1][:200] if fails else "?"))
-        if done % 50 == 0:
-            print("progress %d/%d (ok %d, failed %d)" % (done, len(jobs), len(data), len(fails)), flush=True)
-    ex.shutdown()
+    trading = sorted(d for d, r in results.items() if r)
+    print("trading days found: %d" % len(trading), flush=True)
+    if not trading and not hist:
+        sys.exit("No NSE files could be read at all. NSE may be blocking GitHub.")
 
-    ref_day = max((v[2][-1]["t"] for v in data.values()), default=None)
-    off_idx, off_stk = ({}, {})
-    if ref_day:
-        _, off_idx, off_stk = latest_official(ref_day)
-    verified_any = bool(off_idx or off_stk)
-
-    meta = {"updated": datetime.now(IST).strftime("%Y-%m-%d %H:%M IST"), "last_candle": ref_day,
-            "constituents": list_src, "official_check": verified_any, "symbols": {}}
-    written = []
-    for app_sym, (kind, key, c) in data.items():
-        last = c[-1]
-        official = (off_idx if kind == "index" else off_stk).get(key)
-        status = "unverified"
-        if official is not None:
-            if last["t"] == ref_day and not agree(last["c"], official):
-                status = "mismatch"
-                print("SKIP %s: yahoo %.2f vs NSE %.2f" % (app_sym, last["c"], official))
-                fails.append((app_sym, "mismatch vs NSE"))
-                meta["symbols"][app_sym] = {"status": status, "yahoo": last["c"], "nse": official}
+    for d in trading:
+        t = d.strftime("%Y-%m-%d")
+        for sym, (o, h, l, c, v, pc) in results[d].items():
+            cs = hist.setdefault(sym, [])
+            if cs and cs[-1]["t"] >= t:
                 continue
-            status = "verified" if last["t"] == ref_day else "stale"
-        write_json(os.path.join(OUT, file_key(app_sym) + "_1d.json"), c[-SCAN_BARS:])
-        write_json(os.path.join(OUT, file_key(app_sym) + "_5y.json"), c)
-        written.append(app_sym)
-        meta["symbols"][app_sym] = {"status": status, "last": last["t"], "close": last["c"]}
+            if cs and pc and cs[-1]["c"] > 0:
+                ratio = pc / cs[-1]["c"]
+                if abs(ratio - 1) > SPLIT_TOL:                # split / bonus / rights: rescale older candles
+                    print("adjust %s on %s by %.4f" % (sym, t, ratio))
+                    for x in cs:
+                        x["o"] *= ratio; x["h"] *= ratio; x["l"] *= ratio; x["c"] *= ratio; x["v"] = x["v"] / ratio
+            cs.append({"t": t, "o": o, "h": max(h, o, c), "l": min(l, o, c), "c": c, "v": v})
 
-    write_json(os.path.join(OUT, "nifty500.json"), sorted(s for s in stocks if s in written))
-    write_json(os.path.join(OUT, "meta.json"), meta)
-    print("written %d, failed %d, official check: %s, last candle %s" % (len(written), len(fails), verified_any, ref_day))
-    bad_index = any(s in dict(fails) for s in INDICES)
-    if bad_index or len(fails) > max(10, len(jobs) // 10):
-        sys.exit("too many failures: " + ", ".join(f[0] for f in fails))
+    cutoff = (today - timedelta(days=HISTORY_DAYS)).strftime("%Y-%m-%d")
+    written = []
+    for sym, cs in hist.items():
+        cs = [x for x in cs if x["t"] >= cutoff]
+        if len(cs) < 20:
+            continue
+        cs = [{"t": x["t"], "o": round(x["o"], 2), "h": round(x["h"], 2), "l": round(x["l"], 2), "c": round(x["c"], 2), "v": int(x["v"])} for x in cs]
+        write_json(os.path.join(OUT, file_key(sym) + "_1d.json"), cs[-SCAN_BARS:])
+        write_json(os.path.join(OUT, file_key(sym) + "_5y.json"), cs)
+        written.append(sym)
+    listed = sorted(s for s in stocks if s in written)
+    write_json(os.path.join(OUT, "nifty500.json"), listed)
+    lastc = max((hist[s][-1]["t"] for s in written), default=None)
+    write_json(os.path.join(OUT, "meta.json"), {"updated": datetime.now(IST).strftime("%Y-%m-%d %H:%M IST"), "last_candle": lastc,
+                                               "source": "NSE official daily files", "symbols": len(written), "constituents": list_src})
+    print("done: %d symbols, last candle %s" % (len(written), lastc))
+    if "NIFTY" not in written:
+        sys.exit("NIFTY index data missing")
 
 if __name__ == "__main__":
     main()
