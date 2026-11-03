@@ -2996,6 +2996,7 @@ const indiaListReady = (async () => {
     if (!Array.isArray(list) || !list.length) return;
     INDIA_STOCKS = list.map(String);
     INDIA_SYMS = ['NIFTY', 'BANKNIFTY'].concat(INDIA_STOCKS);
+    if (typeof RS_MARKETS !== 'undefined' && RS_MARKETS.nifty50) { RS_MARKETS.nifty50.symbols = INDIA_SYMS.slice(); RS_MARKETS.nifty50.active = true; try { if (typeof rbDraft !== 'undefined' && rbDraft) rbRenderScope(); } catch (e) { /* builder closed */ } }
     const sel = document.getElementById('sscan-und');
     if (sel && !sel.querySelector('[data-india-stocks]')) {
       const all = document.createElement('option'); all.value = INDIA_STOCKS.join(','); all.textContent = 'All Nifty 500 stocks (daily only)'; all.setAttribute('data-india-stocks', '1');
@@ -4024,7 +4025,7 @@ function rsScanCandles(sc, base, baseTf) {
 // XAUTUSD and PAXGUSD are simply part of Crypto here, listed by their own names.
 var RS_MARKETS = {
   crypto:  { label: 'Crypto', active: true, symbols: ['BTCUSD', 'ETHUSD', 'SOLUSD', 'XAUTUSD', 'PAXGUSD'], tfs: ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'] },
-  nifty50: { label: 'Nifty 50', active: false }, mcx: { label: 'MCX', active: false }, all: { label: 'All markets', active: false }
+  nifty50: { label: 'Nifty', active: false, unit: 'stock', symbols: [], tfs: ['1d', '1w', '1M'] }, mcx: { label: 'MCX', active: false }, all: { label: 'All markets', active: false }
 };
 var RS_FETCH_CAP = 4000, RS_KEY = 'tradepro_rule_scans_v1', rscans = [], rscanResults = {}, rsRunning = {}, rsWin = 'all', rsCache = {};
 try { const v = JSON.parse(localStorage.getItem(RS_KEY) || 'null'); if (Array.isArray(v)) rscans = v; } catch (e) { /* storage unavailable */ }
@@ -4076,6 +4077,15 @@ function rsRuleText(r) { return rsSrcText(r.a) + ' ' + (RS_OPS[r.op] || r.op) + 
 
 /* ---- data ---- */
 async function rsFetchBase(sym, tf, count) {
+  await indiaListReady;
+  if (isIndiaUnd(sym)) {                 // Nifty / Nifty stocks: daily candles from our data branch
+    if (tf !== '1d') throw new Error('Nifty data is daily only. Set every rule to Daily.');
+    const k = 'IN|' + sym, h = rsCache[k];
+    if (h && Date.now() - h.at < 300000) return h.candles;
+    const cs = (await indiaCandles(sym, '1d')).map(c => ({ ts: Date.UTC(+c.t.slice(0, 4), +c.t.slice(5, 7) - 1, +c.t.slice(8, 10)) / 1000, o: c.o, h: c.h, l: c.l, c: c.c, v: c.v }));
+    rsCache[k] = { at: Date.now(), candles: cs };
+    return cs;
+  }
   const key = sym + '|' + tf + '|' + count, hit = rsCache[key];
   if (hit && Date.now() - hit.at < 20000) return hit.candles;
   const sec = LIVE_RES[tf], end = Math.floor(Date.now() / 1000), CH = 1500; let all = [], e = end, left = count;
@@ -4096,11 +4106,16 @@ async function rsFetchBase(sym, tf, count) {
 async function rsRun(sc) {
   const tf = rsBaseTf(sc.rules), need = rsNeedCandles(sc.rules, tf), count = Math.min(RS_FETCH_CAP, Math.max(500, need + 1200));
   const warn = need > RS_FETCH_CAP ? `These rules need about ${need.toLocaleString()} ${RS_TF_LABEL[tf].toLowerCase()} candles of history, but only ${RS_FETCH_CAP.toLocaleString()} are read, so they cannot be evaluated. Use a longer timeframe or a shorter indicator length.` : '';
-  const results = await Promise.all((sc.symbols || []).map(async sym => {
-    try { const base = await rsFetchBase(sym, tf, count); const r = rsScanCandles(sc, base, tf); r.sym = sym; return r; }
-    catch (e) { return { sym, err: typeof liveErrText === 'function' ? liveErrText(e) : String(e && e.message || e) }; }
-  }));
-  return { at: Date.now(), baseTf: tf, need, count, warn, results };
+  const syms = sc.symbols || [], results = new Array(syms.length); let nx = 0;
+  const work = async () => {
+    while (nx < syms.length) {
+      const k = nx++, sym = syms[k];
+      try { const base = await rsFetchBase(sym, tf, count); const r = rsScanCandles(sc, base, tf); r.sym = sym; results[k] = r; }
+      catch (e) { results[k] = { sym, err: typeof liveErrText === 'function' ? liveErrText(e) : String(e && e.message || e) }; }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(8, syms.length) }, work));
+  return { at: Date.now(), baseTf: tf, need, count, warn, results, unit: rsUnit(sc.market) };
 }
 async function rsRunOne(id) {
   const sc = rscans.find(x => x.id === id); if (!sc || rsRunning[id]) return;
@@ -4127,6 +4142,7 @@ function rsStats(trs, N) {
   return { n: v.length, up: v.filter(x => x > 0).length, dn: v.filter(x => x < 0).length, med };
 }
 function rsSetWin(k) { rsWin = k; renderSScans(); rbPreviewRefresh(); }
+function rsUnit(m) { return (RS_MARKETS[m] || RS_MARKETS.crypto).unit || 'coin'; }
 function rsSymHtml(r, R) {
   if (r.err) return `<div class="rs-sym"><div class="rs-symhead"><b>${sscanEsc(r.sym)}</b><span class="sc2-st n">No data</span></div><div class="rs-line">No data from the feed yet: ${sscanEsc(r.err)}</div></div>`;
   const tf = R.baseTf, yr = r.to - r.from > 300 * 86400, F = (t) => rsFmt(t, tf, yr), trs = rsInWin(r.triggers), chip = r.now === true ? `<span class="sc2-st m">Match${r.since ? ' since ' + F(r.since) : ''}</span>` : r.now === false ? '<span class="sc2-st n">No match now</span>' : '<span class="sc2-st n">Not enough history</span>';
@@ -4166,15 +4182,24 @@ function rsResultsHtml(R) {
   if (!R) return '';
   const chips = [['7', '7D'], ['30', '30D'], ['90', '90D'], ['all', 'All data']].map(([k, l]) => `<button class="sc2-chip${rsWin === k ? ' on' : ''}" onclick="rsSetWin('${k}')">${l}</button>`).join('');
   let tot = 0; R.results.forEach(r => { if (!r.err) tot += rsInWin(r.triggers).length; });
+  const U = R.unit || 'coin';
+  let shown = R.results, bigNote = '';
+  if (shown.length > 12) {
+    const lastT = r => { const t = rsInWin(r.triggers); return t.length ? t[t.length - 1].ts : 0; };
+    const act = shown.filter(r => !r.err && (r.now === true || rsInWin(r.triggers).length)).sort((a, b) => ((b.now === true) - (a.now === true)) || (lastT(b) - lastT(a)));
+    const errN = shown.filter(r => r.err).length;
+    bigNote = `<div class="rs-line"><b>${act.length}</b> of ${shown.length} ${U}s fired in this window${act.length > 60 ? ' \u00b7 showing the 60 most recent' : ''}${errN ? ' \u00b7 ' + errN + ' had no data' : ''}.</div>`;
+    shown = act.slice(0, 60);
+  }
   return `<div class="rs-res"><div class="sc2-chips" style="margin:0">${chips}</div>
-    <div class="rs-sum"><b>${tot}</b> trigger${tot === 1 ? '' : 's'} across ${R.results.length} coin${R.results.length === 1 ? '' : 's'} in ${rsWin === 'all' ? 'all available data' : 'the last ' + rsWin + ' days'}</div>
+    <div class="rs-sum"><b>${tot}</b> trigger${tot === 1 ? '' : 's'} across ${R.results.length} ${U}${R.results.length === 1 ? '' : 's'} in ${rsWin === 'all' ? 'all available data' : 'the last ' + rsWin + ' days'}</div>
     ${rsBarsHtml(R)}
     ${R.warn ? `<div class="rs-line" style="color:var(--red)">${sscanEsc(R.warn)}</div>` : ''}
-    ${R.results.map(r => rsSymHtml(r, R)).join('')}
+    ${bigNote}${shown.map(r => rsSymHtml(r, R)).join('')}
     <div class="rs-line">This only shows what price did afterwards. Past triggers don\u2019t predict future ones, and a few triggers is a small sample.</div></div>`;
 }
 function rsSubLine(sc, R) {
-  if (!R || rsRunning[sc.id]) return `${(RS_MARKETS[sc.market] || RS_MARKETS.crypto).label} \u00b7 ${sc.symbols.length} coin${sc.symbols.length === 1 ? '' : 's'} \u00b7 ${RS_TF_LABEL[rsBaseTf(sc.rules)]} \u00b7 ${sc.rules.length} rule${sc.rules.length === 1 ? '' : 's'}`;
+  if (!R || rsRunning[sc.id]) return `${(RS_MARKETS[sc.market] || RS_MARKETS.crypto).label} \u00b7 ${sc.symbols.length} ${rsUnit(sc.market)}${sc.symbols.length === 1 ? '' : 's'} \u00b7 ${RS_TF_LABEL[rsBaseTf(sc.rules)]} \u00b7 ${sc.rules.length} rule${sc.rules.length === 1 ? '' : 's'}`;
   let n = 0, last = 0; R.results.forEach(r => { if (r.err) return; n += rsInWin(r.triggers).length; r.triggers.forEach(t => { if (t.ts > last) last = t.ts; }); });
   const yrs = R.results.some(r => !r.err && r.to - r.from > 300 * 86400);
   return (last ? 'Last fired ' + rsFmt(last, R.baseTf, yrs) : 'Not fired in available data') + ` \u00b7 ${n} in ${rsWin === 'all' ? 'all data' : rsWin + 'D'}`;
@@ -4185,7 +4210,7 @@ function rsCardHtml(sc, meta) {
   let best = null; rows.forEach(x => { if (x && x.det && x.det.length) { const n = x.det.filter(d => d === true).length; if (!best || n > best.n) best = { n, t: x.det.length }; } });
   meta.match = hit.length > 0;
   const dots = best ? Array.from({ length: Math.min(best.t, 6) }, (_, k) => `<i class="sc2-dot${best.t <= 6 ? (k < best.n ? ' f' : '') : (k < Math.round(best.n / best.t * 6) ? ' f' : '')}"></i>`).join('') : '';
-  const chip = running ? '<span class="sc2-st n">Scanning\u2026</span>' : !R ? '<span class="sc2-st n">Not scanned</span>' : hit.length ? `<span class="sc2-st m">Match \u00b7 ${hit.length > 2 ? hit.length + ' coins' : hit.join(' + ')}</span>` : `<span class="sc2-st n">${best && best.n ? best.n + ' of ' + best.t : 'No match'}</span>`;
+  const chip = running ? '<span class="sc2-st n">Scanning\u2026</span>' : !R ? '<span class="sc2-st n">Not scanned</span>' : hit.length ? `<span class="sc2-st m">Match \u00b7 ${hit.length > 2 ? hit.length + ' ' + rsUnit(sc.market) + 's' : hit.join(' + ')}</span>` : `<span class="sc2-st n">${best && best.n ? best.n + ' of ' + best.t : 'No match'}</span>`;
   const key = 'r:' + sc.id, sub = scSubOf(key);
   return `<details class="sc2-row" data-k="${sscanEsc(key)}" ${scOpen[key] ? 'open' : ''} ontoggle="scToggle(this)">
     <summary><span class="sc2-rbar" style="background:${ci.col}"></span>
@@ -4278,14 +4303,39 @@ function rbApplyTf(tf) { if (!tf) return; rbDraft.rules.forEach(r => ['a', 'b'].
 /* scope (market + coins) */
 function rbRenderScope() {
   const el = document.getElementById('rb-scope'); if (!el) return;
-  const mk = RS_MARKETS.crypto, n = rbDraft.symbols.length, all = n === mk.symbols.length;
-  el.innerHTML = `<button type="button" class="rb-scope" onclick="rbToggleScope()" aria-expanded="${rbScopeOpen}"><span>Crypto <span class="rb-dim">\u00b7 ${all ? 'all ' + n + ' coins' : n + ' of ' + mk.symbols.length + ' coins'}</span></span><span class="rb-chv${rbScopeOpen ? ' up' : ''}">${RB_CHEV}</span></button>` +
-    (rbScopeOpen ? `<div class="rb-scopebody"><div class="rb-lb" style="margin-top:0">Market</div><div class="rb-opts">${Object.keys(RS_MARKETS).map(k => { const m = RS_MARKETS[k]; return m.active ? `<button class="sc2-chip on" type="button">${m.label}</button>` : `<button class="sc2-chip" type="button" disabled title="Coming soon">${m.label} <span class="sc2-n">Soon</span></button>`; }).join('')}</div>
-      <div class="rb-lb">Coins</div><div class="rb-opts">${rbOptChip(all, 'All ' + mk.symbols.length, 'rbAllSyms()')}${mk.symbols.map(s => rbOptChip(rbDraft.symbols.indexOf(s) >= 0, s, `rbToggleSym('${s}')`)).join('')}</div></div>` : '');
+  const mk = RS_MARKETS[rbDraft.market] || RS_MARKETS.crypto, n = rbDraft.symbols.length, all = n === mk.symbols.length, u = mk.unit || 'coin';
+  const mkts = Object.keys(RS_MARKETS).map(k => { const m = RS_MARKETS[k]; return m.active ? `<button class="sc2-chip${k === rbDraft.market ? ' on' : ''}" type="button" onclick="rbSetMarket('${k}')">${m.label}</button>` : `<button class="sc2-chip" type="button" disabled title="Coming soon">${m.label} <span class="sc2-n">Soon</span></button>`; }).join('');
+  let syms;
+  if (rbDraft.market === 'nifty50') {
+    const idxs = ['NIFTY', 'BANKNIFTY'], stocks = mk.symbols.filter(x => idxs.indexOf(x) < 0), sel = rbDraft.symbols;
+    const same = (a, b) => a.length === b.length && a.every(x => b.indexOf(x) >= 0);
+    syms = `<div class="rb-lb">Symbols</div><div class="rb-opts">${rbOptChip(same(sel, stocks), 'All ' + stocks.length + ' stocks', "rbSymGroup('stocks')")}${rbOptChip(same(sel, idxs), 'Indices only', "rbSymGroup('indices')")}${rbOptChip(same(sel, mk.symbols), 'Stocks + indices', "rbSymGroup('all')")}</div>
+      <div class="rb-lb">Add a symbol</div><div class="rb-opts"><label class="rb-pre"><input id="rb-symadd" type="text" autocapitalize="characters" placeholder="e.g. TCS" aria-label="Symbol" onkeydown="if(event.key==='Enter'){event.preventDefault();rbAddSym();}"></label><button type="button" class="rb-chip" onclick="rbAddSym()">Add</button></div>
+      ${sel.length && sel.length <= 12 ? '<div class="rb-opts">' + sel.map(x => rbOptChip(true, x + ' \u2715', `rbToggleSym('${x}')`)).join('') + '</div>' : ''}`;
+  } else {
+    syms = `<div class="rb-lb">Coins</div><div class="rb-opts">${rbOptChip(all, 'All ' + mk.symbols.length, 'rbAllSyms()')}${mk.symbols.map(x => rbOptChip(rbDraft.symbols.indexOf(x) >= 0, x, `rbToggleSym('${x}')`)).join('')}</div>`;
+  }
+  el.innerHTML = `<button type="button" class="rb-scope" onclick="rbToggleScope()" aria-expanded="${rbScopeOpen}"><span>${mk.label} <span class="rb-dim">\u00b7 ${all ? 'all ' + n + ' ' + u + 's' : n + ' of ' + mk.symbols.length + ' ' + u + 's'}</span></span><span class="rb-chv${rbScopeOpen ? ' up' : ''}">${RB_CHEV}</span></button>` +
+    (rbScopeOpen ? `<div class="rb-scopebody"><div class="rb-lb" style="margin-top:0">Market</div><div class="rb-opts">${mkts}</div>${syms}</div>` : '');
 }
 function rbToggleScope() { rbScopeOpen = !rbScopeOpen; rbRenderScope(); }
-function rbToggleSym(s) { const i = rbDraft.symbols.indexOf(s); if (i >= 0) rbDraft.symbols.splice(i, 1); else rbDraft.symbols.push(s); rbDraft.symbols.sort((a, b) => RS_MARKETS.crypto.symbols.indexOf(a) - RS_MARKETS.crypto.symbols.indexOf(b)); rbRenderScope(); rbDirty(); }
-function rbAllSyms() { rbDraft.symbols = RS_MARKETS.crypto.symbols.slice(); rbRenderScope(); rbDirty(); }
+function rbToggleSym(x) { const mk = RS_MARKETS[rbDraft.market] || RS_MARKETS.crypto, i = rbDraft.symbols.indexOf(x); if (i >= 0) rbDraft.symbols.splice(i, 1); else rbDraft.symbols.push(x); rbDraft.symbols.sort((a, b) => mk.symbols.indexOf(a) - mk.symbols.indexOf(b)); rbRenderScope(); rbDirty(); }
+function rbAllSyms() { rbDraft.symbols = (RS_MARKETS[rbDraft.market] || RS_MARKETS.crypto).symbols.slice(); rbRenderScope(); rbDirty(); }
+function rbSymGroup(g) { const all = RS_MARKETS.nifty50.symbols, idx = ['NIFTY', 'BANKNIFTY']; rbDraft.symbols = g === 'indices' ? idx.slice() : g === 'stocks' ? all.filter(x => idx.indexOf(x) < 0) : all.slice(); rbRenderScope(); rbDirty(); }
+function rbAddSym() {
+  const inp = document.getElementById('rb-symadd'); if (!inp) return;
+  const mk = RS_MARKETS[rbDraft.market] || RS_MARKETS.crypto, v = inp.value.trim().toUpperCase().replace(/\s+/g, '');
+  if (!v) return;
+  if (mk.symbols.indexOf(v) < 0) { inp.value = ''; inp.placeholder = v + ' is not in the list'; return; }
+  if (rbDraft.symbols.indexOf(v) < 0) rbToggleSym(v); else inp.value = '';
+}
+function rbSetMarket(k) {
+  const m = RS_MARKETS[k]; if (!m || !m.active || rbDraft.market === k) return;
+  rbDraft.market = k;
+  rbDraft.symbols = k === 'nifty50' ? m.symbols.filter(x => x !== 'NIFTY' && x !== 'BANKNIFTY') : m.symbols.slice();
+  rbDraft.rules.forEach(r => ['a', 'b'].forEach(sd => { const q = r[sd]; if (q.type !== 'num' && m.tfs.indexOf(q.tf) < 0) q.tf = '1d'; }));   // Nifty is daily: move any shorter timeframe to Daily
+  rbSel = null; rbRender(); rbDirty();
+}
 function rbRenderMode() { const el = document.getElementById('rb-mode'); if (el) el.innerHTML = [['all', 'All'], ['any', 'Any']].map(([v, l]) => `<button type="button" class="seg-btn${rbDraft.mode === v ? ' active' : ''}" onclick="rbSetMode('${v}')">${l}</button>`).join(''); }
 function rbSetMode(v) { rbDraft.mode = v; rbRenderMode(); rbDirty(); }
 
@@ -4296,7 +4346,7 @@ function rbRender() {
     <div class="rb-presets"><span class="rb-dim">Start from</span>${quick.map(p => `<button type="button" class="rb-chip" onclick="rbPreset('${p.id}')">${sscanEsc(p.name.length > 22 ? p.name.split(/[,:(]/)[0] : p.name)}</button>`).join('')}<button type="button" class="rb-chip" onclick="rbShowPresets()">All ${RS_PRESETS.length} ${RB_CHEV}</button></div>
     <input class="field-input" id="rb-name" type="text" value="${sscanEsc(d.name)}" placeholder="Scanner name" aria-label="Scanner name" oninput="rbDraft.name=this.value">
     <div id="rb-scope"></div>
-    <div class="rb-sec"><span>Rules</span><select class="field-input rb-sel rb-tfall" aria-label="Set all timeframes" onchange="rbApplyTf(this.value); this.value=''"><option value="">Set all timeframes\u2026</option>${RS_MARKETS.crypto.tfs.map(t => `<option value="${t}">${RS_TF_LABEL[t]}</option>`).join('')}</select></div>
+    <div class="rb-sec"><span>Rules</span><select class="field-input rb-sel rb-tfall" aria-label="Set all timeframes" onchange="rbApplyTf(this.value); this.value=''"><option value="">Set all timeframes\u2026</option>${(RS_MARKETS[d.market] || RS_MARKETS.crypto).tfs.map(t => `<option value="${t}">${RS_TF_LABEL[t]}</option>`).join('')}</select></div>
     <div id="rb-rules" class="rb-rules"></div>
     <div class="rb-addrow"><button type="button" class="rb-chip" onclick="rbAddRule()">+ Add rule</button><span class="rb-trig">Trigger when <span class="seg" id="rb-mode"></span></span></div>
     <div class="rb-hint">Tap any chip to change it. \u201cnow\u201d is the candle being checked; on a longer timeframe it is the candle so far.</div>`;
@@ -4314,17 +4364,19 @@ function rbHidePresets() { const e = document.getElementById('rb-pre-overlay'); 
 /* validation + live result */
 function rbValidate() {
   const d = rbDraft;
-  if (!d.symbols.length) return 'Pick at least one coin.';
+  const mkv = RS_MARKETS[d.market] || RS_MARKETS.crypto;
+  if (!d.symbols.length) return 'Pick at least one ' + (mkv.unit || 'coin') + '.';
   if (!d.rules.length) return 'Add at least one rule.';
   for (const r of d.rules) for (const sd of ['a', 'b']) {
     const s = r[sd];
+    if (s.type !== 'num' && mkv.tfs.indexOf(s.tf) < 0) return mkv.label + ' data is daily: set every rule to Daily, Weekly or Monthly (use \u201cSet all timeframes\u201d).';
     if (s.type === 'num' && !isFinite(parseFloat(s.value))) return 'Enter a number in every Number box.';
     if (s.type === 'ind' && s.ind !== 'macd' && s.ind !== 'macdsig' && !(s.len >= 1)) return 'Every indicator needs a length of 1 or more.';
     if (s.type === 'ind' && s.mult !== '' && s.mult != null && !isFinite(+s.mult)) return 'A multiplier must be a number.';
   }
   return '';
 }
-function rbSig() { return JSON.stringify([rbDraft.rules, rbDraft.symbols, rbDraft.mode]); }
+function rbSig() { return JSON.stringify([rbDraft.rules, rbDraft.symbols, rbDraft.mode, rbDraft.market]); }
 function rbDirty() { clearTimeout(rbAutoTimer); if (!rbDraft) return; rbAutoState = rbValidate() ? 'err' : 'busy'; rbAutoMsg = rbValidate(); rbPaint(); if (rbAutoState === 'busy') rbAutoTimer = setTimeout(rbAutoTest, 700); }
 async function rbAutoTest() {
   if (!rbDraft || rbValidate()) return;
@@ -4341,7 +4393,7 @@ function rbStripHtml() {
   if (!ok.length) return '<span class="rb-dim">No data from the feed yet.</span>';
   if (R.warn) return '<span style="color:var(--red)">Needs more history than the feed provides.</span><span class="rb-more">Details ' + RB_CHEV + '</span>';
   const n = ok.reduce((a, r) => a + r.triggers.length, 0), hit = ok.filter(r => r.now === true).map(r => r.sym);
-  return `<span><b>Fired ${n} time${n === 1 ? '' : 's'}</b> <span class="rb-dim">\u00b7 ${hit.length ? 'match now on ' + (hit.length > 2 ? hit.length + ' coins' : hit.join(' + ')) : 'no match now'}</span></span><span class="rb-more">History ${RB_CHEV}</span>`;
+  return `<span><b>Fired ${n} time${n === 1 ? '' : 's'}</b> <span class="rb-dim">\u00b7 ${hit.length ? 'match now on ' + (hit.length > 2 ? hit.length + ' ' + (R.unit || 'coin') + 's' : hit.join(' + ')) : 'no match now'}</span></span><span class="rb-more">History ${RB_CHEV}</span>`;
 }
 function rbPaint() {
   const st = document.getElementById('rb-strip'); if (st) st.innerHTML = rbStripHtml();
@@ -4413,7 +4465,7 @@ function scSetLive(k) { scLiveFilter = k; renderSScans(); }
 function scLibItems() {
   const out = [], condTxt = c => `${c.ind} ${c.op} ${c.val}`, plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
   rscans.forEach((sc, i) => out.push({ scope: 'mine', kind: 'custom', ref: i, cat: sc.cat || 'neutral', name: sc.name, vis: sc.vis,
-    desc: `${(RS_MARKETS[sc.market] || RS_MARKETS.crypto).label} \u00b7 ${plural(sc.symbols.length, 'coin')} \u00b7 ${RS_TF_LABEL[rsBaseTf(sc.rules)]} \u00b7 ${plural(sc.rules.length, 'rule')}`,
+    desc: `${(RS_MARKETS[sc.market] || RS_MARKETS.crypto).label} \u00b7 ${plural(sc.symbols.length, rsUnit(sc.market))} \u00b7 ${RS_TF_LABEL[rsBaseTf(sc.rules)]} \u00b7 ${plural(sc.rules.length, 'rule')}`,
     conds: sc.rules.map(rsRuleText), assets: sc.symbols }));
   sscans.forEach((sc, i) => out.push({ scope: 'mine', kind: 'strategy', ref: i, cat: sscanDeriveCat(sc), name: sc.name,
     desc: `${sc.side === 'Sell' ? 'Sell' : 'Buy'} ${sc.strat} \u00b7 ${String(sc.und).replace(/,/g, ' + ')} \u00b7 ${sc.tf}`,
