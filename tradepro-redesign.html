@@ -1266,6 +1266,7 @@
 .mkt-stats .pcr-bull b,.mkt-stats .pcr-bull small{color:var(--green)}
 .mkt-stats .pcr-bear b,.mkt-stats .pcr-bear small{color:var(--red)}
 .mkt-stats .pcr-neu b,.mkt-stats .pcr-neu small{color:var(--warn)}
+.mkt-stats .pcr-ext{background:color-mix(in srgb,var(--warn) 14%,var(--surface));border:1px dashed var(--warn)}.mkt-stats .pcr-ext b,.mkt-stats .pcr-ext small{color:var(--warn)}
 .mkt-ladder-h,.mkt-oirow{display:grid;grid-template-columns:minmax(0,1fr) 62px minmax(0,1fr);gap:6px;align-items:center}
 .mkt-ladder-h{font-size:12px;color:var(--text-muted);padding:0 4px 4px}
 .mkt-oirow{width:100%;min-height:44px;border:0;background:none;color:var(--text);padding:3px 4px;border-radius:8px;cursor:pointer;font:12px var(--mono)}
@@ -1310,6 +1311,13 @@
 .wl-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:flex;align-items:flex-end;justify-content:center}.wl-sh{background:var(--surface);border:1px solid var(--border);border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:82vh;overflow:auto;padding:16px 16px 28px}
 #wl-bar{margin-bottom:10px}
 .panel-body{overflow-x:auto}.wl-ed button{padding:2px 7px!important}
+.tr-grid{display:grid;grid-template-columns:44px repeat(3,minmax(0,1fr)) 68px;gap:4px;align-items:center}
+.tr-gh{font-size:12px;color:var(--text-muted);text-align:center}.tr-nm{font-size:13px;font-weight:500}
+.tr-c{border:0;border-radius:8px;padding:7px 2px;text-align:center;font:12px var(--mono);cursor:pointer;line-height:1.35;min-height:46px}.tr-c b{display:block;font:500 15px var(--sans)}
+.tr-bu{background:color-mix(in srgb,var(--green) 22%,var(--surface));color:var(--green)}.tr-be{background:color-mix(in srgb,var(--red) 22%,var(--surface));color:var(--red)}.tr-mx{background:color-mix(in srgb,var(--warn) 18%,var(--surface));color:var(--warn)}
+.tr-ld{background:var(--surface-2);color:var(--text-faint)}.tr-c.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.tr-ag{font-size:12px;text-align:center;line-height:1.3}.tr-ag small{display:block;font-size:11px;color:var(--text-muted)}
+.tr-mini{display:flex;gap:6px;margin:8px 0}.tr-mini div{flex:1;text-align:center;border-radius:8px;padding:6px 0;font-size:13px}.tr-mini small{display:block;font-size:11px;color:var(--text-muted)}.tr-mini .sel{outline:2px solid var(--accent);outline-offset:-2px}
 </style>
 </head>
 <body>
@@ -1346,7 +1354,7 @@
         <kbd>⌘K</kbd>
       </div>
       <div class="topbar-spacer"></div>
-      <div class="icon-btn"><span class="ping"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+      <div class="icon-btn" role="button" tabindex="0" aria-label="Alerts" onclick="showView('markets');mktSeg('alerts')"><span class="ping"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
       <div class="theme-wrap"><button class="icon-btn" id="theme-btn" type="button" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button><div class="theme-menu" id="theme-menu" hidden><button type="button" data-t="dark" onclick="setTheme('dark')"><i class="th-dot" style="background:linear-gradient(135deg,#0A0D12 50%,#17C3B2 50%)"></i>Classic dark</button><button type="button" data-t="daylight" onclick="setTheme('daylight')"><i class="th-dot" style="background:linear-gradient(135deg,#F5F7FA 50%,#0F9D8F 50%)"></i>Daylight</button><button type="button" data-t="navygold" onclick="setTheme('navygold')"><i class="th-dot" style="background:linear-gradient(135deg,#0E1A2E 50%,#D4A93A 50%)"></i>Navy and gold</button></div></div>
       <div class="ccy-seg" title="Show money in ₹ or $ (1 USD = ₹85)"><button data-c="INR" onclick="setDisplayCcy('INR')">₹</button><button data-c="USD" onclick="setDisplayCcy('USD')">$</button></div>
       <div class="avatar">AB</div>
@@ -1446,7 +1454,7 @@
 
       <div id="view-markets" class="view" style="display:none">
         <div class="mkt-head"><div class="mkt-title">Markets</div><div class="mkt-stamp" id="mkt-stamp"><i></i>Loading</div></div>
-        <div class="mkt-seg"><button id="mkt-b-pulse" class="on" onclick="mktSeg('pulse')">Pulse</button><button id="mkt-b-options" onclick="mktSeg('options')">Options</button><button id="mkt-b-calendar" onclick="mktSeg('calendar')">Calendar</button><button id="mkt-b-alerts" onclick="mktSeg('alerts')">Alerts</button></div>
+        <div class="mkt-seg"><button id="mkt-b-pulse" class="on" onclick="mktSeg('pulse')">Pulse</button><button id="mkt-b-options" onclick="mktSeg('options')">Options</button><button id="mkt-b-calendar" onclick="mktSeg('calendar')">Calendar</button><button id="mkt-b-trend" onclick="mktSeg('trend')">Trend</button></div>
         <div id="mkt-pulse">
           <div class="mkt-chips" id="mkt-cols"></div>
           <div class="mkt-heat" id="mkt-heat"></div>
@@ -1454,7 +1462,8 @@
         </div>
         <div id="mkt-options" style="display:none"><div id="mkt-opt"></div></div>
         <div id="mkt-calendar" style="display:none"><div id="mkt-cal"></div></div>
-        <div id="mkt-alerts" style="display:none"><div id="mkt-alr"></div></div>
+        <div id="mkt-alerts" style="display:none"><div class="mkt-chips"><button onclick="mktSeg('pulse')">‹ Back to Markets</button></div><div id="mkt-alr"></div></div>
+        <div id="mkt-trend" style="display:none"><div id="mkt-tr"></div></div>
       </div>
 
       <div id="view-strategies" class="view" style="display:none">
@@ -11329,7 +11338,7 @@ function mktAge(t) { return t ? Math.max(0, Math.round((Date.now() - t) / 1000))
 function mktStamp() {
   const el = document.getElementById('mkt-stamp'); if (!el) return;
   const t = MKT.seg === 'options' ? MKT.oat : MKT.seg === 'pulse' ? MKT.ptAt : 0, a = mktAge(t);
-  if (MKT.seg === 'calendar' || MKT.seg === 'alerts') { el.className = 'mkt-stamp'; el.innerHTML = MKT.seg === 'alerts' ? 'Checks every 30s' : 'Times in IST'; return; }
+  if (MKT.seg === 'calendar' || MKT.seg === 'alerts' || MKT.seg === 'trend') { el.className = 'mkt-stamp'; el.innerHTML = MKT.seg === 'alerts' ? 'Checks every 30s' : MKT.seg === 'trend' ? 'Updates every minute' : 'Times in IST'; return; }
   el.className = 'mkt-stamp' + (a == null || a > 60 ? ' stale' : '');
   el.innerHTML = a == null ? '<i></i>Loading' : '<i></i>' + (a > 60 ? 'Stale · ' : 'Live · ') + a + 's ago';
 }
@@ -11339,13 +11348,14 @@ function mktTick() {
   if (document.hidden || !v || v.style.display === 'none') return;
   if (MKT.seg === 'pulse' && mktAge(MKT.ptAt) > 20) mktPulseLoad();
   else if (MKT.seg === 'options' && mktAge(MKT.oat) > 30) mktOptLoad();
+  else if (MKT.seg === 'trend' && mktAge(TR.at) > 60) trLoad();
   else if (MKT.seg === 'calendar') mktCalRender();
   mktStamp();
 }
 function mktSeg(name) {
   MKT.seg = name;
-  ['pulse', 'options', 'calendar', 'alerts'].forEach(n => { document.getElementById('mkt-' + n).style.display = n === name ? '' : 'none'; document.getElementById('mkt-b-' + n).classList.toggle('on', n === name); });
-  if (name === 'pulse') { mktPulseRender(); mktPulseLoad(); } else if (name === 'options') { mktOptRender(); mktOptLoad(); } else if (name === 'alerts') { alrRender(); mktPulseLoad(); } else mktCalRender();
+  ['pulse', 'options', 'calendar', 'trend', 'alerts'].forEach(n => { document.getElementById('mkt-' + n).style.display = n === name ? '' : 'none'; const bb = document.getElementById('mkt-b-' + n); if (bb) bb.classList.toggle('on', n === name); });
+  if (name === 'pulse') { mktPulseRender(); mktPulseLoad(); } else if (name === 'options') { mktOptRender(); mktOptLoad(); } else if (name === 'trend') { trRender(); trLoad(); } else if (name === 'alerts') { alrRender(); mktPulseLoad(); } else mktCalRender();
   mktStamp();
 }
 /* ----- Pulse ----- */
@@ -11381,7 +11391,7 @@ function mktPulseRender() {
   }).join('');
   mktSheet();
 }
-function mktPick(s) { MKT.sym = MKT.sym === s ? null : s; mktPulseRender(); }
+function mktPick(s) { MKT.sym = MKT.sym === s ? null : s; mktPulseRender(); if (MKT.sym) trMiniLoad(MKT.sym); }
 function mktSheet() {
   const el = document.getElementById('mkt-sheet'), q = MKT.sym && MKT.pt[MKT.sym];
   if (!q) { el.innerHTML = ''; return; }
@@ -11390,7 +11400,7 @@ function mktSheet() {
   <div class="mkt-row"><span>Funding</span><span>${q.fund == null ? '–' : q.fund.toFixed(4) + '%'}</span></div>
   <div class="mkt-row"><span>OI change</span><span>${q.oiChg == null ? '–' : mktSgn(q.oiChg)}</span></div>${q.oiUsd ? `<div class="mkt-row"><span>Open interest</span><span>$${mktCompact(q.oiUsd)}</span></div>` : ''}
   <div class="mkt-row"><span>24h volume</span><span>$${mktCompact(q.turn)}</span></div>
-  <div class="mkt-acts"><button class="mkt-btn pri" onclick="mkPractice('${MKT.sym}')">Open in Trade</button><button class="mkt-btn" onclick="alrPrefill('${MKT.sym}')">Set alert</button></div></div>`;
+  ${trMiniHtml(MKT.sym)}<div class="mkt-acts"><button class="mkt-btn pri" onclick="mkPractice('${MKT.sym}')">Open in Trade</button><button class="mkt-btn" onclick="alrPrefill('${MKT.sym}')">Set alert</button></div></div>`;
 }
 /* ----- Options: shares the 17:30 IST baseline with the chart OI layer, so both show the same numbers ----- */
 async function mktOptLoad() {
@@ -11436,17 +11446,18 @@ function mktOptRender() {
   const mv = (x, lab) => x && x.v ? `<div class="mkt-mv"><div>${lab}<p>${mktFmt(x.k)} ${x.t}</p></div><b style="font:500 13px var(--mono);color:${x.v > 0 ? 'var(--green)' : 'var(--red)'}">${x.v > 0 ? '+' : ''}${mktFmt(x.v)}</b></div>` : '';
   const sel = MKT.strike != null && rows[MKT.strike], sr = sel ? rows[MKT.strike] : null;
   const pcr = tc ? tp / tc : null, lbl = pcr == null ? '' : pcr < 0.7 ? 'Call-heavy' : pcr > 1.3 ? 'Put-heavy' : 'Balanced';
-  const pcrCls = pcr == null ? '' : lbl === 'Put-heavy' ? 'pcr-bull' : lbl === 'Call-heavy' ? 'pcr-bear' : 'pcr-neu', pcrBias = pcr == null ? '' : lbl === 'Put-heavy' ? 'Bullish' : lbl === 'Call-heavy' ? 'Bearish' : 'Neutral';
+  const pcrExt = pcr != null && (pcr > 2 || pcr < 0.5), pcrCls = pcr == null ? '' : pcrExt ? 'pcr-ext' : lbl === 'Put-heavy' ? 'pcr-bull' : lbl === 'Call-heavy' ? 'pcr-bear' : 'pcr-neu', pcrBias = pcr == null ? '' : pcrExt ? 'Extreme: can reverse' : lbl === 'Put-heavy' ? 'Leans bullish' : lbl === 'Call-heavy' ? 'Leans bearish' : 'Neutral';
   const addC = all.reduce((a, r) => a + Math.max(0, r.C - r.bC), 0), addP = all.reduce((a, r) => a + Math.max(0, r.P - r.bP), 0);
   const top = (arr, f) => arr.length ? arr.reduce((m, r) => r[f] > m[f] ? r : m) : null, cw = spot ? top(all.filter(r => r.k >= spot), 'C') : null, pw = spot ? top(all.filter(r => r.k < spot), 'P') : null;
   const rd = [];
-  if (pcr != null) rd.push(`<b>PCR ${pcr.toFixed(2)} (${lbl.toLowerCase()}).</b> ` + (lbl === 'Put-heavy' ? 'More put OI than call OI. Often read as hedging, or put writers defending support, which leans supportive. Very high readings can also mean fear.' : lbl === 'Call-heavy' ? 'More call OI than put OI. Can mean call writers capping the upside, or a crowd leaning long. Very low readings can signal over-optimism.' : 'Put and call OI are close, so positioning shows no clear lean.'));
+  if (pcr != null) rd.push(`<b>PCR ${pcr.toFixed(2)} (${lbl.toLowerCase()}).</b> ` + (lbl === 'Put-heavy' ? 'More put OI than call OI. Often read as hedging, or put writers defending support, which leans supportive. Very high readings can also mean fear.' : lbl === 'Call-heavy' ? 'More call OI than put OI. Can mean call writers capping the upside, or a crowd leaning long. Very low readings can signal over-optimism.' : 'Put and call OI are close, so positioning shows no clear lean.') + (pcrExt ? ' Readings this extreme are rare and often show fear or over-optimism, which can come before a reversal, so treat the lean with extra caution.' : ''));
   if (addC + addP > 0) rd.push(`<b>Since the 17:30 IST baseline,</b> ${addP > addC * 1.2 ? 'puts are being added faster' : addC > addP * 1.2 ? 'calls are being added faster' : 'puts and calls are being added at a similar pace'} (new put OI +${mktFmt(addP)}, new call OI +${mktFmt(addC)}).`);
   if (cw || pw) rd.push(`<b>Walls.</b> ${cw ? `Largest call OI above spot: ${mktFmt(cw.k)}, a possible resistance zone.` : ''} ${pw ? `Largest put OI below spot: ${mktFmt(pw.k)}, a possible support zone.` : ''}`);
   if (!ALL && mp != null && spot) { const g = (spot - mp) / mp * 100; rd.push(`<b>Max pain ${mktFmt(mp)}.</b> Spot is ${Math.abs(g).toFixed(1)}% ${g >= 0 ? 'above' : 'below'} it. Price sometimes drifts toward max pain near expiry, but the effect is weak.`); }
   const read = rd.length ? `<div class="mkt-card mkt-read"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">Reading the data</b></div>${rd.map(x => `<p>${x}</p>`).join('')}<p class="mkt-disc">Rule-of-thumb reading of open interest, not financial advice or a trade signal. OI shows positions, not who is long or short, and crypto behaves differently from index options. Use it alongside your own analysis.</p></div>` : '';
   el.innerHTML = head + `</div><div class="mkt-chips mkt-scroll"><button class="${ALL ? 'on' : ''}" onclick="mktExp('ALL')">All</button>` + exps.map(e => `<button class="${e === MKT.exp ? 'on' : ''}" onclick="mktExp('${e}')">${liveExpLabel(e).slice(0, 6)}</button>`).join('') + `</div>
   <div class="mkt-stats"><div>Call OI<b>${mktFmt(tc)}</b>${chg(tc, btc)}</div><div>Put OI<b>${mktFmt(tp)}</b>${chg(tp, btp)}</div><div class="${pcrCls}">PCR<b>${pcr == null ? '–' : pcr.toFixed(2)}</b><small>${lbl}${pcrBias ? ' · ' + pcrBias : ''}</small></div><div>Max pain<b>${ALL ? 'Per expiry' : mp == null ? '–' : mktFmt(mp)}</b></div><div>Total OI value<b>${spot ? '≈ $' + mktCompact((tc + tp) * MKT_CS[MKT.und] * spot) : '–'}</b><small>${mktFmt(tc + tp)} contracts</small></div></div>
+  <div class="mkt-note" style="margin:-4px 0 10px">PCR colours show where positions lean. They are not a trade signal, and extremes can reverse.</div>
   <div class="mkt-chips">${[3, 7, 15, 'all'].map(v => `<button class="${MKT.rng === v ? 'on' : ''}" onclick="mktRng(${typeof v === 'string' ? "'all'" : v})">${v === 'all' ? 'All' : '±' + v}</button>`).join('')}<button class="sp" style="color:var(--accent)" onclick="mktJump()">Jump to ATM</button></div>
   <div class="mkt-mm">${all.map(r => `<i class="${r.C >= r.P ? 'c' : ''}" style="height:${Math.max(6, Math.round(Math.max(r.C, r.P) / mmx * 100))}%"></i>`).join('')}<div class="vw" style="left:${(lo / all.length * 100).toFixed(1)}%;width:${(shown.length / all.length * 100).toFixed(1)}%"></div></div>
   <div class="mkt-lad" id="mkt-lad"><div class="mkt-ladder-h"><span style="text-align:right">Puts</span><span style="text-align:center">Strike</span><span>Calls</span></div>${ladder}</div>
@@ -11554,9 +11565,9 @@ try { ALR.list = JSON.parse(localStorage.getItem(ALR_KEY) || '[]') || []; } catc
 const alrSave = () => { try { localStorage.setItem(ALR_KEY, JSON.stringify(ALR.list)); } catch (e) { /* storage unavailable */ } };
 const alrName = a => a.sym.replace(/USD$/, '');
 const alrWall = a => a.type === 'callwall' || a.type === 'putwall';
-const alrLabel = a => alrName(a) + (a.type === 'price' ? ' price' : a.type === 'funding' ? ' funding' : a.type === 'callwall' ? ' call wall' : a.type === 'putwall' ? ' put wall' : ' PCR (all expiries)');
-const alrFmt = (a, v) => v == null ? '–' : alrWall(a) ? mktFmt(v) : a.type === 'price' ? mkUsd(v) : a.type === 'funding' ? v.toFixed(4) + '%' : v.toFixed(2);
-function alrCur(a) { if (a.type === 'pcr') return (ALR.opt[a.sym] || {}).pcr; const q = MKT.pt[a.sym]; return q && mktAge(MKT.ptAt) < 90 ? (a.type === 'price' ? q.price : q.fund) : null; }
+const alrLabel = a => alrName(a) + (a.type === 'price' ? ' price' : a.type === 'funding' ? ' funding' : a.type === 'callwall' ? ' call wall' : a.type === 'putwall' ? ' put wall' : a.type === 'trend' ? ' ' + TR_LAB[a.tf] + ' trend' : ' PCR (all expiries)');
+const alrFmt = (a, v) => v == null ? '–' : alrWall(a) ? mktFmt(v) : a.type === 'trend' ? (TR_NAME[v] || v) : a.type === 'price' ? mkUsd(v) : a.type === 'funding' ? v.toFixed(4) + '%' : v.toFixed(2);
+function alrCur(a) { if (a.type === 'trend') { const d = TR.cache[a.sym + '|' + a.tf]; return d && d.data ? d.data.state : null; } if (a.type === 'pcr') return (ALR.opt[a.sym] || {}).pcr; const q = MKT.pt[a.sym]; return q && mktAge(MKT.ptAt) < 90 ? (a.type === 'price' ? q.price : q.fund) : null; }
 function alrSync() { const g = id => { const e = document.getElementById(id); return e ? e.value : null; }; ALR.draft = { type: g('alr-type') || 'price', sym: g('alr-sym') || ALR.draft.sym, op: g('alr-op') || '>', val: g('alr-val') || '' }; }
 function alrType() { alrSync(); ALR.draft.sym = ['pcr', 'callwall', 'putwall'].includes(ALR.draft.type) ? 'BTC' : 'BTCUSD'; alrRender(); }
 function alrPrefill(sym) { const q = MKT.pt[sym]; ALR.draft = { type: 'price', sym, op: '>', val: q ? String(q.price) : '' }; mktSeg('alerts'); }
@@ -11574,7 +11585,7 @@ function alrToast(msg) {
   t.onclick = () => t.remove(); document.body.appendChild(t); setTimeout(() => t.remove(), 9000);
 }
 function alrFire(a, c) {
-  const msg = alrWall(a) ? `${alrLabel(a)} moved from ${mktFmt(a.base)} to ${mktFmt(c)}` : `${alrLabel(a)} ${a.op === '>' ? 'rose above' : 'fell below'} ${alrFmt(a, a.val)} (now ${alrFmt(a, c)})`;
+  const msg = a.type === 'trend' ? `${alrLabel(a)} changed from ${TR_NAME[a.base]} to ${TR_NAME[c]}` : alrWall(a) ? `${alrLabel(a)} moved from ${mktFmt(a.base)} to ${mktFmt(c)}` : `${alrLabel(a)} ${a.op === '>' ? 'rose above' : 'fell below'} ${alrFmt(a, a.val)} (now ${alrFmt(a, c)})`;
   alrToast(msg);
   try { if ('Notification' in window && Notification.permission === 'granted') new Notification('TradePro alert', { body: msg }); } catch (e) { /* not supported */ }
   try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { /* not supported */ }
@@ -11590,13 +11601,20 @@ async function alrCheck() {
   try {
     if (act.some(a => a.type === 'price' || a.type === 'funding')) await mktPulseLoad();
     for (const u of new Set(act.filter(a => a.type === 'pcr' || alrWall(a)).map(a => a.sym))) ALR.opt[u] = await alrOpt(u);
+    for (const k of new Set(act.filter(a => a.type === 'trend').map(a => a.sym + '|' + a.tf))) { const [sy, tf] = k.split('|'); await trGet(sy, tf); }
   } catch (e) { /* try again next tick */ }
   ALR.busy = false;
   act.forEach(a => {
+    if (a.type === 'trend') { const d = TR.cache[a.sym + '|' + a.tf], st = d && d.data && d.data.state; if (!st) return; if (a.base == null) { a.base = st; return; } if (st !== a.base) { a.hit = Date.now(); a.at = st; alrFire(a, st); } return; }
     if (alrWall(a)) { const w = ALR.opt[a.sym], c = w && (a.type === 'callwall' ? w.cw : w.pw); if (c == null) return; if (a.base == null) { a.base = c; return; } if (c !== a.base) { a.hit = Date.now(); a.at = c; alrFire(a, c); } return; }
     const c = alrCur(a); if (c == null) return; if (a.op === '>' ? c >= a.val : c <= a.val) { a.hit = Date.now(); a.at = c; alrFire(a, c); }
   });
   alrSave(); if (MKT.seg === 'alerts') alrRender();
+}
+function alrRow(a) {
+  const w = alrWall(a), t = a.type === 'trend', title = t ? mktEsc(alrLabel(a)) + ' changes' : w ? mktEsc(alrLabel(a)) + ' moves' : mktEsc(alrLabel(a)) + (a.op === '>' ? ' above ' : ' below ') + alrFmt(a, a.val);
+  const sub = a.hit ? (t ? 'Changed from ' + TR_NAME[a.base] + ' to ' + TR_NAME[a.at] : w ? 'Moved from ' + mktFmt(a.base) + ' to ' + mktFmt(a.at) : 'Triggered at ' + alrFmt(a, a.at)) + ' · ' + new Date(a.hit).toLocaleString() : t ? (a.base == null ? 'Reading the current trend…' : 'Watching: ' + TR_NAME[a.base]) : w ? (a.base == null ? 'Reading the current wall…' : 'Watching ' + mktFmt(a.base)) : 'Now ' + alrFmt(a, alrCur(a));
+  return `<div class="mkt-ev"><div class="n">${title}<small>${sub}</small></div><span class="mkt-tag ${a.hit ? 'hol' : ''}">${a.hit ? 'Hit' : 'Active'}</span>${a.hit ? `<button class="mkt-chipbtn" onclick="alrRearm(${a.id})">Re-arm</button>` : ''}<button class="mkt-chipbtn" aria-label="Delete alert" onclick="alrDel(${a.id})">Delete</button></div>`;
 }
 function alrRender() {
   const el = document.getElementById('mkt-alr'); if (!el) return; const d = ALR.draft;
@@ -11604,7 +11622,7 @@ function alrRender() {
   const syms = optT ? ['BTC', 'ETH'] : (Object.keys(MKT.pt).length ? Object.entries(MKT.pt).sort((a, b) => b[1].turn - a[1].turn).slice(0, 25).map(x => x[0]) : ['BTCUSD', 'ETHUSD']);
   if (!syms.includes(d.sym)) syms.unshift(d.sym);
   const canNote = 'Notification' in window && Notification.permission === 'default';
-  const rows = ALR.list.map(a => `<div class="mkt-ev"><div class="n">${alrWall(a) ? mktEsc(alrLabel(a)) + ' moves' : mktEsc(alrLabel(a)) + (a.op === '>' ? ' above ' : ' below ') + alrFmt(a, a.val)}<small>${a.hit ? (alrWall(a) ? 'Moved from ' + mktFmt(a.base) + ' to ' + mktFmt(a.at) + ' · ' : 'Triggered at ' + alrFmt(a, a.at) + ' · ') + new Date(a.hit).toLocaleString() : alrWall(a) ? (a.base == null ? 'Reading the current wall…' : 'Watching ' + mktFmt(a.base)) : 'Now ' + alrFmt(a, alrCur(a))}</small></div><span class="mkt-tag ${a.hit ? 'hol' : ''}">${a.hit ? 'Hit' : 'Active'}</span>${a.hit ? `<button class="mkt-chipbtn" onclick="alrRearm(${a.id})">Re-arm</button>` : ''}<button class="mkt-chipbtn" aria-label="Delete alert" onclick="alrDel(${a.id})">Delete</button></div>`).join('');
+  const rows = ALR.list.map(alrRow).join('');
   el.innerHTML = `<div class="mkt-card" style="margin-top:0"><div class="alr-f">
     <select id="alr-type" aria-label="Alert type" onchange="alrType()"><option value="price"${d.type === 'price' ? ' selected' : ''}>Price</option><option value="funding"${d.type === 'funding' ? ' selected' : ''}>Funding %</option><option value="pcr"${d.type === 'pcr' ? ' selected' : ''}>PCR</option><option value="callwall"${d.type === 'callwall' ? ' selected' : ''}>Call wall moves</option><option value="putwall"${d.type === 'putwall' ? ' selected' : ''}>Put wall moves</option></select>
     <select id="alr-sym" aria-label="Instrument" onchange="alrSync()">${syms.map(s => `<option value="${s}"${s === d.sym ? ' selected' : ''}>${s.replace(/USD$/, '')}</option>`).join('')}</select>
@@ -11808,6 +11826,62 @@ function closeThemeMenu(){
 document.addEventListener('click',function(e){if(!e.target.closest||!e.target.closest('.theme-wrap'))closeThemeMenu();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeThemeMenu();});
 setTheme(document.documentElement.getAttribute('data-theme')||'dark');
+</script>
+<script>
+/* ---------- Trend view: SMA and RSI lean per timeframe. Uses closed candles from Delta (same fetch as the scanner). ---------- */
+const TR_KEY = 'tradepro_trend_rules_v1', TR_TFS = ['1d', '4h', '1h'], TR_LAB = { '1d': '1D', '4h': '4h', '1h': '1h' }, TR_SEC = { '1d': 86400, '4h': 14400, '1h': 3600 };
+const TR_NAME = { bull: 'Leans bullish', bear: 'Leans bearish', mix: 'Mixed' }, TR_ARROW = { bull: '▲', bear: '▼', mix: '◆' }, TR_CLS = { bull: 'tr-bu', bear: 'tr-be', mix: 'tr-mx' };
+const TR_DEF = { f: 20, s: 50, rp: 14, bu: 55, be: 45 };
+const TR = { rules: Object.assign({}, TR_DEF), cache: {}, sel: null, busy: false, pcr: {}, at: 0 };
+try { const r = JSON.parse(localStorage.getItem(TR_KEY) || 'null'); if (r) TR.rules = Object.assign(TR.rules, r); } catch (e) { /* ignore */ }
+function trSma(a, p) { const o = Array(a.length).fill(null); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= p) s -= a[i - p]; if (i >= p - 1) o[i] = s / p; } return o; }
+function trRsi(a, p) { const o = Array(a.length).fill(null); if (a.length <= p) return o; let g = 0, l = 0; for (let i = 1; i <= p; i++) { const d = a[i] - a[i - 1]; if (d >= 0) g += d; else l -= d; } g /= p; l /= p; o[p] = l === 0 ? 100 : 100 - 100 / (1 + g / l); for (let i = p + 1; i < a.length; i++) { const d = a[i] - a[i - 1]; g = (g * (p - 1) + (d > 0 ? d : 0)) / p; l = (l * (p - 1) + (d < 0 ? -d : 0)) / p; o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); } return o; }
+function trAnalyse(c) {
+  const R = TR.rules, f = trSma(c, R.f), s = trSma(c, R.s), L = trSma(c, 200), r = trRsi(c, R.rp);
+  const st = i => (f[i] == null || s[i] == null || r[i] == null) ? null : (c[i] > f[i] && c[i] > s[i] && r[i] > R.bu) ? 'bull' : (c[i] < f[i] && c[i] < s[i] && r[i] < R.be) ? 'bear' : 'mix';
+  const n = c.length - 1, now = st(n); if (!now) return null; let k = n; while (k > 0 && st(k - 1) === now) k--;
+  return { state: now, bars: n - k + 1, price: c[n], f: f[n], s: s[n], L: L[n], rsi: r[n] };
+}
+async function trGet(sym, tf) {
+  const key = sym + '|' + tf, hit = TR.cache[key]; if (hit && Date.now() - hit.at < 60000) return hit.data;
+  let data = null; try { const cs = await sscanCandles(sym.replace(/USD$/, ''), tf); if (cs.length >= 60) data = trAnalyse(cs.map(x => x.c)); } catch (e) { /* leave empty */ }
+  TR.cache[key] = { at: Date.now(), data }; return data;
+}
+function trRows() { const l = (typeof wlCur === 'function' ? wlCur().items : []).filter(r => r.live && r.type === 'crypto').map(r => r.live), u = [...new Set(l)].slice(0, 8); return u.length ? u : ['BTCUSD', 'ETHUSD']; }
+async function trLoad() {
+  if (TR.busy) return; TR.busy = true; const jobs = []; trRows().forEach(s => TR_TFS.forEach(t => jobs.push([s, t])));
+  try { for (let i = 0; i < jobs.length; i += 3) { await Promise.all(jobs.slice(i, i + 3).map(j => trGet(j[0], j[1]))); if (MKT.seg === 'trend') trRender(); } } catch (e) { /* ignore */ }
+  TR.at = Date.now(); TR.busy = false; if (MKT.seg === 'trend') { trRender(); mktStamp(); }
+}
+const trDur = (bars, tf) => { if (bars <= 1) return 'Just flipped'; const s = bars * TR_SEC[tf]; return s >= 2 * 86400 ? Math.round(s / 86400) + ' days' : s >= 86400 ? '1 day' : Math.round(s / 3600) + ' hours'; };
+const trRule = () => { const R = TR.rules; return `Bullish when price is above SMA ${R.f} and ${R.s} and RSI is above ${R.bu}. Bearish is the reverse, with RSI below ${R.be}. Anything else is mixed.`; };
+function trPick(sym, tf) { TR.sel = TR.sel && TR.sel.sym === sym && TR.sel.tf === tf ? null : { sym, tf }; trRender(); const b = sym.replace(/USD$/, ''); if (TR.sel && (b === 'BTC' || b === 'ETH') && (!TR.pcr[b] || Date.now() - TR.pcr[b].at > 60000)) alrOpt(b).then(o => { TR.pcr[b] = { at: Date.now(), v: o.pcr }; if (TR.sel && TR.sel.sym === sym) trRender(); }).catch(() => { /* PCR row stays blank */ }); }
+function trAlert(sym, tf) { const d = TR.cache[sym + '|' + tf]; if (!d || !d.data) return; if (ALR.list.some(a => a.type === 'trend' && a.sym === sym && a.tf === tf && !a.hit)) { alrToast('You already have an alert on this.'); return; } ALR.list.unshift({ id: Date.now(), type: 'trend', sym, tf, on: true, hit: null, base: d.data.state }); alrSave(); alrToast('Alert set: ' + sym.replace(/USD$/, '') + ' ' + TR_LAB[tf] + ' trend. Find it under the bell.'); alrCheck(); }
+function trRender() {
+  const el = document.getElementById('mkt-tr'); if (!el) return; const rows = trRows();
+  const cell = (s, t) => { const d = (TR.cache[s + '|' + t] || {}).data, sel = TR.sel && TR.sel.sym === s && TR.sel.tf === t; return d === undefined ? '<div class="tr-c tr-ld"><b>…</b></div>' : d === null ? '<div class="tr-c tr-ld"><b>–</b></div>' : `<button class="tr-c ${TR_CLS[d.state]}${sel ? ' sel' : ''}" aria-label="${s.replace(/USD$/, '')} ${TR_LAB[t]} ${TR_NAME[d.state]}" onclick="trPick('${s}','${t}')"><b>${TR_ARROW[d.state]}</b>RSI ${Math.round(d.rsi)}</button>`; };
+  const agg = s => { const ds = TR_TFS.map(t => (TR.cache[s + '|' + t] || {}).data).filter(Boolean), b = ds.filter(d => d.state === 'bull').length, e = ds.filter(d => d.state === 'bear').length; if (!ds.length) return '<div class="tr-ag">–</div>'; return b > e ? `<div class="tr-ag" style="color:var(--green)"><b>${b} of ${ds.length}</b><small>bullish</small></div>` : e > b ? `<div class="tr-ag" style="color:var(--red)"><b>${e} of ${ds.length}</b><small>bearish</small></div>` : `<div class="tr-ag" style="color:var(--warn)"><b>Mixed</b></div>`; };
+  let card = ''; const sd = TR.sel && (TR.cache[TR.sel.sym + '|' + TR.sel.tf] || {}).data;
+  if (sd) { const sy = TR.sel.sym, tf = TR.sel.tf, b = sy.replace(/USD$/, ''), R = TR.rules, pct = (a, x) => (a >= x ? 'Above · +' : 'Below · ') + ((a - x) / x * 100).toFixed(1) + '%', cl = a => a ? 'var(--green)' : 'var(--red)', pc = TR.pcr[b] && TR.pcr[b].v;
+    card = `<div class="mkt-card"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">${b} · ${TR_LAB[tf]}</b><span class="mkt-tag ${TR_CLS[sd.state]}">${TR_NAME[sd.state]}</span></div><div class="mkt-row"><span>Held for</span><span>${trDur(sd.bars, tf)}</span></div>
+    <div class="tr-mini">${TR_TFS.map(t => { const d = (TR.cache[sy + '|' + t] || {}).data; return d ? `<div class="${TR_CLS[d.state]}${t === tf ? ' sel' : ''}">${TR_ARROW[d.state]}<small>${TR_LAB[t]}</small></div>` : `<div class="tr-ld">–<small>${TR_LAB[t]}</small></div>`; }).join('')}</div>
+    <div class="mkt-row"><span>Price vs SMA ${R.f}</span><span style="color:${cl(sd.price >= sd.f)}">${pct(sd.price, sd.f)}</span></div><div class="mkt-row"><span>Price vs SMA ${R.s}</span><span style="color:${cl(sd.price >= sd.s)}">${pct(sd.price, sd.s)}</span></div>
+    ${sd.L != null ? `<div class="mkt-row"><span>SMA ${R.s} vs SMA 200</span><span style="color:${cl(sd.s >= sd.L)}">${sd.s >= sd.L ? 'Above' : 'Below'}</span></div>` : ''}<div class="mkt-row"><span>RSI ${R.rp}</span><span>${sd.rsi.toFixed(0)} · ${sd.rsi > R.bu ? 'above ' + R.bu : sd.rsi < R.be ? 'below ' + R.be : 'between ' + R.be + ' and ' + R.bu}</span></div>
+    ${pc != null ? `<div class="mkt-row"><span>Positions (PCR)</span><span>${pc.toFixed(2)} · ${pc > 2 || pc < 0.5 ? 'extreme, can reverse' : pc > 1.3 ? 'leans bullish' : pc < 0.7 ? 'leans bearish' : 'neutral'}</span></div>` : ''}
+    <div class="mkt-acts"><button class="mkt-btn pri" onclick="trAlert('${sy}','${tf}')">Alert me when this changes</button><button class="mkt-btn" onclick="trRulesOpen()">Edit rules</button></div><div class="mkt-note">${trRule()}</div></div>`; }
+  el.innerHTML = `<div class="tr-grid"><div></div>${TR_TFS.map(t => `<div class="tr-gh">${TR_LAB[t]}</div>`).join('')}<div class="tr-gh">Aligned</div>${rows.map(s => `<div class="tr-nm">${s.replace(/USD$/, '')}</div>${TR_TFS.map(t => cell(s, t)).join('')}${agg(s)}`).join('')}</div>
+  <div class="mkt-leg"><span><b style="color:var(--green)">▲</b> Leans bullish</span><span><b style="color:var(--red)">▼</b> Leans bearish</span><span><b style="color:var(--warn)">◆</b> Mixed</span></div>${card}
+  <div class="mkt-note">Daily sets the direction, the hourly is for timing. Rows follow your active watchlist (live crypto only). Trend lags price and is not a trade signal.</div>`;
+}
+function trRulesOpen() { const R = TR.rules, f = (id, l, v) => `<div style="margin-bottom:8px"><label class="field-label">${l}</label><input class="field-input" style="width:100%" id="${id}" type="number" inputmode="numeric" value="${v}"></div>`; wlSheet(`<div class="mkt-row" style="font-size:16px"><b style="font-weight:500">Trend rules</b><button class="mkt-chipbtn" onclick="wlClose()">Close</button></div><div style="height:10px"></div>${f('tr-f', 'Fast SMA', R.f)}${f('tr-s', 'Slow SMA', R.s)}${f('tr-rp', 'RSI period', R.rp)}${f('tr-bu', 'RSI bullish above', R.bu)}${f('tr-be', 'RSI bearish below', R.be)}<div class="mkt-acts"><button class="mkt-btn pri" onclick="trRulesSave()">Save rules</button><button class="mkt-btn" onclick="trRulesSave(true)">Reset</button></div><div class="mkt-note" id="tr-err"></div>`); }
+function trRulesSave(reset) {
+  const g = id => parseFloat(rskGv(id)), n = reset ? Object.assign({}, TR_DEF) : { f: g('tr-f'), s: g('tr-s'), rp: g('tr-rp'), bu: g('tr-bu'), be: g('tr-be') };
+  if (![n.f, n.s, n.rp].every(v => Number.isInteger(v) && v >= 2 && v <= 150) || !(n.f < n.s) || !(n.be >= 0 && n.bu <= 100 && n.be < n.bu)) { document.getElementById('tr-err').textContent = 'Use whole numbers from 2 to 150 with fast below slow, and the RSI bearish level below the bullish level.'; return; }
+  TR.rules = n; TR.cache = {}; try { localStorage.setItem(TR_KEY, JSON.stringify(n)); } catch (e) { /* ignore */ } wlClose(); trRender(); trLoad();
+}
+const trMiniHtml = sym => `<div class="tr-mini" onclick="TR.sel={sym:'${sym}',tf:'4h'};mktSeg('trend')" title="Open Trend">${TR_TFS.map(t => { const d = (TR.cache[sym + '|' + t] || {}).data; return d ? `<div class="${TR_CLS[d.state]}">${TR_ARROW[d.state]}<small>${TR_LAB[t]}</small></div>` : `<div class="tr-ld">…<small>${TR_LAB[t]}</small></div>`; }).join('')}</div>`;
+async function trMiniLoad(sym) { try { await Promise.all(TR_TFS.map(t => trGet(sym, t))); } catch (e) { /* ignore */ } if (MKT.sym === sym) mktSheet(); }
+
 </script>
 </body>
 </html>
