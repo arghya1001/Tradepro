@@ -2188,7 +2188,7 @@
       <label class="field-label">Underlying</label>
       <select class="field-input" id="sscan-und" onchange="sscanDraft.und=this.value">
         <option value="BTC">BTC</option><option value="ETH">ETH</option><option value="BTC,ETH">BTC + ETH</option>
-        <option value="NIFTY">Nifty 50 (daily only)</option><option value="SENSEX">Sensex (daily only)</option><option value="BANKNIFTY">Bank Nifty (daily only)</option><option value="NIFTY,SENSEX,BANKNIFTY">Nifty + Sensex + Bank Nifty (daily only)</option>
+        <option value="NIFTY">Nifty 50 (daily only)</option><option value="BANKNIFTY">Bank Nifty (daily only)</option><option value="NIFTY,BANKNIFTY">Nifty + Bank Nifty (daily only)</option>
       </select>
 
       <label class="field-label">Timeframe</label>
@@ -2787,7 +2787,9 @@ function renderSScans() {
     const sideCol = sc.side === 'Sell' ? 'var(--red)' : 'var(--green)';
     let res = '';
     if (r) {
-      res = r.rows.map(row => {
+      const bigScan = r.rows.length > 12, shownRows = bigScan ? r.rows.filter(x => x && x.ok).slice(0, 80) : r.rows;
+      const bigHead = bigScan ? `<div class="strat-legs" style="margin-top:6px"><b>${r.rows.filter(x => x && x.ok).length}</b> of ${r.rows.length} match${r.rows.some(x => x && x.err) ? ' · ' + r.rows.filter(x => x && x.err).length + ' could not be scanned' : ''}${r.rows.filter(x => x && x.ok).length > 80 ? ' · showing the first 80' : ''}</div>` : '';
+      res = bigHead + shownRows.map(row => {
         if (row.err) return `<div class="strat-legs" style="margin-top:6px"><b>${row.und}</b> — could not scan: ${sscanEsc(row.err)}</div>`;
         const chip = row.ok ? `<span style="color:var(--green); font-weight:700">MATCH</span>` : `<span style="color:var(--text-faint); font-weight:600">no match</span>`;
         const lines = row.details.map(d => `<div style="font-size:11.5px; color:${d.ok ? 'var(--green)' : 'var(--text-muted)'}">${d.ok ? '✓' : '✗'} ${sscanEsc(d.text)}</div>`).join('');
@@ -2803,12 +2805,12 @@ function renderSScans() {
     let best = null; rows.forEach(x => { if (x && x.details && x.details.length) { const n = x.details.filter(d => d.ok).length; if (!best || n > best.n) best = { n, t: x.details.length }; } });
     metas[i] = { match: hit.length > 0, cat };
     const dots = best ? Array.from({ length: Math.min(best.t, 6) }, (_, k) => `<i class="sc2-dot${k < best.n ? ' f' : ''}"></i>`).join('') : '';
-    const chip = !r ? '<span class="sc2-st n">Not scanned</span>' : hit.length ? `<span class="sc2-st m">Match · ${hit.join(' + ')}</span>` : `<span class="sc2-st n">${best && best.n ? best.n + ' of ' + best.t : 'No match'}</span>`;
+    const chip = !r ? '<span class="sc2-st n">Not scanned</span>' : hit.length ? `<span class="sc2-st m">Match · ${hit.length > 3 ? hit.slice(0, 3).join(' + ') + ' +' + (hit.length - 3) : hit.join(' + ')}</span>` : `<span class="sc2-st n">${best && best.n ? best.n + ' of ' + best.t : 'No match'}</span>`;
     const key = 's:' + sc.name, sub = scSubOf(key);
     return `<details class="sc2-row" data-k="${sscanEsc(key)}" ${scOpen[key] ? 'open' : ''} ontoggle="scToggle(this)">
       <summary><span class="sc2-rbar" style="background:${catCol}"></span>
         <span class="sc2-main"><span class="sc2-name">${sscanEsc(sc.name)}</span>
-          <span class="sc2-sub"><b style="color:${sideCol}; font-weight:600">${sc.side === 'Sell' ? 'Sell' : 'Buy'}</b> ${sscanEsc(sc.strat)} · ${sc.und.replace(/,/g, ' + ')} · ${sc.tf}</span></span>
+          <span class="sc2-sub"><b style="color:${sideCol}; font-weight:600">${sc.side === 'Sell' ? 'Sell' : 'Buy'}</b> ${sscanEsc(sc.strat)} · ${sscanUndLabel(sc.und)} · ${sc.tf}</span></span>
         <span class="sc2-dots">${dots}</span>${chip}${SC_CHEV}</summary>
       <div class="sc2-body">
         ${scSubBar(sub)}
@@ -2979,15 +2981,36 @@ function saveSScan() {
 /* ---- scanning ---- */
 const sscanCache = {};   // 'BTCUSD|15m' -> { at, candles } so several scans share one fetch
 /* ---- Indian indices: daily candles come from our own GitHub data repo (updated every weekday after close) ----
-   Set INDIA_DATA_BASE to your repo's raw URL, e.g. 'https://raw.githubusercontent.com/YOURNAME/tradepro-data/main/data/' */
-const INDIA_DATA_BASE = 'https://raw.githubusercontent.com/YOURNAME/tradepro-data/main/data/';
-const INDIA_SYMS = ['NIFTY', 'SENSEX', 'BANKNIFTY'];
+   Set INDIA_DATA_BASE to your repo's raw URL, e.g. 'https://raw.githubusercontent.com/arghya1001/Tradepro/data/' */
+const INDIA_DATA_BASE = 'https://raw.githubusercontent.com/arghya1001/Tradepro/data/';
+let INDIA_SYMS = ['NIFTY', 'BANKNIFTY'];   // + the Nifty 500 stocks once data/nifty500.json loads
 const isIndiaUnd = u => INDIA_SYMS.indexOf(u) !== -1;
+const indiaFileKey = u => String(u).toUpperCase().replace(/[^A-Z0-9]/g, '_');   // M&M -> M_M (same rule as the fetch script)
+let INDIA_STOCKS = [];
+/* Loads the Nifty 50 stock list (written by the daily GitHub Action) and adds it to the scanner's Underlying menu. */
+const indiaListReady = (async () => {
+  try {
+    const r = await fetch(INDIA_DATA_BASE + 'nifty500.json?v=' + Math.floor(Date.now() / 600000));
+    if (!r.ok) return;
+    const list = await r.json();
+    if (!Array.isArray(list) || !list.length) return;
+    INDIA_STOCKS = list.map(String);
+    INDIA_SYMS = ['NIFTY', 'BANKNIFTY'].concat(INDIA_STOCKS);
+    const sel = document.getElementById('sscan-und');
+    if (sel && !sel.querySelector('[data-india-stocks]')) {
+      const all = document.createElement('option'); all.value = INDIA_STOCKS.join(','); all.textContent = 'All Nifty 500 stocks (daily only)'; all.setAttribute('data-india-stocks', '1');
+      const grp = document.createElement('optgroup'); grp.label = 'Nifty 500 stocks (daily only)'; grp.setAttribute('data-india-stocks', '1');
+      INDIA_STOCKS.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; grp.appendChild(o); });
+      sel.appendChild(all); sel.appendChild(grp);
+      if (typeof sscanDraft !== 'undefined' && sscanDraft && sscanDraft.und) sel.value = sscanDraft.und;
+    }
+  } catch (e) { /* offline or data repo not set up yet: crypto scans still work */ }
+})();
+const sscanUndLabel = u => { const a = String(u).split(','); return a.length > 3 ? a.length + ' stocks' : a.join(' + '); };
 async function indiaCandles(und, res) {
-  if (res !== '1d') throw new Error('Nifty / Sensex / Bank Nifty support the 1d timeframe only for now');
-  if (INDIA_DATA_BASE.indexOf('YOURNAME') !== -1) throw new Error('set INDIA_DATA_BASE in the app to your GitHub data repo first');
-  const r = await liveWithTimeout(fetch(INDIA_DATA_BASE + und + '_1d.json?v=' + Math.floor(Date.now() / 600000)), 12000);
-  if (!r.ok) throw new Error('data file not found (HTTP ' + r.status + ') — has the GitHub Action run yet?');
+  if (res !== '1d') throw new Error('Nifty and Nifty stocks support the 1d timeframe only for now');
+  const r = await liveWithTimeout(fetch(INDIA_DATA_BASE + indiaFileKey(und) + '_1d.json?v=' + Math.floor(Date.now() / 600000)), 12000);
+  if (!r.ok) throw new Error('data file not found (HTTP ' + r.status + ') — has the daily GitHub Action run yet?');
   let candles = await r.json();
   if (!Array.isArray(candles)) throw new Error('bad data file');
   // drop today's candle until the NSE/BSE session has closed (15:30 IST)
@@ -2997,6 +3020,7 @@ async function indiaCandles(und, res) {
   return candles;
 }
 async function sscanCandles(und, res) {
+  await indiaListReady;
   if (isIndiaUnd(und)) return indiaCandles(und, res);
   const key = und + 'USD|' + res, hit = sscanCache[key];
   if (hit && Date.now() - hit.at < 20000) return hit.candles;
@@ -3129,15 +3153,23 @@ async function runSScan(i) {
   if (!sc) return;
   sscanResults[i] = { at: Date.now(), rows: sc.und.split(',').map(u => ({ und: u, ok: false, price: null, details: [{ ok: false, text: 'scanning…' }] })) };
   renderSScans();
-  const rows = [];
-  for (const und of sc.und.split(',')) {
-    try {
-      const candles = await sscanCandles(und, sc.tf);
-      if (candles.length < 5) throw new Error('not enough candles returned');
-      const ev = sscanEval(candles, sc.conds, sscanExitRule(sc), sscanSlRule(sc));
-      rows.push({ und, price: ev.price, details: ev.details, ok: sc.fresh ? ev.allNow && !ev.allPrev : ev.allNow, lastActSec: ev.lastActSec, barsSince: ev.barsSince, actCount: ev.actCount });
-    } catch (e) { rows.push({ und, err: liveErrText(e) }); }
-  }
+  const list = sc.und.split(','), rows = new Array(list.length);
+  await indiaListReady;
+  const workers = isIndiaUnd(list[0]) ? 8 : 1;   // India files are static (fast); Delta stays one-at-a-time
+  let next = 0, done = 0;
+  const work = async () => {
+    while (next < list.length) {
+      const k = next++, und = list[k];
+      try {
+        const candles = await sscanCandles(und, sc.tf);
+        if (candles.length < 5) throw new Error('not enough candles returned');
+        const ev = sscanEval(candles, sc.conds, sscanExitRule(sc), sscanSlRule(sc));
+        rows[k] = { und, price: ev.price, details: ev.details, ok: sc.fresh ? ev.allNow && !ev.allPrev : ev.allNow, lastActSec: ev.lastActSec, barsSince: ev.barsSince, actCount: ev.actCount };
+      } catch (e) { rows[k] = { und, err: liveErrText(e) }; }
+      done++;
+    }
+  };
+  await Promise.all(Array.from({ length: workers }, work));
   sscanResults[i] = { at: Date.now(), rows };
   renderSScans();
 }
