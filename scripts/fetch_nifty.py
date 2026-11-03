@@ -8,6 +8,7 @@ close (tolerance TOL). If NSE can't be reached, files are still written but mark
 unverified in data/meta.json. Standard library only.
 """
 import csv, io, json, os, sys, time, urllib.request, urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
 OUT = os.environ.get("OUT_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
@@ -33,7 +34,7 @@ def get(url, tries=3, headers=None):
     for k in range(tries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*", **(headers or {})})
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=20) as r:
                 return r.read()
         except Exception as e:           # noqa: BLE001
             last = e
@@ -126,19 +127,36 @@ def write_json(path, obj):
 def main():
     os.makedirs(OUT, exist_ok=True)
     stocks, list_src = nse_stock_list()
+    print("stock list:", len(stocks), "from", list_src, flush=True)
     jobs = [(k, v[0], "index", v[1]) for k, v in INDICES.items()] + [(s, s + ".NS", "stock", s) for s in stocks]
 
     data, fails = {}, []
-    for app_sym, ysym, kind, key in jobs:
+
+    def one(job):
+        app_sym, ysym, kind, key = job
+        c = yahoo_candles(ysym)
+        if len(c) < MIN_CANDLES:
+            raise ValueError("only %d candles" % len(c))
+        return app_sym, (kind, key, c)
+
+    done = 0
+    ex = ThreadPoolExecutor(max_workers=6)
+    futs = {ex.submit(one, j): j for j in jobs}
+    for fu in as_completed(futs):
+        done += 1
+        app_sym = futs[fu][0]
         try:
-            c = yahoo_candles(ysym)
-            if len(c) < MIN_CANDLES:
-                raise ValueError("only %d candles" % len(c))
-            data[app_sym] = (kind, key, c)
+            sym, val = fu.result()
+            data[sym] = val
         except Exception as e:           # noqa: BLE001
             fails.append((app_sym, str(e)))
-            print("FAIL", app_sym, e)
-        time.sleep(0.25)
+            print("FAIL", app_sym, str(e)[:200], flush=True)
+        if done == 15 and not data:
+            ex.shutdown(wait=False, cancel_futures=True)
+            sys.exit("Stopped early: the first 15 downloads all failed. Yahoo is probably blocking GitHub. Last error: " + (fails[-1][1][:200] if fails else "?"))
+        if done % 50 == 0:
+            print("progress %d/%d (ok %d, failed %d)" % (done, len(jobs), len(data), len(fails)), flush=True)
+    ex.shutdown()
 
     ref_day = max((v[2][-1]["t"] for v in data.values()), default=None)
     off_idx, off_stk = ({}, {})
