@@ -69,9 +69,10 @@ def num(x):
 def dec(b):
     """NSE's older files are not always UTF-8; never let one odd character stop the run."""
     try:
-        return b.decode("utf-8-sig")
+        t = b.decode("utf-8-sig")
     except UnicodeDecodeError:
-        return b.decode("latin-1")
+        t = b.decode("latin-1")
+    return "\n".join(t.splitlines())        # unify \r, \r\n and \n line endings
 
 def file_key(sym):                      # must match the app: replace(/[^A-Z0-9]/g,'_')
     return "".join(ch if ch.isalnum() and ch.isascii() else "_" for ch in sym.upper())
@@ -154,7 +155,11 @@ def main():
 
     results, errors = {}, []
     def job(d):
-        return d, parse_day(d, want)
+        try:
+            return d, parse_day(d, want)
+        except (csv.Error, UnicodeError, ValueError, KeyError) as e:    # one unreadable old file must not stop the run
+            print("WARN skipped %s (unreadable file: %s)" % (d, str(e)[:80]), flush=True)
+            return d, None
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         for n, fut in enumerate(ex.map(job, days), 1):
             try:
