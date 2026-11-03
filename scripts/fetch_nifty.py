@@ -74,6 +74,10 @@ def dec(b):
         t = b.decode("latin-1")
     return "\n".join(t.splitlines())        # unify \r, \r\n and \n line endings
 
+def clean(r):
+    """One CSV row -> {header: value}, tolerating messy rows (extra columns, missing values)."""
+    return {(k or "").strip(): (v.strip() if isinstance(v, str) else "") for k, v in r.items() if isinstance(k, str)}
+
 def file_key(sym):                      # must match the app: replace(/[^A-Z0-9]/g,'_')
     return "".join(ch if ch.isalnum() and ch.isascii() else "_" for ch in sym.upper())
 
@@ -105,7 +109,7 @@ def parse_day(day, want):
         return None
     rows = {}
     for r in csv.DictReader(io.StringIO(dec(eq))):
-        r = {(k or "").strip(): (v or "").strip() for k, v in r.items()}
+        r = clean(r)
         s = r.get("SYMBOL")
         if s not in want or r.get("SERIES") not in ("EQ", "BE", "BZ", "SM", "ST"):
             continue
@@ -118,7 +122,7 @@ def parse_day(day, want):
     ix = fetch_any(IDX_URLS, d)
     if ix:
         for r in csv.DictReader(io.StringIO(dec(ix))):
-            r = {(k or "").strip(): (v or "").strip() for k, v in r.items()}
+            r = clean(r)
             app = INDICES.get(r.get("Index Name", "").lower())
             if not app:
                 continue
@@ -157,9 +161,9 @@ def main():
     def job(d):
         try:
             return d, parse_day(d, want)
-        except (csv.Error, UnicodeError, ValueError, KeyError) as e:    # one unreadable old file must not stop the run
+        except (csv.Error, UnicodeError, ValueError, KeyError, AttributeError, TypeError) as e:    # one unreadable old file must not stop the run
             print("WARN skipped %s (unreadable file: %s)" % (d, str(e)[:80]), flush=True)
-            return d, None
+            return d, False                                    # False = unreadable (not the same as a holiday)
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         for n, fut in enumerate(ex.map(job, days), 1):
             try:
@@ -177,19 +181,26 @@ def main():
     if not trading and not hist:
         sys.exit("No NSE files could be read at all. NSE may be blocking GitHub.")
 
-    for d in trading:
+    gap = False                                              # an unreadable day just before: previous-close can't be compared safely
+    for d in sorted(results):
+        if results[d] is False:
+            gap = True
+            continue
+        if not results[d]:
+            continue
         t = d.strftime("%Y-%m-%d")
         for sym, (o, h, l, c, v, pc) in results[d].items():
             cs = hist.setdefault(sym, [])
             if cs and cs[-1]["t"] >= t:
                 continue
-            if cs and pc and cs[-1]["c"] > 0:
+            if cs and pc and cs[-1]["c"] > 0 and not gap:
                 ratio = pc / cs[-1]["c"]
                 if abs(ratio - 1) > SPLIT_TOL:                # split / bonus / rights: rescale older candles
                     print("adjust %s on %s by %.4f" % (sym, t, ratio))
                     for x in cs:
                         x["o"] *= ratio; x["h"] *= ratio; x["l"] *= ratio; x["c"] *= ratio; x["v"] = x["v"] / ratio
             cs.append({"t": t, "o": o, "h": max(h, o, c), "l": min(l, o, c), "c": c, "v": v})
+        gap = False
 
     cutoff = (today - timedelta(days=HISTORY_DAYS)).strftime("%Y-%m-%d")
     written = []
