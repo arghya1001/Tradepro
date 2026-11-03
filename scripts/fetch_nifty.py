@@ -66,6 +66,13 @@ def num(x):
     except ValueError:
         return None
 
+def dec(b):
+    """NSE's older files are not always UTF-8; never let one odd character stop the run."""
+    try:
+        return b.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return b.decode("latin-1")
+
 def file_key(sym):                      # must match the app: replace(/[^A-Z0-9]/g,'_')
     return "".join(ch if ch.isalnum() and ch.isascii() else "_" for ch in sym.upper())
 
@@ -78,7 +85,7 @@ def write_json(path, obj):
 def stock_list():
     raw = fetch(LIST_URL)
     if raw:
-        syms = [r["Symbol"].strip() for r in csv.DictReader(io.StringIO(raw.decode("utf-8-sig"))) if r.get("Symbol")]
+        syms = [r["Symbol"].strip() for r in csv.DictReader(io.StringIO(dec(raw))) if r.get("Symbol")]
         if len(syms) >= 400:
             return syms, "nse"
     try:
@@ -96,7 +103,7 @@ def parse_day(day, want):
     if eq is None:
         return None
     rows = {}
-    for r in csv.DictReader(io.StringIO(eq.decode("utf-8-sig"))):
+    for r in csv.DictReader(io.StringIO(dec(eq))):
         r = {(k or "").strip(): (v or "").strip() for k, v in r.items()}
         s = r.get("SYMBOL")
         if s not in want or r.get("SERIES") not in ("EQ", "BE", "BZ", "SM", "ST"):
@@ -109,7 +116,7 @@ def parse_day(day, want):
         rows[s] = (o, h, l, c, num(r.get("TTL_TRD_QNTY")) or 0, num(r.get("PREV_CLOSE")))
     ix = fetch_any(IDX_URLS, d)
     if ix:
-        for r in csv.DictReader(io.StringIO(ix.decode("utf-8-sig"))):
+        for r in csv.DictReader(io.StringIO(dec(ix))):
             r = {(k or "").strip(): (v or "").strip() for k, v in r.items()}
             app = INDICES.get(r.get("Index Name", "").lower())
             if not app:
