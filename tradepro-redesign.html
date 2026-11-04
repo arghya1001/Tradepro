@@ -477,6 +477,27 @@
     .rb-side { display: block; overflow-y: auto; padding: 14px 16px; border-left: 1px solid var(--border-soft); background: var(--surface); }
     .rb-strip { display: none !important; }
   }
+  /* Scanner results v2 */
+  .rs2-card { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 14px; padding: 14px; }
+  .rs2-big { font-size: 15px; color: var(--text-muted); } .rs2-big b { font-size: 34px; color: var(--accent); font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .rs2-meter { height: 8px; border-radius: 4px; background: var(--border-soft); margin-top: 10px; overflow: hidden; } .rs2-meter u { display: block; height: 100%; background: var(--accent); }
+  .rs2-meta { display: flex; gap: 16px; margin-top: 8px; font-size: 12px; color: var(--text-muted); } .rs2-meta b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .rs2-lbl { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); display: flex; justify-content: space-between; } .rs2-lbl span { text-transform: none; letter-spacing: 0; }
+  .rs2-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; } .rs2-stats b { display: block; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; } .rs2-stats small { font-size: 11.5px; color: var(--text-faint); }
+  .rs2-hist { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin-top: 12px; } .rs2-hist i { flex: 1; border-radius: 2px; }
+  .rs2-hl { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-faint); margin-top: 3px; }
+  .rs2-warn { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(242,184,75,.12); border: 1px solid rgba(242,184,75,.35); color: var(--text); font-size: 12.5px; line-height: 1.45; }
+  .rs2-list { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 14px; overflow: hidden; }
+  .rs2-s { border-top: 1px solid var(--border-soft); } .rs2-s:first-child { border-top: 0; } .rs2-s[open] { background: var(--surface); }
+  .rs2-s > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 10px 14px; min-height: 52px; cursor: pointer; } .rs2-s > summary::-webkit-details-marker { display: none; }
+  .rs2-g { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex: none; }
+  .rs2-g.gA { background: rgba(25,195,174,.16); color: var(--accent); } .rs2-g.gB { background: rgba(91,157,255,.16); color: #5B9DFF; } .rs2-g.gC { background: rgba(242,184,75,.16); color: #D9A030; }
+  .rs2-nm { flex: 1; min-width: 0; } .rs2-nm b { display: block; font-size: 15px; } .rs2-nm small { font-size: 11.5px; color: var(--text-faint); }
+  .rs2-px { text-align: right; min-width: 78px; font-variant-numeric: tabular-nums; } .rs2-px b { display: block; font-size: 14px; font-weight: 600; } .rs2-px span { font-size: 12px; }
+  .rs2-body { padding: 2px 14px 14px; } .rs2-fb { margin-top: 10px; } .rs2-fb > div { display: flex; justify-content: space-between; font-size: 13px; } .rs2-fb b { font-variant-numeric: tabular-nums; }
+  .rs2-fb i { display: block; height: 6px; border-radius: 3px; background: var(--border-soft); margin-top: 5px; } .rs2-fb u { display: block; height: 100%; border-radius: 3px; background: var(--accent); } .rs2-fb em { font-style: normal; font-size: 11.5px; color: var(--text-faint); }
+  .rs2-plan { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; } .rs2-plan small { display: block; font-size: 11.5px; color: var(--text-faint); } .rs2-plan b { font-size: 14px; font-variant-numeric: tabular-nums; }
+  .rs2-act > summary { cursor: pointer; font-size: 13px; color: var(--text-muted); min-height: 44px; display: flex; align-items: center; }
   .rs-res { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
   .rs-sum { font-size: 12.5px; }
   .rs-sym { border-top: 1px solid var(--border-soft); padding-top: 9px; }
@@ -4037,8 +4058,8 @@ function rsScanCandles(sc, base, baseTf) {
     triggers.push({ ts: base[i].ts, price: px, after, up, dn, avail });
   }
   const firstOk = ok.findIndex(x => x !== null), now = n ? ok[n - 1] : null;
-  let since = null; if (now === true) { let j = n - 1; while (j > 0 && ok[j - 1] === true) j--; since = base[j].ts; }
-  return { now, det: last ? last.det : [], since, triggers, n, from: n ? base[0].ts : null, to: n ? base[n - 1].ts : null, evalFrom: firstOk >= 0 ? base[firstOk].ts : null, baseTf };
+  let since = null, days = 0; if (now === true) { let j = n - 1; while (j > 0 && ok[j - 1] === true) j--; since = base[j].ts; days = n - j; }
+  return { now, det: last ? last.det : [], since, days, x: n > 25 ? rsExtras(base) : null, triggers, n, from: n ? base[0].ts : null, to: n ? base[n - 1].ts : null, evalFrom: firstOk >= 0 ? base[firstOk].ts : null, baseTf };
 }
 /* RULE ENGINE END */
 
@@ -4200,8 +4221,89 @@ function rsBarsHtml(R) {
     <div class="rs-bars">${bk.map(b => `<div class="rs-bar${b.n ? '' : ' z'}" title="${b.label}: ${b.n}">${b.n && bk.length <= 12 ? b.n : ''}<i style="height:${b.n ? Math.max(4, Math.round(b.n / max * 40)) : 1}px"></i></div>`).join('')}</div>
     <div class="rs-bl">${bk.map((b, i) => `<span>${i % every === 0 || i === bk.length - 1 ? b.label : ''}</span>`).join('')}</div>${older ? `<div class="rs-line">${older} more before that.</div>` : ''}</div>`;
 }
+/* ---- Scanner results v2 (big lists such as Nifty 500): track record, graded setups, trade plan ---- */
+var rsView = { f: 'ab', n: 15 }, RS_RISK = 5000;
+function rsClamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+function rsExtras(base) {
+  const n = base.length; if (n < 25) return null;
+  const last = base[n - 1], prev = base[n - 2];
+  let vs = 0; for (let i = n - 21; i < n - 1; i++) vs += base[i].v || 0;
+  const volAvg = vs / 20; let atr = 0;
+  for (let i = n - 14; i < n; i++) atr += Math.max(base[i].h - base[i].l, Math.abs(base[i].h - base[i - 1].c), Math.abs(base[i].l - base[i - 1].c));
+  return { px: last.c, chg: (last.c / prev.c - 1) * 100, volRatio: volAvg > 0 ? (last.v || 0) / volAvg : null, atr: atr / 14, ret20: (last.c / base[n - 21].c - 1) * 100, spark: base.slice(-10).map(c => c.c) };
+}
+function rsIdxRet20() { const h = rsCache['IN|NIFTY']; if (!h || h.candles.length < 22) return null; const c = h.candles; return (c[c.length - 1].c / c[c.length - 21].c - 1) * 100; }
+function rsGrade(r, idx) {
+  const x = r.x; if (!x) return null;
+  const vol = x.volRatio == null ? 0 : rsClamp((x.volRatio - 0.8) / 1.2, 0, 1) * 40, rel = x.ret20 - (idx || 0), str = rsClamp(rel / 6, 0, 1) * 35;
+  const age = r.days || 1, fresh = age <= 1 ? 25 : age === 2 ? 18 : age <= 4 ? 10 : 4, score = Math.round(vol + str + fresh);
+  return { score, g: score >= 70 ? 'A' : score >= 50 ? 'B' : 'C', vol, str, fresh, rel };
+}
+function rsPlan(x) {
+  const risk = 1.5 * x.atr; if (!(risk > 0)) return null;
+  return { stop: x.px - risk, tgt: x.px + 2 * risk, stopPct: -risk / x.px * 100, tgtPct: 2 * risk / x.px * 100, qty: Math.floor(RS_RISK / risk) };
+}
+function rsRecord(R) {
+  const bins = new Array(9).fill(0); let n = 0, w = 0, sum = 0, sigs = 0;
+  R.results.forEach(r => { if (r.err) return; sigs += r.triggers.length; r.triggers.forEach(t => { const v = t.after[5]; if (v == null) return; n++; if (v > 0) w++; sum += v; bins[rsClamp(Math.floor((v + 8) / (16 / 9)), 0, 8)]++; }); });
+  return { sigs, n, win: n ? w / n * 100 : null, avg: n ? sum / n : null, bins };
+}
+function rsSetView(k) { rsView.f = k; rsView.n = 15; renderSScans(); }
+function rsMore() { rsView.n += 15; renderSScans(); }
+function rsSpark(a) {
+  if (!a || a.length < 2) return '';
+  const lo = Math.min(...a), hi = Math.max(...a), rg = hi - lo || 1;
+  return `<svg width="52" height="22" viewBox="0 0 52 22" aria-hidden="true"><polyline points="${a.map((v, i) => (i * 52 / (a.length - 1)).toFixed(1) + ',' + (20 - (v - lo) / rg * 18).toFixed(1)).join(' ')}" fill="none" stroke="${a[a.length - 1] >= a[0] ? 'var(--green)' : 'var(--red)'}" stroke-width="2"/></svg>`;
+}
+function rsBar(label, val, pct, note) { return `<div class="rs2-fb"><div><span>${label}</span><b>${val}</b></div><i><u style="width:${Math.round(rsClamp(pct, 0, 1) * 100)}%"></u></i>${note ? `<em>${note}</em>` : ''}</div>`; }
+function rsStockHtml(r, R, idx) {
+  const x = r.x, g = r.gr, pl = rsPlan(x), isNew = r.since != null && r.since === r.to, yr = true;
+  const trs = r.triggers, meas = trs.filter(t => t.after[5] != null), won = meas.filter(t => t.after[5] > 0).length, avg = meas.length ? meas.reduce((s, t) => s + t.after[5], 0) / meas.length : null;
+  const rows = trs.slice().reverse().slice(0, 5).map(t => `<tr><td>${rsFmt(t.ts, R.baseTf, yr)}</td><td>${rsPx(t.price)}</td><td>${rsPct(t.after[1])}</td><td>${rsPct(t.after[3])}</td><td>${rsPct(t.after[5])}</td><td>${rsPct(t.after[10])}</td></tr>`).join('');
+  return `<details class="rs2-s"><summary><span class="rs2-g g${g.g}">${g.g}</span>
+    <span class="rs2-nm"><b>${sscanEsc(r.sym)}</b><small>${isNew ? 'New today' : 'Day ' + (r.days || 1)} · Vol ${x.volRatio == null ? '\u2014' : x.volRatio.toFixed(1) + 'x'} · Score ${g.score}</small></span>
+    ${rsSpark(x.spark)}<span class="rs2-px"><b>${rsPx(x.px)}</b>${rsPct(x.chg)}</span></summary>
+    <div class="rs2-body">
+      <div class="rs2-lbl">Why it grades ${g.g}</div>
+      ${rsBar('Volume vs 20-day average', x.volRatio == null ? '\u2014' : x.volRatio.toFixed(1) + 'x', g.vol / 40)}
+      ${rsBar(idx == null ? '20-day move' : 'Strength vs Nifty (20D)', (g.rel >= 0 ? '+' : '') + g.rel.toFixed(1) + '%', g.str / 35)}
+      ${rsBar('Signal freshness', isNew ? 'Today' : 'Day ' + (r.days || 1), g.fresh / 25)}
+      ${pl ? `<div class="rs2-lbl" style="margin-top:12px">Trade plan <span>risk \u20b9${RS_RISK.toLocaleString()}</span></div>
+      <div class="rs2-plan"><div><small>Entry</small><b>${rsPx(x.px)}</b></div><div><small>Quantity</small><b>${pl.qty.toLocaleString()} shares</b></div>
+      <div><small>Stop (1.5\u00d7 ATR)</small><b class="rs-dn">${rsPx(pl.stop)} \u00b7 ${pl.stopPct.toFixed(1)}%</b></div><div><small>Target (2R)</small><b class="rs-up">${rsPx(pl.tgt)} \u00b7 +${pl.tgtPct.toFixed(1)}%</b></div></div>` : ''}
+      <div class="rs2-lbl" style="margin-top:12px">This stock on this scanner</div>
+      <div class="rs-line" style="margin:2px 0 6px">${meas.length ? `<b>${won} of ${meas.length}</b> past signals were up after 5 candles \u00b7 average ${rsPct(avg)}` : 'No past signals old enough to measure.'}</div>
+      ${rows ? `<div class="rs-tbl"><table><thead><tr><th>Triggered</th><th>Price</th><th>+1</th><th>+3</th><th>+5</th><th>+10</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}
+    </div></details>`;
+}
+function rsBigHtml(R) {
+  const U = R.unit || 'stock', idx = rsIdxRet20(), rec = rsRecord(R), ok = R.results.filter(r => !r.err), tot = ok.length;
+  const matches = ok.filter(r => r.now === true), pct = tot ? matches.length / tot * 100 : 0, isNew = r => r.since != null && r.since === r.to;
+  matches.forEach(r => { r.gr = rsGrade(r, idx); });
+  const graded = matches.filter(r => r.gr), newN = graded.filter(isNew).length, abN = graded.filter(r => r.gr.g !== 'C').length;
+  let list = graded; if (rsView.f === 'ab') list = list.filter(r => r.gr.g !== 'C'); else if (rsView.f === 'new') list = list.filter(isNew);
+  list = list.slice().sort((a, b) => b.gr.score - a.gr.score);
+  const mx = Math.max(1, ...rec.bins), hist = rec.bins.map((n, i) => `<i style="height:${Math.max(3, Math.round(n / mx * 34))}px;background:var(${i < 4 ? '--red' : '--green'});opacity:${i === 4 ? .55 : .9}"></i>`).join('');
+  const chip = (k, l) => `<button class="sc2-chip${rsView.f === k ? ' on' : ''}" onclick="rsSetView('${k}')">${l}</button>`;
+  const wchips = [['7', '7D'], ['30', '30D'], ['90', '90D'], ['all', 'All data']].map(([k, l]) => `<button class="sc2-chip${rsWin === k ? ' on' : ''}" onclick="rsSetWin('${k}')">${l}</button>`).join('');
+  return `<div class="rs-res">
+    <div class="rs2-card"><div class="rs2-big"><b>${matches.length}</b> of ${tot} ${U}s match</div>
+      <div class="rs2-meter"><u style="width:${pct.toFixed(1)}%"></u></div>
+      <div class="rs2-meta"><span><b>${newN}</b> new on last close</span><span><b>${abN}</b> graded A or B</span></div></div>
+    <div class="rs2-card"><div class="rs2-lbl">Track record \u00b7 all available data</div>
+      ${rec.win == null ? '<div class="rs-line">Not enough history to measure yet.</div>' : `<div class="rs2-stats"><div><b class="${rec.win >= 50 ? 'rs-up' : 'rs-dn'}">${rec.win.toFixed(0)}%</b><small>up after 5 candles</small></div><div><b>${rsPct(rec.avg)}</b><small>average move</small></div><div><b>${rec.sigs.toLocaleString()}</b><small>signals</small></div></div>
+      <div class="rs2-hist" role="img" aria-label="Distribution of moves after 5 candles">${hist}</div><div class="rs2-hl"><span>\u22128%</span><span>0</span><span>+8%</span></div>`}
+      ${pct > 40 ? `<div class="rs2-warn">This rule matches ${pct.toFixed(0)}% of ${U}s, so it is not narrowing much. Ranking matters more than matching: start with the A and B grades, or add a volume or trend-strength rule.</div>` : ''}</div>
+    <div class="sc2-chips" style="margin:0">${chip('ab', 'A + B grade ' + abN)}${chip('new', 'New today ' + newN)}${chip('all', 'All matches ' + graded.length)}</div>
+    <div class="rs2-list">${list.length ? list.slice(0, rsView.n).map(r => rsStockHtml(r, R, idx)).join('') : '<div class="rs-line" style="padding:14px">Nothing in this filter right now.</div>'}</div>
+    ${list.length > rsView.n ? `<button class="btn-ghost" onclick="rsMore()">Show ${Math.min(15, list.length - rsView.n)} more (${list.length - rsView.n} left)</button>` : ''}
+    <details class="rs2-act"><summary>Activity and history</summary><div class="sc2-chips" style="margin:8px 0">${wchips}</div>${rsBarsHtml(R)}</details>
+    ${R.warn ? `<div class="rs-line" style="color:var(--red)">${sscanEsc(R.warn)}</div>` : ''}
+    <div class="rs-line">Grades combine volume, strength vs Nifty and how fresh the signal is. Stops and targets are simple ATR-based examples. A guide for ranking, not advice; past results don\u2019t predict future ones.</div></div>`;
+}
 function rsResultsHtml(R) {
   if (!R) return '';
+  if (R.results.length > 12 && R.results.some(r => !r.err && r.x)) return rsBigHtml(R);
   const chips = [['7', '7D'], ['30', '30D'], ['90', '90D'], ['all', 'All data']].map(([k, l]) => `<button class="sc2-chip${rsWin === k ? ' on' : ''}" onclick="rsSetWin('${k}')">${l}</button>`).join('');
   let tot = 0; R.results.forEach(r => { if (!r.err) tot += rsInWin(r.triggers).length; });
   const U = R.unit || 'coin';
