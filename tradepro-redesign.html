@@ -1359,6 +1359,43 @@
 @media (prefers-reduced-motion:reduce){.spk-dot{animation:none}}
 .mkt-chips button.hotx{position:relative}.mkt-chips button.hotx::after{content:"";position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--red)}
 .spk-out{display:flex;gap:6px;margin-top:5px}.spk-out div{flex:1;text-align:center;border-radius:6px;padding:4px 0;font:11px var(--mono);background:var(--surface-2)}.spk-out small{display:block;font:11px var(--sans);color:var(--text-muted)}
+/* ===== India markets (heatmap + Home strip) ===== */
+.inx-tag{display:inline-block;font:500 11.5px var(--mono);border-radius:6px;padding:2px 8px;background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border)}
+.inx-up{color:var(--green)}.inx-dn{color:var(--red)}
+.inx-lab{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
+.inx-link{background:none;border:0;color:var(--accent);font:500 13px var(--sans);cursor:pointer;padding:6px 4px;min-height:32px}
+.inx-seg{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:2px}
+.inx-seg button{font:500 12px var(--mono);color:var(--text-muted);background:none;border:0;border-radius:6px;min-height:30px;min-width:38px;padding:0 10px;cursor:pointer}
+.inx-seg button.on{background:var(--surface-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+.inx-bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px}
+.inx-bar .g{display:flex;align-items:center;gap:8px}
+.inx-wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;align-items:start}
+.inx-map{position:relative;height:540px;border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--border)}
+.inx-t{position:absolute;border:0;padding:0;margin:0;cursor:pointer;color:var(--text);text-align:left;overflow:hidden;outline:1px solid var(--bg);outline-offset:-1px;font-family:var(--mono)}
+.inx-t:focus-visible{outline:2px solid var(--text);outline-offset:-3px;z-index:3}
+.inx-t.sel{outline:2px solid var(--text);outline-offset:-2px;z-index:2}
+.inx-t span{display:block;padding:4px 6px;line-height:1.25}.inx-t b{display:block;font-weight:600}
+.inx-sec{position:absolute;height:18px;line-height:18px;padding:0 6px;pointer-events:none;z-index:1;font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);background:color-mix(in srgb,var(--bg) 82%,transparent);white-space:nowrap;overflow:hidden}
+.inx-legend{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 2px 0;font:12px var(--mono);color:var(--text-muted)}
+.inx-legend i{display:block;width:200px;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--red-dim),var(--surface) 50%,var(--green-dim));border:1px solid var(--border)}
+.inx-peek{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.inx-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:7px 0;border-bottom:1px solid var(--border-soft)}
+.inx-row:last-child{border-bottom:0}.inx-row span:first-child{color:var(--text-muted)}
+.inx-msg{padding:28px 12px;text-align:center;color:var(--text-muted);font-size:13px}
+.inx-btn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);font:500 13px var(--sans);padding:9px 14px;border-radius:8px;cursor:pointer;min-height:38px}
+.inx-home{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;margin-bottom:12px}
+.inx-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-width:0}
+.inx-stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.inx-svg{width:100%;height:auto;display:block}
+.inx-line{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round}.inx-dn-s .inx-line{stroke:var(--red)}
+.inx-dot{fill:var(--green);stroke:var(--bg);stroke-width:2}.inx-dn-s .inx-dot{fill:var(--red)}
+.inx-gs{stop-color:var(--green)}.inx-dn-s .inx-gs{stop-color:var(--red)}
+.inx-grid{stroke:var(--border-soft);fill:none}
+.inx-mini{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:28px;gap:3px}
+.inx-mini button{border:0;border-radius:4px;color:var(--text);font:500 10.5px var(--mono);text-align:left;padding:3px 5px;cursor:pointer;overflow:hidden;min-width:0}
+.inx-head{display:flex;justify-content:space-between;align-items:center;margin:4px 0 8px}
+@media (max-width:880px){.inx-wrap,.inx-home{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:700px){.inx-map{height:440px}.inx-legend i{width:120px}}
 </style>
 </head>
 <body>
@@ -1428,6 +1465,7 @@
         </div>
       </section>
 
+      <div id="home-india"></div>
       <div id="home-today" class="mkt-card" style="margin:0 0 10px"></div>
       <div id="home-rv" class="mkt-card rvrow" onclick="rvOpen('week')"></div>
       <div id="wl-bar"></div>
@@ -1497,9 +1535,13 @@
         <div class="mkt-head"><div class="mkt-title">Markets</div><div class="mkt-stamp" id="mkt-stamp"><i></i>Loading</div></div>
         <div class="mkt-seg"><button id="mkt-b-pulse" class="on" onclick="mktSeg('pulse')">Pulse</button><button id="mkt-b-options" onclick="mktSeg('options')">Options</button><button id="mkt-b-calendar" onclick="mktSeg('calendar')">Calendar</button><button id="mkt-b-trend" onclick="mktSeg('trend')">Trend</button></div>
         <div id="mkt-pulse">
+          <div class="mkt-chips" id="inx-mk"></div>
+          <div id="mkt-crypto">
           <div class="mkt-chips" id="mkt-cols"></div>
           <div class="mkt-heat" id="mkt-heat"></div>
           <div id="mkt-sheet"></div>
+          </div>
+          <div id="inx-pane" style="display:none"></div>
         </div>
         <div id="mkt-options" style="display:none"><div id="mkt-opt"></div></div>
         <div id="mkt-calendar" style="display:none"><div id="mkt-cal"></div></div>
@@ -2350,7 +2392,7 @@ function showView(name) {
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.toggle('active', id === name || (!['strategies','scanner','replay','markets'].includes(name) && id === 'home'));
   });
-  if (name === 'home') { try { homeToday(); wlBar(); } catch (e) { /* not ready */ } }
+  if (name === 'home') { try { homeToday(); wlBar(); } catch (e) { /* not ready */ } try { inxHome(); } catch (e) { /* not ready */ } }
   if (name === 'review') { try { rskRender(); wkRender(); jrnRender(); } catch (e) { /* not ready */ } }
   if (name === 'markets') { try { mktEnter(); } catch (e) { /* not ready */ } }
   if (name === 'scanner') { try { renderSPerf(); } catch (e) { /* not ready */ } }
@@ -3028,6 +3070,7 @@ let INDIA_SYMS = ['NIFTY', 'BANKNIFTY'];   // + the Nifty 500 stocks once data/n
 const isIndiaUnd = u => INDIA_SYMS.indexOf(u) !== -1;
 const indiaFileKey = u => String(u).toUpperCase().replace(/[^A-Z0-9]/g, '_');   // M&M -> M_M (same rule as the fetch script)
 let INDIA_STOCKS = [];
+const INDIA_META = {};   // optional { name, sector, idx } per stock when nifty500.json holds objects
 /* Loads the Nifty 50 stock list (written by the daily GitHub Action) and adds it to the scanner's Underlying menu. */
 const indiaListReady = (async () => {
   try {
@@ -3035,7 +3078,7 @@ const indiaListReady = (async () => {
     if (!r.ok) return;
     const list = await r.json();
     if (!Array.isArray(list) || !list.length) return;
-    INDIA_STOCKS = list.map(String);
+    INDIA_STOCKS = list.map(x => { if (x && typeof x === 'object') { const k = String(x.sym || x.symbol || x.ticker || ''); if (k) INDIA_META[k] = x; return k; } return String(x); }).filter(Boolean);
     INDIA_SYMS = ['NIFTY', 'BANKNIFTY'].concat(INDIA_STOCKS);
     if (typeof RS_MARKETS !== 'undefined' && RS_MARKETS.nifty50) { RS_MARKETS.nifty50.symbols = INDIA_SYMS.slice(); RS_MARKETS.nifty50.active = true; try { if (typeof rbDraft !== 'undefined' && rbDraft) rbRenderScope(); } catch (e) { /* builder closed */ } }
     const sel = document.getElementById('sscan-und');
@@ -11545,6 +11588,7 @@ const mktSgn = (v, d) => (v >= 0 ? '+' : '') + v.toFixed(d == null ? 1 : d) + '%
 function mktAge(t) { return t ? Math.max(0, Math.round((Date.now() - t) / 1000)) : null; }
 function mktStamp() {
   const el = document.getElementById('mkt-stamp'); if (!el) return;
+  if (MKT.seg === 'pulse' && INX.mk === 'in') { el.className = 'mkt-stamp' + (INX.err ? ' stale' : ''); el.innerHTML = '<i></i>' + (INX.snap ? 'EOD · ' + inxDate(INX.snap.asOf) : INX.err ? 'Data unavailable' : 'Loading'); return; }
   const t = MKT.seg === 'options' ? MKT.oat : MKT.seg === 'pulse' ? MKT.ptAt : 0, a = mktAge(t);
   if (MKT.seg === 'calendar' || MKT.seg === 'alerts' || MKT.seg === 'trend') { el.className = 'mkt-stamp'; el.innerHTML = MKT.seg === 'alerts' ? 'Checks every 30s' : MKT.seg === 'trend' ? 'Updates every minute' : 'Times in IST'; return; }
   el.className = 'mkt-stamp' + (a == null || a > 60 ? ' stale' : '');
@@ -11554,7 +11598,7 @@ function mktEnter() { mktSeg(MKT.seg); clearInterval(MKT.timer); MKT.timer = set
 function mktTick() {
   const v = document.getElementById('view-markets');
   if (document.hidden || !v || v.style.display === 'none') return;
-  if (MKT.seg === 'pulse' && mktAge(MKT.ptAt) > 20) mktPulseLoad();
+  if (MKT.seg === 'pulse' && INX.mk === 'crypto' && mktAge(MKT.ptAt) > 20) mktPulseLoad();
   else if (MKT.seg === 'options' && mktAge(MKT.oat) > 30) mktOptLoad();
   else if (MKT.seg === 'trend' && mktAge(TR.at) > 60) trLoad();
   else if (MKT.seg === 'calendar') mktCalRender();
@@ -11563,7 +11607,7 @@ function mktTick() {
 function mktSeg(name) {
   MKT.seg = name;
   ['pulse', 'options', 'calendar', 'trend', 'alerts'].forEach(n => { document.getElementById('mkt-' + n).style.display = n === name ? '' : 'none'; const bb = document.getElementById('mkt-b-' + n); if (bb) bb.classList.toggle('on', n === name); });
-  if (name === 'pulse') { mktPulseRender(); mktPulseLoad(); } else if (name === 'options') { mktOptRender(); mktOptLoad(); } else if (name === 'trend') { trRender(); trLoad(); } else if (name === 'alerts') { alrRender(); mktPulseLoad(); try { spkAlrPanel(); } catch (e) { /* ignore */ } } else mktCalRender();
+  if (name === 'pulse') { inxPulseEnter(); } else if (name === 'options') { mktOptRender(); mktOptLoad(); } else if (name === 'trend') { trRender(); trLoad(); } else if (name === 'alerts') { alrRender(); mktPulseLoad(); try { spkAlrPanel(); } catch (e) { /* ignore */ } } else mktCalRender();
   mktStamp();
 }
 /* ----- Pulse ----- */
@@ -12221,6 +12265,177 @@ function spkTick() { const v = document.getElementById('view-markets'), on = v &
 (function () { const st = document.createElement('div'); st.id = 'spk-strip'; st.style.display = 'none'; document.body.appendChild(st); })();
 setInterval(spkTick, 30000); setTimeout(spkTick, 8000);
 
+</script>
+<script>
+/* ===== India markets: data snapshot, heatmap (Markets > Pulse) and Home strip =====
+   Data: INDIA_DATA_BASE + 'india_snapshot.json' (written by build_india_snapshot.py in the daily Action).
+   If that file is not there yet, the snapshot is built in the browser from the daily candle files (first 80 stocks). */
+const INX = { snap: null, err: null, busy: null, at: 0, mk: 'in', met: '1D', size: 'T', grp: 'S', idx: 'N50', sel: null, rng: 66, hasSector: false, hasIdx: false, prog: '' };
+try { const m = localStorage.getItem('tp-inx-mk'); if (m === 'in' || m === 'crypto') INX.mk = m; } catch (e) { /* ignore */ }
+const INX_MAX = { '1D': 3, '1W': 6, '1M': 12, '3M': 20 };
+const INX_KEY = { '1D': 'chgPct', '1W': 'ret1w', '1M': 'ret1m', '3M': 'ret3m' };
+const inxEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const inxOk = v => typeof v === 'number' && isFinite(v);
+const inxPct = v => !inxOk(v) ? '–' : Math.abs(v) < 0.005 ? '0.00%' : (v >= 0 ? '▲ +' : '▼ ') + Math.abs(v).toFixed(2) + '%';
+const inxSm = v => (Math.abs(v) < 0.05 ? '0.0' : (v > 0 ? '+' : '') + v.toFixed(1)) + '%';
+const inxCls = v => !inxOk(v) ? '' : v >= 0 ? 'inx-up' : 'inx-dn';
+const inxNum = (v, d) => v.toLocaleString('en-IN', { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d });
+const inxDate = s => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(s || ''); return m ? (+m[3]) + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+m[2] - 1] : ''; };
+const inxTint = (v, mx) => { const p = Math.round(8 + Math.min(1, Math.abs(v) / mx) * 92); return `color-mix(in srgb, var(${v >= 0 ? '--green-dim' : '--red-dim'}) ${p}%, var(--surface))`; };
+
+/* ---------- data ---------- */
+function inxStat(c, longSpark) {
+  const n = c.length; if (n < 2) return null; const L = c[n - 1], P = c[n - 2], y = c.slice(-250);
+  const ret = k => n > k ? (L.c / c[n - 1 - k].c - 1) * 100 : null;
+  return { c: L.c, chg: L.c - P.c, chgPct: (L.c / P.c - 1) * 100, ret1w: ret(5), ret1m: ret(21), ret3m: ret(63), turnover: L.c * (L.v || 0), hi52: Math.max.apply(null, y.map(d => d.h)), lo52: Math.min.apply(null, y.map(d => d.l)), spark: c.slice(longSpark ? -260 : -30).map(d => d.c), asOf: L.t };
+}
+async function inxBuild() {
+  const syms = ['NIFTY', 'BANKNIFTY'].concat(INDIA_STOCKS.slice(0, 80)), got = {}; let i = 0, done = 0;
+  const worker = async () => { while (i < syms.length) { const s = syms[i++]; try { got[s] = await indiaCandles(s, '1d'); } catch (e) { /* skip */ } done++; INX.prog = done + ' / ' + syms.length; const m = document.getElementById('inx-prog'); if (m) m.textContent = INX.prog; } };
+  await Promise.all([1, 2, 3, 4, 5, 6].map(worker));
+  if (!got.NIFTY || got.NIFTY.length < 2) throw new Error('Nifty data not found. Has the daily data job run yet?');
+  const snap = { asOf: got.NIFTY[got.NIFTY.length - 1].t, indices: {}, stocks: [] };
+  ['NIFTY', 'BANKNIFTY'].forEach(s => { if (got[s]) { const st = inxStat(got[s], true); if (st) snap.indices[s] = Object.assign({ name: s === 'NIFTY' ? 'Nifty 50' : 'Bank Nifty' }, st); } });
+  INDIA_STOCKS.forEach(s => { if (!got[s]) return; const st = inxStat(got[s]); if (!st) return; const m = INDIA_META[s] || {}; snap.stocks.push(Object.assign({ sym: s, name: m.name || s, sector: m.sector || '', idx: m.idx || '' }, st)); });
+  return snap;
+}
+async function inxLoad(force) {
+  if (INX.busy) return INX.busy;
+  if (!force && INX.snap && Date.now() - INX.at < 600000) return INX.snap;
+  INX.err = null;
+  INX.busy = (async () => {
+    try {
+      await indiaListReady;
+      let snap = null;
+      try { const r = await liveWithTimeout(fetch(INDIA_DATA_BASE + 'india_snapshot.json?v=' + Math.floor(Date.now() / 600000)), 12000); if (r.ok) { const j = await r.json(); if (j && j.indices && j.indices.NIFTY && Array.isArray(j.stocks)) snap = j; } } catch (e) { /* fall back to candle files */ }
+      if (!snap) snap = await inxBuild();
+      INX.snap = snap; INX.at = Date.now();
+      INX.hasSector = snap.stocks.some(s => s.sector); INX.hasIdx = snap.stocks.some(s => s.idx === 'N50');
+      if (!INX.hasIdx && INX.idx !== 'ALL') INX.idx = 'ALL';
+      if (!INX.sel || !snap.stocks.some(s => s.sym === INX.sel)) { const t = snap.stocks.slice().sort((a, b) => b.turnover - a.turnover)[0]; INX.sel = t ? t.sym : null; }
+    } catch (e) { INX.err = (e && e.message) || 'Could not load India data'; }
+    INX.busy = null; inxRenderAll();
+  })();
+  return INX.busy;
+}
+function inxUniverse() {
+  const S = INX.snap; if (!S) return [];
+  let L = S.stocks.filter(s => inxOk(s.turnover) && inxOk(s[INX_KEY[INX.met]]));
+  if (INX.hasIdx && INX.idx === 'N50') L = L.filter(s => s.idx === 'N50'); else if (INX.hasIdx && INX.idx === 'NN50') L = L.filter(s => s.idx === 'NN50');
+  return L.sort((a, b) => b.turnover - a.turnover).slice(0, 120);
+}
+function inxArea(vals, W, H, pad) {
+  const mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals), rg = (mx - mn) || 1;
+  const pts = vals.map((v, i) => [i / (vals.length - 1) * W, pad + (1 - (v - mn) / rg) * (H - 2 * pad)]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('');
+  return { line, area: line + 'L' + W + ' ' + H + 'L0 ' + H + 'Z', last: pts[pts.length - 1] };
+}
+function inxSquarify(items, x, y, w, h) {
+  const out = []; let rest = items.slice();
+  const worst = (row, s) => { const sum = row.reduce((a, b) => a + b.a, 0), mx = Math.max.apply(null, row.map(r => r.a)), mn = Math.min.apply(null, row.map(r => r.a)); return Math.max(s * s * mx / (sum * sum), sum * sum / (s * s * mn)); };
+  while (rest.length) {
+    const sh = Math.min(w, h); let row = [rest[0]], i = 1;
+    while (i < rest.length) { const t = row.concat(rest[i]); if (worst(t, sh) <= worst(row, sh)) { row = t; i++; } else break; }
+    const sum = row.reduce((a, b) => a + b.a, 0);
+    if (w >= h) { const cw = sum / h; let cy = y; row.forEach(r => { const ch = r.a / cw; out.push({ d: r.d, x, y: cy, w: cw, h: ch }); cy += ch; }); x += cw; w -= cw; }
+    else { const rh = sum / w; let cx = x; row.forEach(r => { const cw2 = r.a / rh; out.push({ d: r.d, x: cx, y, w: cw2, h: rh }); cx += cw2; }); y += rh; h -= rh; }
+    rest = rest.slice(row.length);
+  }
+  return out;
+}
+const inxLay = (arr, x, y, w, h, key) => { const tot = arr.reduce((a, d) => a + key(d), 0) || 1; return inxSquarify(arr.map(d => ({ d, a: key(d) / tot * w * h })).sort((a, b) => b.a - a.a), x, y, w, h); };
+
+/* ---------- Markets > Pulse ---------- */
+function inxSetMk(m) { INX.mk = m; try { localStorage.setItem('tp-inx-mk', m); } catch (e) { /* ignore */ } inxPulseEnter(); }
+function inxPulseEnter() {
+  const chips = document.getElementById('inx-mk'), cr = document.getElementById('mkt-crypto'), pane = document.getElementById('inx-pane'); if (!chips || !cr || !pane) return;
+  chips.innerHTML = `<button class="${INX.mk === 'in' ? 'on' : ''}" onclick="inxSetMk('in')">India</button><button class="${INX.mk === 'crypto' ? 'on' : ''}" onclick="inxSetMk('crypto')">Crypto</button>`;
+  cr.style.display = INX.mk === 'crypto' ? '' : 'none'; pane.style.display = INX.mk === 'in' ? '' : 'none';
+  if (INX.mk === 'crypto') { mktPulseRender(); mktPulseLoad(); } else { inxPaneRender(); inxLoad(); }
+  mktStamp();
+}
+function inxSet(k, v) { INX[k] = v; inxPaneRender(); }
+function inxPick(s) { INX.sel = s; inxMapRender(); inxPeekRender(); }
+function inxPaneRender() {
+  const el = document.getElementById('inx-pane'); if (!el) return;
+  if (!INX.snap) {
+    el.innerHTML = INX.err ? `<div class="inx-msg">${inxEsc(INX.err)}<br><br><button class="inx-btn" onclick="inxLoad(true);inxPaneRender()">Retry</button> <button class="inx-btn" onclick="inxSetMk('crypto')">Show crypto</button></div>` : `<div class="inx-msg">Loading India market… <span id="inx-prog">${inxEsc(INX.prog)}</span></div>`;
+    return;
+  }
+  const seg = (key, arr) => `<div class="inx-seg" role="group">${arr.map(([l, v]) => `<button type="button" class="${INX[key] === v ? 'on' : ''}" onclick="inxSet('${key}','${v}')">${l}</button>`).join('')}</div>`;
+  const mx = INX_MAX[INX.met];
+  el.innerHTML = `<div class="inx-bar">
+    ${INX.hasIdx ? `<div class="g">${seg('idx', [['Nifty 50', 'N50'], ['Next 50', 'NN50'], ['All', 'ALL']])}</div>` : ''}
+    <div class="g"><span class="inx-lab">Colour</span>${seg('met', [['1D', '1D'], ['1W', '1W'], ['1M', '1M'], ['3M', '3M']])}</div>
+    <div class="g"><span class="inx-lab">Size</span>${seg('size', [['Turnover', 'T'], ['Equal', 'E']])}</div>
+    ${INX.hasSector ? `<div class="g"><span class="inx-lab">Group</span>${seg('grp', [['Sector', 'S'], ['None', 'N']])}</div>` : ''}
+  </div>
+  <div class="inx-wrap"><div><div class="inx-map" id="inx-map" role="group" aria-label="India stock heatmap"></div>
+    <div class="inx-legend"><span>−${mx}%</span><i></i><span>+${mx}%</span><span style="margin-left:auto">Tile area = ${INX.size === 'T' ? 'turnover (close × volume)' : 'equal'}. Colour = ${INX.met} change.</span></div></div>
+    <div id="inx-peek"></div></div>`;
+  inxMapRender(); inxPeekRender();
+}
+function inxMapRender() {
+  const map = document.getElementById('inx-map'); if (!map) return;
+  const L = inxUniverse(); if (!L.length) { map.innerHTML = '<div class="inx-msg">No stocks with data for this view.</div>'; return; }
+  const W = map.clientWidth || 800, H = map.clientHeight || 540, VW = 1000, VH = 600, key = INX.met, k = INX_KEY[key], mx = INX_MAX[key], wt = d => INX.size === 'T' ? Math.max(1, d.turnover) : 1;
+  let tiles = '', secs = '';
+  const tile = r => {
+    const d = r.d, v = d[k], pw = r.w / VW * W, ph = r.h / VH * H, big = pw > 78 && ph > 46, mid = pw > 44 && ph > 28, fs = big ? Math.min(15, 10 + pw / 45) : 10;
+    tiles += `<button type="button" class="inx-t${INX.sel === d.sym ? ' sel' : ''}" onclick="inxPick('${inxEsc(d.sym).replace(/'/g, '')}')" aria-label="${inxEsc(d.sym)} ${inxEsc(inxPct(v))}" style="left:${(r.x / VW * 100).toFixed(2)}%;top:${(r.y / VH * 100).toFixed(2)}%;width:${(r.w / VW * 100).toFixed(2)}%;height:${(r.h / VH * 100).toFixed(2)}%;background:${inxTint(v, mx)}">${mid ? `<span style="font-size:${fs.toFixed(1)}px"><b>${inxEsc(d.sym)}</b>${big ? inxEsc(inxPct(v)) : inxSm(v)}</span>` : ''}</button>`;
+  };
+  if (INX.grp === 'S' && INX.hasSector) {
+    const m = {}; L.forEach(d => { (m[d.sector || 'Other'] = m[d.sector || 'Other'] || []).push(d); });
+    const gs = Object.keys(m).map(n => ({ n, list: m[n] }));
+    inxLay(gs, 0, 0, VW, VH, g => g.list.reduce((a, d) => a + wt(d), 0)).forEach(gr => {
+      const g = gr.d, avg = g.list.reduce((a, d) => a + d[k], 0) / g.list.length, hh = 18 / H * VH;
+      secs += `<div class="inx-sec" style="left:${(gr.x / VW * 100).toFixed(2)}%;top:${(gr.y / VH * 100).toFixed(2)}%;width:${(gr.w / VW * 100).toFixed(2)}%">${inxEsc(g.n)} <span style="opacity:.85">${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%</span></div>`;
+      inxLay(g.list, gr.x, gr.y + hh, gr.w, Math.max(4, gr.h - hh), wt).forEach(tile);
+    });
+  } else inxLay(L, 0, 0, VW, VH, wt).forEach(tile);
+  map.innerHTML = tiles + secs;
+}
+function inxPeekRender() {
+  const el = document.getElementById('inx-peek'); if (!el) return;
+  const d = INX.snap && INX.snap.stocks.find(s => s.sym === INX.sel); if (!d) { el.innerHTML = ''; return; }
+  const a = inxArea(d.spark, 320, 100, 6), dn = d.spark[d.spark.length - 1] < d.spark[0], tc = d.turnover / 1e7, hi = d.hi52, lo = d.lo52, pos = hi > lo ? (d.c - lo) / (hi - lo) * 100 : 50, gid = 'inxp';
+  const row = (l, v, c) => `<div class="inx-row"><span>${l}</span><span class="${c || ''}" style="font-family:var(--mono)">${v}</span></div>`;
+  el.innerHTML = `<div class="inx-peek"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><b style="font-size:18px;font-weight:600">${inxEsc(d.sym)}</b>${d.sector ? ` <span class="inx-tag">${inxEsc(d.sector)}</span>` : ''}<div style="font-size:12.5px;color:var(--text-muted)">${inxEsc(d.name)}</div></div></div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin:8px 0 2px;flex-wrap:wrap"><span style="font:500 24px var(--mono)">₹${inxNum(d.c)}</span><span class="${inxCls(d.chgPct)}" style="font-family:var(--mono)">${inxPct(d.chgPct)}</span></div>
+    <svg class="inx-svg ${dn ? 'inx-dn-s' : ''}" viewBox="0 0 320 100" role="img" aria-label="Last 30 sessions"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop class="inx-gs" offset="0" style="stop-opacity:.28"/><stop class="inx-gs" offset="1" style="stop-opacity:0"/></linearGradient></defs><path d="${a.area}" fill="url(#${gid})"/><path class="inx-line" d="${a.line}"/></svg>
+    <div style="font:11.5px var(--mono);color:var(--text-muted);margin:2px 0 6px">Last 30 sessions · daily close</div>
+    ${row('1 week', inxPct(d.ret1w), inxCls(d.ret1w))}${row('1 month', inxPct(d.ret1m), inxCls(d.ret1m))}${row('3 months', inxPct(d.ret3m), inxCls(d.ret3m))}${row('Turnover', '₹' + inxNum(tc, tc >= 100 ? 0 : 1) + ' cr')}
+    <div style="margin-top:10px"><div class="inx-lab" style="margin-bottom:6px">52 week range</div><div style="position:relative;height:6px;background:var(--surface-2);border-radius:3px"><i style="position:absolute;left:${Math.max(0, Math.min(100, pos)).toFixed(0)}%;top:-4px;width:3px;height:14px;background:var(--text);border-radius:2px"></i></div><div style="display:flex;justify-content:space-between;font:12px var(--mono);margin-top:8px"><span>${inxNum(lo, 0)}</span><span style="color:var(--text-muted)">${((1 - d.c / hi) * 100).toFixed(1)}% from high</span><span>${inxNum(hi, 0)}</span></div></div></div>`;
+}
+let inxRz = 0; window.addEventListener('resize', () => { clearTimeout(inxRz); inxRz = setTimeout(() => { const p = document.getElementById('inx-pane'); if (p && p.style.display !== 'none' && INX.snap) inxMapRender(); }, 150); });
+
+/* ---------- Home strip ---------- */
+function inxOpenMap(s) { if (s) INX.sel = s; showView('markets'); mktSeg('pulse'); if (INX.mk !== 'in') inxSetMk('in'); else inxPaneRender(); }
+function inxSetRng(n) { INX.rng = n; inxHome(); }
+function inxHome() {
+  const el = document.getElementById('home-india'); if (!el) return;
+  const S = INX.snap, head = `<div class="inx-head"><div style="display:flex;align-items:center;gap:10px"><b style="font-size:15px;font-weight:600">India market</b>${S ? `<span class="inx-tag">EOD · ${inxEsc(inxDate(S.asOf))}</span>` : ''}</div><button class="inx-link" onclick="inxOpenMap()">Open Markets ›</button></div>`;
+  if (!S) { el.innerHTML = head + `<div class="inx-card"><div class="inx-msg" style="padding:14px">${INX.err ? inxEsc(INX.err) + '<br><br><button class="inx-btn" onclick="inxLoad(true);inxHome()">Retry</button>' : 'Loading India market… <span id="inx-prog">' + inxEsc(INX.prog) + '</span>'}</div></div>`; if (!INX.err && !INX.busy) inxLoad(); return; }
+  const nf = S.indices.NIFTY, bn = S.indices.BANKNIFTY, n = Math.min(INX.rng, nf.spark.length), vals = nf.spark.slice(-n), a = inxArea(vals, 640, 250, 16), dn = vals[vals.length - 1] < vals[0], y = nf.spark.slice(-250);
+  const rg = [['1M', 22], ['3M', 66], ['6M', 126], ['1Y', 252]].map(([l, v]) => `<button type="button" class="${INX.rng === v ? 'on' : ''}" onclick="inxSetRng(${v})">${l}</button>`).join('');
+  let grid = ''; for (let i = 1; i < 4; i++) grid += 'M0 ' + (i * 62.5) + 'L640 ' + (i * 62.5);
+  const main = `<div class="inx-card ${dn ? 'inx-dn-s' : ''}"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start"><div><div style="display:flex;gap:8px;align-items:center"><b style="font-size:16px;font-weight:600">Nifty 50</b><span class="inx-tag">NSE</span></div><div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span style="font:500 28px var(--mono)">${inxNum(nf.c)}</span><span class="${inxCls(nf.chgPct)}" style="font-family:var(--mono)">${inxPct(nf.chgPct)}</span></div></div><div class="inx-seg" role="group" aria-label="Nifty range">${rg}</div></div>
+    <svg class="inx-svg" viewBox="0 0 640 250" role="img" aria-label="Nifty 50 trend" style="margin-top:6px"><defs><linearGradient id="inxh" x1="0" y1="0" x2="0" y2="1"><stop class="inx-gs" offset="0" style="stop-opacity:.26"/><stop class="inx-gs" offset="1" style="stop-opacity:0"/></linearGradient></defs><path class="inx-grid" d="${grid}"/><path d="${a.area}" fill="url(#inxh)"/><path class="inx-line" d="${a.line}"/><circle class="inx-dot" cx="${Math.min(a.last[0], 634).toFixed(1)}" cy="${a.last[1].toFixed(1)}" r="4"/></svg>
+    <div style="font:12px var(--mono);color:var(--text-muted);margin-top:4px">52w ${inxNum(Math.min.apply(null, y), 0)} – ${inxNum(Math.max.apply(null, y), 0)}</div></div>`;
+  const bnc = bn ? (() => { const b = inxArea(bn.spark.slice(-60), 96, 32, 3); return `<div class="inx-card ${bn.chgPct < 0 ? 'inx-dn-s' : ''}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="display:flex;gap:8px;align-items:center"><b style="font-weight:600">Bank Nifty</b><span class="inx-tag">NSE</span></div><svg viewBox="0 0 96 32" width="96" height="32" aria-hidden="true"><path class="inx-line" style="stroke-width:1.8" d="${b.line}"/></svg></div><div style="display:flex;gap:12px;align-items:baseline"><span style="font:500 22px var(--mono)">${inxNum(bn.c)}</span><span class="${inxCls(bn.chgPct)}" style="font-family:var(--mono)">${inxPct(bn.chgPct)}</span></div></div>`; })() : '';
+  const bl = S.stocks.filter(s => inxOk(s.chgPct) && (!INX.hasIdx || s.idx === 'N50')), adv = bl.filter(s => s.chgPct > 0).length, dec = bl.filter(s => s.chgPct < 0).length, flat = bl.length - adv - dec;
+  const brd = bl.length ? `<div class="inx-card"><div style="display:flex;justify-content:space-between;align-items:center"><span class="inx-lab">Breadth · ${bl.length} stocks</span></div><div style="display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px;margin:10px 0 8px"><i style="flex:${adv};background:var(--green)"></i><i style="flex:${flat};background:var(--text-faint)"></i><i style="flex:${dec};background:var(--red)"></i></div><div style="display:flex;justify-content:space-between;font:12.5px var(--mono)"><span class="inx-up">▲ ${adv}</span><span style="color:var(--text-muted)">${flat} flat</span><span class="inx-dn">▼ ${dec}</span></div></div>` : '';
+  const top = S.stocks.filter(s => inxOk(s.chgPct) && inxOk(s.turnover) && (!INX.hasIdx || s.idx === 'N50')).sort((p, q) => q.turnover - p.turnover).slice(0, 8);
+  const sp = ['grid-column:span 3;grid-row:span 2', 'grid-column:span 3;grid-row:span 2'];
+  const mini = top.length ? `<div class="inx-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span class="inx-lab">Market map · 1D</span><button class="inx-link" style="min-height:24px;padding:0" onclick="inxOpenMap()">Heatmap ›</button></div><div class="inx-mini">${top.map((s, i) => `<button type="button" style="${sp[i] || ''};background:${inxTint(s.chgPct, 3)}" onclick="inxOpenMap('${inxEsc(s.sym).replace(/'/g, '')}')" aria-label="${inxEsc(s.sym)} ${inxEsc(inxPct(s.chgPct))}">${inxEsc(s.sym.slice(0, i < 2 ? 12 : 7))}${i < 2 ? '<br>' + inxSm(s.chgPct) : ''}</button>`).join('')}</div></div>` : '';
+  el.innerHTML = head + `<div class="inx-home">${main}<div class="inx-stack">${bnc}${brd}${mini}</div></div>`;
+}
+function inxRenderAll() {
+  try { inxHome(); } catch (e) { /* ignore */ }
+  try { const p = document.getElementById('inx-pane'); if (p && p.style.display !== 'none') inxPaneRender(); } catch (e) { /* ignore */ }
+  try { mktStamp(); } catch (e) { /* ignore */ }
+}
+inxHome();
 </script>
 </body>
 </html>
