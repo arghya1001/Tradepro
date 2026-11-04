@@ -1308,7 +1308,7 @@
 @keyframes abring{0%{box-shadow:inset 3px 0 0 var(--sg),0 0 0 0 color-mix(in srgb,var(--sg) 70%,transparent)}100%{box-shadow:inset 3px 0 0 var(--sg),0 0 0 10px color-mix(in srgb,var(--sg) 0%,transparent)}}
 .mkt-oirow .sd{min-width:0;display:flex;flex-direction:column;gap:3px}.mkt-oirow .sd.l{align-items:flex-end}.mkt-oirow .sd.r{align-items:flex-start}
 .mkt-bd{font:600 10.5px var(--mono);padding:2px 6px;border-radius:4px;white-space:nowrap}
-.mkt-bds{font:11px var(--sans);color:var(--text-muted);white-space:nowrap}
+.mkt-bds{font:11px var(--sans);color:var(--text-muted);white-space:normal;display:block;margin-top:2px;line-height:1.4}
 .mkt-sig{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;text-align:left;border:1px solid var(--sg);background:color-mix(in srgb,var(--sg) 12%,transparent);color:var(--text);border-radius:8px;padding:9px 12px;font:13px var(--sans);margin-bottom:10px;cursor:pointer;min-height:44px}
 .mkt-sig .dot{width:8px;height:8px;border-radius:50%;background:var(--sg);flex:none}
 .mkt-sig.new .dot{animation:abdot 1.2s ease-out 3}
@@ -1331,6 +1331,13 @@
 .tr-ld{background:var(--surface-2);color:var(--text-faint)}.tr-c.sel{outline:2px solid var(--accent);outline-offset:-2px}
 .tr-ag{font-size:12px;text-align:center;line-height:1.3}.tr-ag small{display:block;font-size:11px;color:var(--text-muted)}
 .tr-mini{display:flex;gap:6px;margin:8px 0}.tr-mini div{flex:1;text-align:center;border-radius:8px;padding:6px 0;font-size:13px}.tr-mini small{display:block;font-size:11px;color:var(--text-muted)}.tr-mini .sel{outline:2px solid var(--accent);outline-offset:-2px}
+#spk-strip{position:fixed;top:0;left:0;right:0;z-index:9500;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;background:color-mix(in srgb,var(--red) 24%,var(--surface));border-bottom:2px solid var(--red);font:13px var(--sans);color:var(--text)}
+#spk-strip button{border:1px solid var(--border);background:var(--surface-2);color:var(--text);font:12px var(--sans);padding:5px 10px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.spk-dot{width:9px;height:9px;border-radius:50%;background:var(--red);flex:none;box-shadow:0 0 0 4px color-mix(in srgb,var(--red) 30%,transparent);animation:spkp 1.4s ease-out infinite}
+@keyframes spkp{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--red) 60%,transparent)}100%{box-shadow:0 0 0 8px transparent}}
+@media (prefers-reduced-motion:reduce){.spk-dot{animation:none}}
+.mkt-chips button.hotx{position:relative}.mkt-chips button.hotx::after{content:"";position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--red)}
+.spk-out{display:flex;gap:6px;margin-top:5px}.spk-out div{flex:1;text-align:center;border-radius:6px;padding:4px 0;font:11px var(--mono);background:var(--surface-2)}.spk-out small{display:block;font:11px var(--sans);color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -1367,7 +1374,7 @@
         <kbd>⌘K</kbd>
       </div>
       <div class="topbar-spacer"></div>
-      <div class="icon-btn" role="button" tabindex="0" aria-label="Alerts" onclick="showView('markets');mktSeg('alerts')"><span class="ping"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+      <div class="icon-btn" role="button" tabindex="0" aria-label="Alerts" onclick="showView('markets');mktSeg('alerts')"><span class="ping" id="bell-ping" style="display:none"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
       <div class="theme-wrap"><button class="icon-btn" id="theme-btn" type="button" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button><div class="theme-menu" id="theme-menu" hidden><button type="button" data-t="dark" onclick="setTheme('dark')"><i class="th-dot" style="background:linear-gradient(135deg,#0A0D12 50%,#17C3B2 50%)"></i>Classic dark</button><button type="button" data-t="daylight" onclick="setTheme('daylight')"><i class="th-dot" style="background:linear-gradient(135deg,#F5F7FA 50%,#0F9D8F 50%)"></i>Daylight</button><button type="button" data-t="navygold" onclick="setTheme('navygold')"><i class="th-dot" style="background:linear-gradient(135deg,#0E1A2E 50%,#D4A93A 50%)"></i>Navy and gold</button></div></div>
       <div class="ccy-seg" title="Show money in ₹ or $ (1 USD = ₹85)"><button data-c="INR" onclick="setDisplayCcy('INR')">₹</button><button data-c="USD" onclick="setDisplayCcy('USD')">$</button></div>
       <div class="avatar">AB</div>
@@ -3773,6 +3780,7 @@ function oiLegend(canvas, ready) {
 }
 function oiRender() {
   const canvas = document.getElementById('chart-canvas'); if (!canvas) return;
+  try { spkChartClear(canvas); } catch (e) { /* ignore */ }
   let lay = document.getElementById('oi-layer'), ctl = document.getElementById('oi-ctl');
   if (!lay) {
     lay = document.createElement('div'); lay.id = 'oi-layer'; lay.style.cssText = 'position:absolute;top:0;right:62px;pointer-events:none;z-index:4;opacity:.6';
@@ -3823,6 +3831,7 @@ function oiRender() {
   const lg = wall(wC, 'r', wC && wC.C, wC && wC.bC) + wall(wP, 'g', wP && wP.P, wP && wP.bP);
   lay.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">${svg}${lg}</svg>`;
   oiCard(lay, rows, yAt, SH);
+  try { spkChart(canvas, yAt, rh, W, H, g); } catch (e) { /* highlight must never break the chart */ }
 }
 /* Tap a strike's OI bars -> small card with that strike's CE (call) and PE (put) OI for the expiry picked in the dropdown
    (All expiries = summed over every expiry). Tap elsewhere to close. Hit-tested by hand so chart panning/crosshair keep working. */
@@ -11452,7 +11461,7 @@ function mktTick() {
 function mktSeg(name) {
   MKT.seg = name;
   ['pulse', 'options', 'calendar', 'trend', 'alerts'].forEach(n => { document.getElementById('mkt-' + n).style.display = n === name ? '' : 'none'; const bb = document.getElementById('mkt-b-' + n); if (bb) bb.classList.toggle('on', n === name); });
-  if (name === 'pulse') { mktPulseRender(); mktPulseLoad(); } else if (name === 'options') { mktOptRender(); mktOptLoad(); } else if (name === 'trend') { trRender(); trLoad(); } else if (name === 'alerts') { alrRender(); mktPulseLoad(); } else mktCalRender();
+  if (name === 'pulse') { mktPulseRender(); mktPulseLoad(); } else if (name === 'options') { mktOptRender(); mktOptLoad(); } else if (name === 'trend') { trRender(); trLoad(); } else if (name === 'alerts') { alrRender(); mktPulseLoad(); try { spkAlrPanel(); } catch (e) { /* ignore */ } } else mktCalRender();
   mktStamp();
 }
 /* ----- Pulse ----- */
@@ -11512,7 +11521,7 @@ async function mktOptLoad() {
     if (!b || b.ss !== ss) { b = { ss, at: now, raw, px }; try { localStorage.setItem(OI_KEY + '_base_' + und, JSON.stringify(b)); } catch (e) { /* ignore */ } }
     MKT.raw = raw; MKT.px = px; mktSnap(und, now, raw, px); MKT.base = b; MKT.spot = spot || (MKT.pt[und + 'USD'] || {}).price || null; MKT.err = null;
   } catch (e) { MKT.err = liveErrText(e); }
-  MKT.oat = Date.now(); MKT.busy = false; mktOptRender(); mktStamp();
+  MKT.oat = Date.now(); MKT.busy = false; try { spkScan(); } catch (e) { /* scan must not break loading */ } mktOptRender(); mktStamp();
 }
 /* ----- Abnormal ΔOI signals: flags unusually large OI changes, typed by the premium move ----- */
 const MKT_SIG = { win: 15 * 60000, minHist: 3 * 60000, keep: 35 * 60000, z: 3.5, cap: 3 };
@@ -11529,7 +11538,7 @@ const mktAgo = ms => ms < 45000 ? 'just now' : ms < 3600000 ? Math.round(ms / 60
 const mktPct = p => (p >= 0 ? '+' : '−') + Math.round(Math.abs(p)).toLocaleString('en-US') + '%';
 function mktBadge(c) {
   const T = MKT_SIGT[c.ty], w = c.src === 'int' ? Math.max(1, Math.round((Date.now() - c.at) / 60000)) + 'm' : 'since 17:30';
-  return `<span class="mkt-bd" style="background:${T.c};color:${T.f}">${T.g} ${T.s} ${mktPct(c.pct)}</span><span class="mkt-bds">${c.d > 0 ? '+' : '−'}${mktFmt(Math.abs(c.d))} · ${T.d(c.t)} · ${w}</span>`;
+  return `<span class="mkt-bd" style="background:${T.c};color:${T.f}">${T.g} ${T.s} ${mktPct(c.pct)}</span><span class="mkt-bds">${c.d > 0 ? '+' : '−'}${mktFmt(Math.abs(c.d))} · ${T.d(c.t)}${c.ty === 'SB' ? (c.t === 'C' ? ' · possible resistance' : ' · possible support') : c.ty === 'SC' ? (c.t === 'C' ? ' · resistance weakening' : ' · support weakening') : ''}${c.wake ? ' · quiet strike woke up' : ''} · ${w}${MKT.spot ? ' · ' + (Math.abs(c.k - MKT.spot) / MKT.spot * 100).toFixed(1) + '% ' + (c.k < MKT.spot ? 'below' : 'above') + ' spot' : ''}</span>`;
 }
 function mktSnap(und, now, raw, px) {
   const h = MKT.hist[und] || (MKT.hist[und] = []);
@@ -11542,7 +11551,7 @@ function mktSignals(all, ALL) {
   const out = { by: {}, list: [] };
   if (!MKT.base || all.length < 5) return out;
   const cur = new Set(mktExps()), now = Date.now(), hist = MKT.hist[MKT.und] || [];
-  const total = all.reduce((a, r) => a + r.C + r.P, 0), minAbs = Math.max(20, total * 0.004);
+  const S = MKT_SENS[SPK.sens] || MKT_SENS.med, total = all.reduce((a, r) => a + r.C + r.P, 0), minAbs = Math.max(20, total * S.k);
   let ref = null; for (let i = hist.length - 1; i >= 0; i--) if (now - hist[i].t >= MKT_SIG.win) { ref = hist[i]; break; }
   if (!ref && hist.length && now - hist[0].t >= MKT_SIG.minHist) ref = hist[0];
   const rA = ref ? mktAggMap(ref.raw, ALL, cur) : null, rP = ref ? mktPxMap(ref.px, ALL) : {}, bP = mktPxMap(MKT.base.px, ALL), cP = mktPxMap(MKT.px, ALL);
@@ -11558,9 +11567,11 @@ function mktSignals(all, ALL) {
     const mad = g.map(c => Math.abs(c.d - med)).sort((a, b) => a - b)[g.length >> 1], sc = 1.4826 * Math.max(mad, 1);
     g.forEach(c => {
       const z = (c.d - med) / sc, up = c.d > 0;
-      if (up ? !(c.d >= minAbs && c.pct >= 100 && z >= MKT_SIG.z) : !(c.d <= -minAbs && c.pct <= -50 && z <= -MKT_SIG.z)) return;
+      const spx = MKT.spot, usd = spx ? Math.abs(c.d) * (MKT_CS[MKT.und] || 0.001) * spx : 0, near = spx && Math.abs(c.k - spx) / spx <= 0.02, wake = up && near && c.pct >= S.wp && usd >= S.wu && z >= S.z;
+      if (up ? !((c.d >= minAbs && c.pct >= S.p && z >= S.z) || wake) : !(c.d <= -minAbs && c.pct <= -50 && z <= -S.z)) return;
       const a = Math.abs(c.pct);
       c.sev = up ? (z >= 10 && a >= 1000 ? 3 : z >= 6 && a >= 300 ? 2 : 1) : (a >= 80 && z <= -6 ? 2 : 1);
+      if (wake) { c.wake = true; c.sev = Math.max(c.sev, 2); }
       const pc = c.p0 && c.p1 ? (c.p1 - c.p0) / c.p0 * 100 : null, flat = pc == null || Math.abs(pc) < 1;
       c.ty = up ? (flat ? 'BU' : pc < 0 ? 'SB' : 'LB') : (flat ? 'UW' : pc > 0 ? 'SC' : 'LU');
       const key = c.k + '|' + c.t, o = out.by[key];
@@ -11572,11 +11583,11 @@ function mktSignals(all, ALL) {
   arr.forEach(c => {
     const id = MKT.und + '|' + MKT.exp + '|' + c.k + '|' + c.t + '|' + c.ty + '|' + c.sev;
     if (!MKT.seen[id]) MKT.seen[id] = now;
-    c.seen = MKT.seen[id]; c.fresh = now - c.seen < 8000; out.by[c.k + '|' + c.t] = c;
+    c.seen = MKT.seen[id]; c.id = id; c.fresh = !SPK.ack[id] && now - c.seen < 1800000; out.by[c.k + '|' + c.t] = c;
   });
   out.list = arr; return out;
 }
-function mktSigGo(k) { MKT.abn = false; MKT.strike = k; MKT.rng = 'all'; MKT.goto = k; mktOptRender(); }
+function mktSigGo(k) { try { spkAckStrike(k); } catch (e) { /* ignore */ } MKT.abn = false; MKT.strike = k; MKT.rng = 'all'; MKT.goto = k; mktOptRender(); }
 function mktAbn() { MKT.abn = !MKT.abn; MKT.nokeep = true; mktOptRender(); }
 function mktUnd(u) { MKT.und = u; MKT.raw = null; MKT.exp = null; MKT.strike = null; mktOptRender(); mktOptLoad(); }
 function mktExp(e) { MKT.exp = e; MKT.strike = null; mktOptRender(); }
@@ -11619,7 +11630,7 @@ function mktOptRender() {
   if (!ALL && mp != null && spot) { const g = (spot - mp) / mp * 100; rd.push(`<b>Max pain ${mktFmt(mp)}.</b> Spot is ${Math.abs(g).toFixed(1)}% ${g >= 0 ? 'above' : 'below'} it. Price sometimes drifts toward max pain near expiry, but the effect is weak.`); }
   const read = rd.length ? `<div class="mkt-card mkt-read"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">Reading the data</b></div>${rd.map(x => `<p>${x}</p>`).join('')}<p class="mkt-disc">Rule-of-thumb reading of open interest, not financial advice or a trade signal. OI shows positions, not who is long or short, and crypto behaves differently from index options. Use it alongside your own analysis.</p></div>` : '';
   const s0 = sigs.list[0], sT = s0 && MKT_SIGT[s0.ty], sBan = s0 ? `<button class="mkt-sig${s0.fresh ? ' new' : ''}" style="--sg:${sT.c}" onclick="mktSigGo(${s0.k})"><i class="dot"></i><span><b>${mktFmt(s0.k)} ${s0.t === 'C' ? 'CE' : 'PE'}</b> ${sT.n.toLowerCase()} <b>${mktPct(s0.pct)}</b> · ${MKT_SEV[s0.sev]} · ${mktAgo(Date.now() - s0.seen)}</span><span class="mo">${sigs.list.length > 1 ? '+' + (sigs.list.length - 1) + ' more ›' : '›'}</span></button>` : '';
-  el.innerHTML = head + `</div><div class="mkt-chips mkt-scroll"><button class="${ALL ? 'on' : ''}" onclick="mktExp('ALL')">All</button>` + exps.map(e => `<button class="${e === MKT.exp ? 'on' : ''}" onclick="mktExp('${e}')">${liveExpLabel(e).slice(0, 6)}</button>`).join('') + `</div>
+  el.innerHTML = head + `</div><div class="mkt-chips mkt-scroll"><button class="${ALL ? 'on' : ''}" onclick="mktExp('ALL')">All</button>` + exps.map(e => `<button class="${e === MKT.exp ? 'on' : ''}${SPK.byExp[e] ? ' hotx' : ''}" onclick="mktExp('${e}')">${liveExpLabel(e).slice(0, 6)}</button>`).join('') + `</div>
   ${sBan}<div class="mkt-stats"><div>Call OI<b>${mktFmt(tc)}</b>${chg(tc, btc)}</div><div>Put OI<b>${mktFmt(tp)}</b>${chg(tp, btp)}</div><div class="${pcrCls}">PCR<b>${pcr == null ? '–' : pcr.toFixed(2)}</b><small>${lbl}${pcrBias ? ' · ' + pcrBias : ''}</small></div><div>Max pain<b>${ALL ? 'Per expiry' : mp == null ? '–' : mktFmt(mp)}</b></div><div>Total OI value<b>${spot ? '≈ $' + mktCompact((tc + tp) * MKT_CS[MKT.und] * spot) : '–'}</b><small>${mktFmt(tc + tp)} contracts</small></div></div>
   <div class="mkt-note" style="margin:-4px 0 10px">PCR colours show where positions lean. They are not a trade signal, and extremes can reverse.</div>
   <div class="mkt-chips">${[3, 7, 15, 'all'].map(v => `<button class="${MKT.rng === v ? 'on' : ''}" onclick="mktRng(${typeof v === 'string' ? "'all'" : v})">${v === 'all' ? 'All' : '±' + v}</button>`).join('')}<button class="${MKT.abn ? 'on' : ''}" onclick="mktAbn()"${sigs.list.length ? ' style="border-color:var(--red)"' : ''}>Abnormal${sigs.list.length ? ' · ' + sigs.list.length : ''}</button><button class="sp" style="color:var(--accent)" onclick="mktJump()">Jump to ATM</button></div>
@@ -11632,7 +11643,7 @@ function mktOptRender() {
   <div class="mkt-row"><span>Call OI</span><span>${mktFmt(sr.C)} ${chg(sr.C, sr.bC)}</span></div><div class="mkt-row"><span>Put OI</span><span>${mktFmt(sr.P)} ${chg(sr.P, sr.bP)}</span></div>
   <div class="mkt-acts"><button class="mkt-btn pri" onclick="mktShowOnChart()">Show on ${MKT.und} chart</button></div>
   ${ALL ? '<div class="mkt-note">Pick a single expiry to trade a contract.</div>' : `<div class="mkt-acts" style="margin-top:6px"><button class="mkt-btn" onclick="mktTradeOpt('C')">Trade ${mktFmt(sr.k)} CE</button><button class="mkt-btn" onclick="mktTradeOpt('P')">Trade ${mktFmt(sr.k)} PE</button></div>`}</div>` : ''}
-  <div style="margin-top:10px">${mv(up[0], 'Biggest buildup')}${mv(up[1], 'Next buildup')}${mv(dn && dn.v < 0 ? dn : null, 'Biggest unwinding')}</div>${read}`;
+  <div style="margin-top:10px">${mv(up[0], 'Biggest buildup')}${mv(up[1], 'Next buildup')}${mv(dn && dn.v < 0 ? dn : null, 'Biggest unwinding')}</div>${read}${spkLogHtml()}`;
   const LD = document.getElementById('mkt-lad'); if (LD) { if (MKT.goto != null) { const e = LD.querySelector('.sel'); if (e) LD.scrollTop = e.offsetTop - LD.clientHeight / 2 + e.offsetHeight / 2; MKT.goto = null; } else if (keep != null) LD.scrollTop = keep; else mktJump(); }
 }
 function mktRng(v) { MKT.rng = v; MKT.nokeep = true; mktOptRender(); }
@@ -12046,6 +12057,64 @@ function trRulesSave(reset) {
 }
 const trMiniHtml = sym => `<div class="tr-mini" onclick="TR.sel={sym:'${sym}',tf:'4h'};mktSeg('trend')" title="Open Trend">${TR_TFS.map(t => { const d = (TR.cache[sym + '|' + t] || {}).data; return d ? `<div class="${TR_CLS[d.state]}">${TR_ARROW[d.state]}<small>${TR_LAB[t]}</small></div>` : `<div class="tr-ld">…<small>${TR_LAB[t]}</small></div>`; }).join('')}</div>`;
 async function trMiniLoad(sym) { try { await Promise.all(TR_TFS.map(t => trGet(sym, t))); } catch (e) { /* ignore */ } if (MKT.sym === sym) mktSheet(); }
+
+</script>
+<script>
+/* ---------- Spike attention: cross-expiry scan, top strip, bell, chart highlight, spike log, sensitivity ---------- */
+const SPK_KEY = 'tradepro_spike_v1', SPK_SENS_KEY = 'tradepro_spike_sens_v1';
+const MKT_SENS = { low: { z: 5, p: 300, k: 0.006, wp: 3000, wu: 150000 }, med: { z: 3.5, p: 100, k: 0.004, wp: 1000, wu: 50000 }, high: { z: 3, p: 100, k: 0.002, wp: 500, wu: 25000 } };
+const SPK = { sens: 'med', live: [], byExp: {}, und: null, ack: {}, notified: {}, log: [], saveAt: 0 };
+try { const s = JSON.parse(localStorage.getItem(SPK_KEY) || 'null'); if (s) { SPK.ack = s.ack || {}; SPK.notified = s.notified || {}; SPK.log = s.log || []; const lim = Date.now() - 7200000; Object.keys(s.seen || {}).forEach(k => { if (s.seen[k] > lim) MKT.seen[k] = s.seen[k]; }); } const sv = localStorage.getItem(SPK_SENS_KEY); if (MKT_SENS[sv]) SPK.sens = sv; } catch (e) { /* ignore */ }
+function spkSave(force) { if (!force && Date.now() - SPK.saveAt < 5000) return; SPK.saveAt = Date.now(); try { localStorage.setItem(SPK_KEY, JSON.stringify({ ack: SPK.ack, notified: SPK.notified, log: SPK.log.slice(0, 40), seen: MKT.seen })); } catch (e) { /* storage unavailable */ } }
+function spkSens(v) { if (!MKT_SENS[v]) return; SPK.sens = v; try { localStorage.setItem(SPK_SENS_KEY, v); } catch (e) { /* ignore */ } try { spkScan(); } catch (e) { /* ignore */ } mktOptRender(); }
+function mktRowsFor(exp) { const rows = {}, cur = new Set(mktExps()), put = (m, f) => { for (const k in m) { const [e, s, t] = k.split('|'); if (e !== exp || (f === 'b' && !cur.has(e))) continue; const r = rows[s] || (rows[s] = { k: +s, C: 0, P: 0, bC: 0, bP: 0 }); r[f + t] += m[k]; } }; put(MKT.raw, ''); put(MKT.base.raw, 'b'); return Object.values(rows).sort((a, b) => a.k - b.k); }
+const spkText = c => `${mktFmt(c.k)} ${c.t === 'C' ? 'CE' : 'PE'} ${MKT_SIGT[c.ty].n.toLowerCase()} ${mktPct(c.pct)} · ${MKT_SEV[c.sev]}`;
+function spkScan() {
+  if (!MKT.raw || !MKT.base) return; const keep = MKT.exp, list = [], by = {};
+  try { mktExps().forEach(e => { MKT.exp = e; mktSignals(mktRowsFor(e), false).list.forEach(c => { c.exp = e; list.push(c); by[e] = (by[e] || 0) + 1; }); }); } finally { MKT.exp = keep; }
+  list.sort((a, b) => b.sev - a.sev || Math.abs(b.pct) - Math.abs(a.pct)); SPK.live = list; SPK.byExp = by; SPK.und = MKT.und;
+  const now = Date.now();
+  list.forEach(c => {
+    if (!SPK.log.some(l => l.id === c.id)) SPK.log.unshift({ id: c.id, at: c.seen, und: MKT.und, exp: c.exp, k: c.k, t: c.t, ty: c.ty, sev: c.sev, pct: c.pct, d: c.d, spot: MKT.spot, o: [null, null, null] });
+    if (c.sev >= 2 && !SPK.notified[c.id] && now - c.seen < 600000) { SPK.notified[c.id] = now; alrToast(MKT.und + ' · ' + spkText(c)); try { if (navigator.vibrate) navigator.vibrate(c.sev >= 3 ? [200, 100, 200] : 120); } catch (e) { /* ignore */ } try { if ('Notification' in window && Notification.permission === 'granted') new Notification('TradePro · OI spike', { body: MKT.und + ' · ' + spkText(c) }); } catch (e) { /* ignore */ } }
+  });
+  SPK.log = SPK.log.slice(0, 40);
+  SPK.log.forEach(l => { if (l.und !== MKT.und || !MKT.spot || !l.spot) return; [15, 30, 60].forEach((m, i) => { const age = now - l.at; if (l.o[i] == null && age >= m * 60000) l.o[i] = age < (m + 25) * 60000 ? (MKT.spot - l.spot) / l.spot * 100 : 'na'; }); });
+  spkSave(); spkUi(); try { oiRender(); } catch (e) { /* chart not ready */ }
+}
+const spkUnacked = () => (SPK.live || []).filter(c => !SPK.ack[c.id] && Date.now() - c.seen < 1800000);
+function spkAck(id) { SPK.ack[id] = Date.now(); spkSave(true); spkUi(); if (MKT.seg === 'options') mktOptRender(); }
+function spkAckStrike(k) { (SPK.live || []).forEach(c => { if (c.k === k) SPK.ack[c.id] = Date.now(); }); spkSave(true); spkUi(); }
+function spkView(id) { const c = (SPK.live || []).find(x => x.id === id); if (!c) return; SPK.ack[id] = Date.now(); spkSave(true); if (MKT.und !== SPK.und) return; MKT.exp = c.exp; MKT.abn = false; showView('markets'); mktSeg('options'); mktSigGo(c.k); spkUi(); }
+function spkUi() {
+  const un = spkUnacked(), st = document.getElementById('spk-strip'), top = un.find(c => c.sev >= 3), bp = document.getElementById('bell-ping'), n = un.filter(c => c.sev >= 2).length;
+  if (bp) { bp.style.display = n ? '' : 'none'; bp.title = n ? n + ' OI spike' + (n > 1 ? 's' : '') : ''; }
+  if (st) { if (top) { st.style.display = 'flex'; st.innerHTML = `<i class="spk-dot"></i><span style="flex:1"><b>${mktEsc(SPK.und)} ${mktEsc(spkText(top))}</b> · ${mktAgo(Date.now() - top.seen)}</span><button onclick="spkView('${top.id}')">View</button><button onclick="spkAck('${top.id}')">Snooze</button>`; } else { st.style.display = 'none'; st.innerHTML = ''; } }
+  const ap = document.getElementById('spk-alr'); if (ap) spkAlrPanel();
+}
+function spkAlrPanel() {
+  let ap = document.getElementById('spk-alr'); const host = document.getElementById('mkt-alerts'); if (!host) return; if (!ap) { ap = document.createElement('div'); ap.id = 'spk-alr'; host.insertBefore(ap, document.getElementById('mkt-alr')); }
+  const un = spkUnacked().slice(0, 5); ap.innerHTML = un.length ? `<div class="mkt-card" style="margin-top:0;border-color:var(--red)"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">OI spikes</b><span>${mktEsc(SPK.und || '')}</span></div>${un.map(c => `<div class="mkt-ev" style="padding:8px 0"><div class="n">${mktEsc(spkText(c))}<small>${mktAgo(Date.now() - c.seen)} · ${liveExpLabel(c.exp)}</small></div><button class="mkt-chipbtn" onclick="spkView('${c.id}')">View</button><button class="mkt-chipbtn" onclick="spkAck('${c.id}')">Snooze</button></div>`).join('')}</div>` : '';
+}
+function spkLogHtml() {
+  const rows = SPK.log.filter(l => l.und === MKT.und).slice(0, 10), fmt = v => v == null ? '…' : v === 'na' ? '–' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%', cl = v => typeof v === 'number' ? (v >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-faint)';
+  const ist = t => new Date(t + 19800000).toISOString().slice(11, 16);
+  return `<div class="mkt-card"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">Spike log</b><span>${MKT.und}</span></div>
+  <div class="mkt-chips" style="margin:6px 0"><span style="font-size:12px;color:var(--text-muted)">Sensitivity</span>${['low', 'med', 'high'].map(v => `<button class="${SPK.sens === v ? 'on' : ''}" onclick="spkSens('${v}')">${{ low: 'Low', med: 'Medium', high: 'High' }[v]}</button>`).join('')}</div>
+  ${rows.length ? rows.map(l => { const T = MKT_SIGT[l.ty]; return `<div class="mkt-ev" style="align-items:flex-start"><div class="t">${ist(l.at)}</div><div class="n"><span class="mkt-bd" style="background:${T.c};color:${T.f}">${T.g} ${T.s} ${mktPct(l.pct)}</span> <b style="font-weight:500">${mktFmt(l.k)} ${l.t === 'C' ? 'CE' : 'PE'}</b> · ${l.d > 0 ? '+' : '−'}${mktFmt(Math.abs(l.d))} · ${MKT_SEV[l.sev]}<small>Spot then ${l.spot ? mktFmt(l.spot) : '–'}</small><div class="spk-out">${['15m', '30m', '60m'].map((m, i) => `<div style="color:${cl(l.o[i])}">${fmt(l.o[i])}<small>${m}</small></div>`).join('')}</div></div></div>`; }).join('') : '<div class="mkt-note">No flagged spikes yet. They appear here with what price did over the next 15, 30 and 60 minutes, while the app stays open.</div>'}
+  <div class="mkt-note">Sensitivity changes how big a jump must be to flag. It describes activity and is not a trade signal. Outcomes fill in only while TradePro is open.</div></div>`;
+}
+function spkChartClear(canvas) { const o = canvas && canvas.querySelector('#spk-hl'); if (o) o.remove(); }
+function spkChart(canvas, yAt, rh, W, H, g) {
+  const now = Date.now(), L = (SPK.live || []).filter(c => SPK.und === oi.und && (oi.exp === 'ALL' || c.exp === oi.exp) && now - c.seen < 1800000).slice(0, 3); if (!L.length) return;
+  const lo = g.GAP + 12, hi = g.GAP + g.priceAreaH - 12; let h = '';
+  L.forEach((c, i) => { const raw = yAt(c.k), out = raw < lo || raw > hi, y = Math.max(lo, Math.min(hi, raw)), col = c.sev >= 3 ? '#F6465D' : c.sev === 2 ? '#F5A524' : '#17C3B2', T = MKT_SIGT[c.ty];
+    h += `<div style="position:absolute;left:0;right:${W}px;top:${y}px;border-top:1.5px dashed ${col}"></div>` + (out ? '' : `<div class="spk-ring" style="position:absolute;right:0;top:${y - rh / 2 - 2}px;width:${W}px;height:${rh + 4}px;border:2px solid ${col};border-radius:4px;box-shadow:0 0 8px ${col}"></div>`) + `<div style="position:absolute;left:6px;top:${y - 19 - i * 2}px;background:${col};color:#fff;font:700 10.5px var(--mono);padding:2px 6px;border-radius:4px;white-space:nowrap">${out ? (raw < lo ? '▲ ' : '▼ ') : ''}${mktFmt(c.k)} ${c.t === 'C' ? 'CE' : 'PE'} ${T.g} ${mktPct(c.pct)} · ${MKT_SEV[c.sev]} · ${mktAgo(now - c.seen)}</div>`; });
+  const ov = document.createElement('div'); ov.id = 'spk-hl'; ov.style.cssText = `position:absolute;top:0;left:0;right:62px;height:${H}px;pointer-events:none;z-index:6`; ov.innerHTML = h; canvas.appendChild(ov);
+}
+function spkTick() { const v = document.getElementById('view-markets'), on = v && v.style.display !== 'none' && MKT.seg === 'options'; if (!on && !MKT.busy && mktAge(MKT.oat) > 25) mktOptLoad(); spkUi(); }
+(function () { const st = document.createElement('div'); st.id = 'spk-strip'; st.style.display = 'none'; document.body.appendChild(st); })();
+setInterval(spkTick, 30000); setTimeout(spkTick, 8000);
 
 </script>
 </body>
