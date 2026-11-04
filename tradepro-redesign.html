@@ -12107,9 +12107,12 @@ function spkLogHtml() {
 function spkChartClear(canvas) { const o = canvas && canvas.querySelector('#spk-hl'); if (o) o.remove(); }
 function spkChart(canvas, yAt, rh, W, H, g) {
   const now = Date.now(), L = (SPK.live || []).filter(c => SPK.und === oi.und && (oi.exp === 'ALL' || c.exp === oi.exp) && now - c.seen < 1800000).slice(0, 3); if (!L.length) return;
-  const lo = g.GAP + 12, hi = g.GAP + g.priceAreaH - 12; let h = '';
-  L.forEach((c, i) => { const raw = yAt(c.k), out = raw < lo || raw > hi, y = Math.max(lo, Math.min(hi, raw)), col = c.sev >= 3 ? '#F6465D' : c.sev === 2 ? '#F5A524' : '#17C3B2', T = MKT_SIGT[c.ty];
-    h += `<div style="position:absolute;left:0;right:${W}px;top:${y}px;border-top:1.5px dashed ${col}"></div>` + (out ? '' : `<div class="spk-ring" style="position:absolute;right:0;top:${y - rh / 2 - 2}px;width:${W}px;height:${rh + 4}px;border:2px solid ${col};border-radius:4px;box-shadow:0 0 8px ${col}"></div>`) + `<div style="position:absolute;left:6px;top:${y - 19 - i * 2}px;background:${col};color:#fff;font:700 10.5px var(--mono);padding:2px 6px;border-radius:4px;white-space:nowrap">${out ? (raw < lo ? '▲ ' : '▼ ') : ''}${mktFmt(c.k)} ${c.t === 'C' ? 'CE' : 'PE'} ${T.g} ${mktPct(c.pct)} · ${MKT_SEV[c.sev]} · ${mktAgo(now - c.seen)}</div>`; });
+  const lo = g.GAP + 12, hi = g.GAP + g.priceAreaH - 12, maxTop = H - 78; /* keep labels clear of the OI controls (bottom-left) */
+  const items = L.map(c => { const raw = yAt(c.k); return { c, raw, out: raw < lo || raw > hi, y: Math.max(lo, Math.min(hi, raw)) }; }).sort((p, q) => p.y - q.y);
+  for (let j = items.length - 1; j >= 0; j--) items[j].top = Math.min(items[j].y - 19, j === items.length - 1 ? maxTop : items[j + 1].top - 21);
+  let h = '';
+  items.forEach(it => { const c = it.c, col = c.sev >= 3 ? '#F6465D' : c.sev === 2 ? '#F5A524' : '#17C3B2', T = MKT_SIGT[c.ty];
+    h += `<div style="position:absolute;left:0;right:${W}px;top:${it.y}px;border-top:1.5px dashed ${col}"></div>` + (it.out ? '' : `<div class="spk-ring" style="position:absolute;right:0;top:${it.y - rh / 2 - 2}px;width:${W}px;height:${rh + 4}px;border:2px solid ${col};border-radius:4px;box-shadow:0 0 8px ${col}"></div>`) + `<div style="position:absolute;left:6px;top:${it.top}px;background:${col};color:#fff;font:700 10.5px var(--mono);padding:2px 6px;border-radius:4px;white-space:nowrap;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis">${it.out ? (it.raw < lo ? '▲ ' : '▼ ') : ''}${mktFmt(c.k)} ${c.t === 'C' ? 'CE' : 'PE'} ${T.g} ${mktPct(c.pct)} · ${MKT_SEV[c.sev]} · ${mktAgo(now - c.seen)}</div>`; });
   const ov = document.createElement('div'); ov.id = 'spk-hl'; ov.style.cssText = `position:absolute;top:0;left:0;right:62px;height:${H}px;pointer-events:none;z-index:6`; ov.innerHTML = h; canvas.appendChild(ov);
 }
 function spkTick() { const v = document.getElementById('view-markets'), on = v && v.style.display !== 'none' && MKT.seg === 'options'; if (!on && !MKT.busy && mktAge(MKT.oat) > 25) mktOptLoad(); spkUi(); }
