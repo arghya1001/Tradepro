@@ -1374,8 +1374,8 @@
 .inx-t{position:absolute;border:0;padding:0;margin:0;cursor:pointer;color:var(--text);text-align:left;overflow:hidden;outline:1px solid var(--bg);outline-offset:-1px;font-family:var(--mono)}
 .inx-t:focus-visible{outline:2px solid var(--text);outline-offset:-3px;z-index:3}
 .inx-t.sel{outline:2px solid var(--text);outline-offset:-2px;z-index:2}
-.inx-t span{display:block;padding:4px 6px;line-height:1.25}.inx-t b{display:block;font-weight:600}
-.inx-sec{position:absolute;height:18px;line-height:18px;padding:0 6px;pointer-events:none;z-index:1;font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);background:color-mix(in srgb,var(--bg) 82%,transparent);white-space:nowrap;overflow:hidden}
+.inx-t span{display:block;padding:4px 6px;line-height:1.25}.inx-t b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inx-sec{position:absolute;height:18px;line-height:18px;padding:0 6px;pointer-events:none;z-index:1;font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);background:color-mix(in srgb,var(--bg) 82%,transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .inx-legend{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 2px 0;font:12px var(--mono);color:var(--text-muted)}
 .inx-legend i{display:block;width:200px;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--red-dim),var(--surface) 50%,var(--green-dim));border:1px solid var(--border)}
 .inx-peek{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
@@ -1395,7 +1395,7 @@
 .inx-mini button{border:0;border-radius:4px;color:var(--text);font:500 10.5px var(--mono);text-align:left;padding:3px 5px;cursor:pointer;overflow:hidden;min-width:0}
 .inx-head{display:flex;justify-content:space-between;align-items:center;margin:4px 0 8px}
 @media (max-width:880px){.inx-wrap,.inx-home{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:700px){.inx-map{height:440px}.inx-legend i{width:120px}}
+@media (max-width:700px){.inx-map{height:560px}.inx-legend i{width:120px}}
 </style>
 </head>
 <body>
@@ -1703,6 +1703,7 @@
                 <option value="perp">Perpetuals</option>
                 <option value="options">Options</option>
                 <option value="strategy">Strategies (combined)</option>
+                <option value="india">India (NSE, daily)</option>
               </select>
             </div>
             <div class="rc-field" id="rc-live-strat-wrap" style="display:none">
@@ -1752,6 +1753,8 @@
                 <option value="2h">2 hour</option>
                 <option value="4h">4 hour</option>
                 <option value="1d">1 day</option>
+                <option value="1w" hidden disabled>1 week</option>
+                <option value="1M" hidden disabled>1 month</option>
               </select>
             </div>
             <div class="rc-field" id="rc-live-scan-wrap" style="display:none">
@@ -1915,7 +1918,7 @@
           </div>
         </div>
 
-        <div class="panel">
+        <div class="panel" id="paper-panel">
           <div class="panel-head">
             <div class="panel-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -2847,7 +2850,7 @@ function persistSScans() { try { localStorage.setItem(SSCAN_KEY, JSON.stringify(
 let sscanResults = {};   // scan index -> { at, rows:[{und, ok, price, details, err}] }
 let sscanDraft = null, sscanEditing = null, sscanAutoTimer = null, sscanBusy = false;
 const sscanEsc = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-const sscanTime = sec => new Date(sec * 1000 + 19800000).toISOString().slice(5, 16).replace('T', ' ') + ' IST';
+const sscanTime = sec => (typeof liveMode !== 'undefined' && liveMode && LIVE.kind === 'india' && sec % 86400 === 0) ? new Date(sec * 1000).toISOString().slice(0, 10) : new Date(sec * 1000 + 19800000).toISOString().slice(5, 16).replace('T', ' ') + ' IST';
 let scanOverlay = null, scanOverlayTimer = null;   // activation markers drawn on the combined-strategy chart
 const sscanFmt = v => v == null ? '–' : v.toLocaleString('en-US', { maximumFractionDigits: v >= 100 ? 1 : 4 });
 function sscanRefLabel(c) { if (c.k === 'gsq') return 'EMA squeeze → ' + (c.op === 'below' ? 'breakdown' : 'breakout'); if (c.k === 'gmma') return `Guppy ${(c.s || SSCAN_GMMA.s).join(',')} vs ${(c.l || SSCAN_GMMA.l).join(',')}`; return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
@@ -2877,7 +2880,7 @@ function renderSScans() {
         const chip = row.ok ? `<span style="color:var(--green); font-weight:700">MATCH</span>` : `<span style="color:var(--text-faint); font-weight:600">no match</span>`;
         const lines = row.details.map(d => `<div style="font-size:11.5px; color:${d.ok ? 'var(--green)' : 'var(--text-muted)'}">${d.ok ? '✓' : '✗'} ${sscanEsc(d.text)}</div>`).join('');
         const when = row.lastActSec ? `<div style="font-size:11.5px; margin-top:4px; color:var(--text-muted)">${row.ok ? 'Active since' : 'Last activated'} <b>${sscanTime(row.lastActSec)}</b> · ${row.barsSince === 0 ? 'this candle' : row.barsSince + ' candle' + (row.barsSince > 1 ? 's' : '') + ' ago'} · ${row.actCount} activation${row.actCount > 1 ? 's' : ''} in the last ~400 candles</div>` : `<div style="font-size:11.5px; margin-top:4px; color:var(--text-faint)">Not activated in the last ~400 candles</div>`;
-        const open = sc.strat === 'Guppy crossover' ? (isIndiaUnd(row.und) ? '' : `<button class="strat-chart-btn" onclick="openGuppyChart('${row.und}',${i})">Open on live chart (Bullish + Bearish) ↗</button>`) : ((row.actCount || row.ok) && !isIndiaUnd(row.und) ? `<button class="strat-chart-btn" onclick="openSScanChart(${i},'${row.und}')">Show ${sscanEsc(sc.side)} ${sscanEsc(sc.strat)} chart with activations ↗</button>` : '');
+        const open = sc.strat === 'Guppy crossover' ? (isIndiaUnd(row.und) ? `<button class="strat-chart-btn" onclick="openIndiaChart('${row.und}',${i})">Open on chart (Bullish + Bearish) ↗</button>` : `<button class="strat-chart-btn" onclick="openGuppyChart('${row.und}',${i})">Open on live chart (Bullish + Bearish) ↗</button>`) : ((row.actCount || row.ok) ? `<button class="strat-chart-btn" onclick="openSScanChart(${i},'${row.und}')">Show ${sscanEsc(sc.side)} ${sscanEsc(sc.strat)} chart with activations ↗</button>` : '');
         return `<div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border)">
           <div style="display:flex; justify-content:space-between; font-size:13px"><span><b>${row.und}</b> · close ${sscanFmt(row.price)}</span>${chip}</div>
           ${lines}${when}${open}</div>`;
@@ -3104,6 +3107,72 @@ async function indiaCandles(und, res) {
   if (last && last.t === today && mins < 15 * 60 + 35) candles = candles.slice(0, -1);
   return candles;
 }
+/* ---- India chart: the SAME chart as crypto (Trade tab, Paper mode), fed with daily NSE candles ----
+   LIVE.kind === 'india': no websocket, no order ticket, timeframes 1d / 1w / 1M (weekly and monthly are built from daily). */
+function liveIsIndiaSym(s) { s = String(s || ''); return isIndiaUnd(s) || !/USD|^[CP]-|^S~/.test(s); }
+const INC_NAMES = {};
+function incName(sym) {
+  if (sym === 'NIFTY') return 'Nifty 50'; if (sym === 'BANKNIFTY') return 'Bank Nifty';
+  if (!INC_NAMES._built && typeof INX !== 'undefined' && INX.snap) { INX.snap.stocks.forEach(s => { INC_NAMES[s.sym] = s.name; }); INC_NAMES._built = 1; }
+  const n = INC_NAMES[sym] || (INDIA_META[sym] && INDIA_META[sym].name);
+  return n && n !== sym ? n + ' (' + sym + ')' : sym;
+}
+function incShort(sym) { return sym === 'NIFTY' ? 'Nifty 50' : sym === 'BANKNIFTY' ? 'Bank Nifty' : sym; }
+function incDate(s) { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(s || ''); return m ? (+m[3]) + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+m[2] - 1] + ' ' + m[1] : ''; }
+function inxFillLiveSymbols(want) {
+  const sel = document.getElementById('live-symbol'); if (!sel) return;
+  if (sel.dataset.mk !== 'in') {
+    const syms = ['NIFTY', 'BANKNIFTY'].concat(INDIA_STOCKS);
+    sel.innerHTML = syms.map(s => '<option value="' + String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + incName(s).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('');
+    sel.dataset.mk = 'in';
+  }
+  if (want) { if (!Array.from(sel.options).some(o => o.value === want)) sel.add(new Option(want, want)); sel.value = want; }
+}
+const INC_CACHE = {};
+async function inxChartCandles(sym, res) {
+  await indiaListReady;
+  const key = indiaFileKey(sym), hit = INC_CACHE[key];
+  let cs;
+  if (hit && Date.now() - hit.at < 600000) cs = hit.cs;
+  else {
+    const get = async f => { const r = await liveWithTimeout(fetch(INDIA_DATA_BASE + key + f + '.json?v=' + Math.floor(Date.now() / 600000)), 15000); if (!r.ok) throw new Error('HTTP ' + r.status); const j = await r.json(); if (!Array.isArray(j) || j.length < 2) throw new Error('empty file'); return j; };
+    try { cs = await get('_5y'); } catch (e) { try { cs = await get('_1d'); } catch (e2) { throw new Error('No data file for ' + sym + ' yet (' + ((e2 && e2.message) || e2) + '). Has the daily data job run?'); } }
+    const ist = new Date(Date.now() + 19800000), today = ist.toISOString().slice(0, 10), mins = ist.getUTCHours() * 60 + ist.getUTCMinutes(), last = cs[cs.length - 1];
+    if (last && last.t === today && mins < 15 * 60 + 35) cs = cs.slice(0, -1);   // today's candle only counts after the 15:30 IST close
+    INC_CACHE[key] = { at: Date.now(), cs };
+  }
+  return res === '1w' ? inxAgg(cs, 'W') : res === '1M' ? inxAgg(cs, 'M') : cs;
+}
+function inxAgg(cs, mode) {
+  const out = []; let cur = null, ck = '';
+  cs.forEach(c => {
+    const d = new Date(c.t + 'T00:00:00Z'); let k;
+    if (mode === 'M') k = c.t.slice(0, 7); else { const m = new Date(d); m.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); k = m.toISOString().slice(0, 10); }
+    if (k !== ck) { cur = { t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: c.v || 0 }; out.push(cur); ck = k; }
+    else { cur.h = Math.max(cur.h, c.h); cur.l = Math.min(cur.l, c.l); cur.c = c.c; cur.v += c.v || 0; }
+  });
+  return out;
+}
+async function openIndiaChart(sym, scanIdx) {   // heatmap, Home strip and scanner rows all land here
+  try {
+    await indiaListReady;
+    showView('replay');
+    LIVE.lastIndia = sym;
+    if (!liveMode) setDataMode('live', { symbol: sym, res: '1d' });
+    else {
+      const k = document.getElementById('live-kind');
+      if (LIVE.kind !== 'india') { if (k) k.value = 'india'; await onLiveKindChange(); }
+      inxFillLiveSymbols(sym);
+      const tf = document.getElementById('live-timeframe'); if (tf && !['1d', '1w', '1M'].includes(tf.value)) tf.value = '1d';
+      liveSwitch('Instrument switched');
+    }
+    if (scanIdx != null && typeof sscans !== 'undefined' && sscans[scanIdx]) {   // same as openGuppyChart: switch the scan's signals on
+      const sc = sscans[scanIdx];
+      sscanApplied = sc.strat === 'Guppy crossover' && sscanGuppyPair() ? '__pair' : sc.name;
+      sscanFillApply(); sscanApplyRefresh();
+    }
+  } catch (e) { console.warn('openIndiaChart failed', e); }
+}
 async function sscanCandles(und, res) {
   await indiaListReady;
   if (isIndiaUnd(und)) return indiaCandles(und, res);
@@ -3275,7 +3344,7 @@ function sscanOverlayMeta(sc, und) { // the chart evaluates the scan on its OWN 
 }
 // Signals on the chart's own closed candles (the still-forming last candle is ignored: a signal needs a CLOSE).
 function sscanChartSignals(ov) {
-  const secs = liveMode ? LIVE_RES[LIVE.res] : 0;   // replay data is all historical: no still-forming candle to skip
+  const secs = liveMode && LIVE.kind !== 'india' ? LIVE_RES[LIVE.res] : 0;   // replay data is all historical: no still-forming candle to skip
   let n = Math.min(replayIndex, replayCandles.length);
   if (n > 0 && secs) { const ts = liveTimeToSec(replayCandles[n - 1].t); if (ts != null && ts + secs > Date.now() / 1000) n--; }
   const cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
@@ -3283,7 +3352,7 @@ function sscanChartSignals(ov) {
   return { sig, cs };
 }
 async function openSScanChart(i, und) {
-  if (isIndiaUnd(und)) return;   // premium charts need option data (crypto only)
+  if (isIndiaUnd(und)) return openIndiaChart(und, i);   // India: plain price chart with the scan's signals (no option premium)
   const sc = sscans[i];
   const t = sc && TEMPLATES.find(x => x.name === sc.strat);
   if (!t) return;
@@ -3340,7 +3409,7 @@ async function sscanApplyRefresh() {
   const token = ++sscanApplyToken;
   const draw = () => { try { renderChart(); } catch (e) { /* chart not ready yet */ } };
   if (!sscanApplied) { scanOverlay = null; if (info) info.textContent = ''; draw(); return; }
-  const onPerp = liveMode && LIVE.kind === 'perp', onOpt = liveMode && LIVE.kind === 'options' && /^[CP]-/.test(String(LIVE.symbol || ''));
+  const onPerp = liveMode && (LIVE.kind === 'perp' || LIVE.kind === 'india'), onOpt = liveMode && LIVE.kind === 'options' && /^[CP]-/.test(String(LIVE.symbol || ''));
   const onReplay = !liveMode;
   if (!onReplay && !onPerp && !onOpt && (LIVE.kind !== 'strategy' || !LIVE.stratSymbol)) return;
   const pair = sscanApplied === '__pair' ? sscanGuppyPair() : null;
@@ -5006,7 +5075,7 @@ let restoreMode = null;       // 'replay' | 'live' — which mode the saved sess
 let liveMode = false;         // true while the chart is fed by Delta Exchange instead of the bundled replay data
 // Live-mode state. Declared up here (not next to the live code) because datasetKey()/saveState()
 // read it and can run before the live section further down has been evaluated.
-const LIVE_RES = { '1m':60, '3m':180, '5m':300, '15m':900, '30m':1800, '1h':3600, '2h':7200, '4h':14400, '1d':86400 };
+const LIVE_RES = { '1m':60, '3m':180, '5m':300, '15m':900, '30m':1800, '1h':3600, '2h':7200, '4h':14400, '1d':86400, '1w':604800, '1M':2592000 };
 const LIVE = {
   restBases: ['https://api.india.delta.exchange', 'https://cdn.india.deltaex.org'], // tried in order; first that answers wins
   restIdx: 0,
@@ -7822,7 +7891,7 @@ function renderChart(forceEnd) {
   });
 
   // scanner signals, evaluated on THIS chart's candles: one entry per cycle, then an exit when every condition flips
-  if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && (scanOverlay.replay ? !liveMode : liveMode) && (scanOverlay.replay ? true : scanOverlay.perp ? LIVE.kind === 'perp' : scanOverlay.opt ? (LIVE.kind === 'options' && LIVE.symbol === scanOverlay.symbol) : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
+  if (typeof scanOverlay !== 'undefined' && scanOverlay && scanOverlay.conds && (scanOverlay.replay ? !liveMode : liveMode) && (scanOverlay.replay ? true : scanOverlay.perp ? (LIVE.kind === 'perp' || LIVE.kind === 'india') : scanOverlay.opt ? (LIVE.kind === 'options' && LIVE.symbol === scanOverlay.symbol) : (LIVE.kind === 'strategy' && LIVE.stratSymbol === scanOverlay.symbol))) {
     const infoParts = [], multiOv = !!scanOverlay.multi, placedPills = [];   // label boxes already drawn, so neighbouring entry/exit labels stack instead of overlapping
     (scanOverlay.multi || [scanOverlay]).forEach(ov => {
     const isSell = ov.side === 'Sell';
@@ -9449,9 +9518,11 @@ async function liveLoadProducts() {
 function liveRenderSymbolOptions(list) {
   const sel = document.getElementById('live-symbol');
   if (!sel) return;
-  const syms = (list.indexOf(LIVE.symbol) === -1 && !/^[CP]-|^S~/.test(LIVE.symbol)) ? [LIVE.symbol].concat(list) : list;
+  const inIdx = liveIsIndiaSym(LIVE.symbol);
+  const syms = (list.indexOf(LIVE.symbol) === -1 && !/^[CP]-|^S~/.test(LIVE.symbol) && !inIdx) ? [LIVE.symbol].concat(list) : list;
   sel.innerHTML = syms.map(s => `<option value="${s}">${s}</option>`).join('');
-  sel.value = LIVE.symbol;
+  sel.dataset.mk = '';
+  sel.value = inIdx ? (LIVE.lastPerp && list.indexOf(LIVE.lastPerp) !== -1 ? LIVE.lastPerp : list[0]) : LIVE.symbol;
 }
 function liveInitControls() {
   liveRenderSymbolOptions(LIVE_FALLBACK_SYMBOLS);
@@ -9535,12 +9606,19 @@ function liveRenderOptionSelectors(prefSymbol) {
 function liveApplyKindUi() {
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   const opt = liveMode && LIVE.kind === 'options', strat = liveMode && LIVE.kind === 'strategy';
-  show('rc-live-symbol-wrap', liveMode && LIVE.kind === 'perp');
+  show('rc-live-symbol-wrap', liveMode && (LIVE.kind === 'perp' || LIVE.kind === 'india'));
   ['rc-live-und-wrap', 'rc-live-exp-wrap'].forEach(id => show(id, opt || strat));
   ['rc-live-ot-wrap', 'rc-live-strike-wrap'].forEach(id => show(id, opt));
   ['rc-live-strat-wrap', 'rc-live-center-wrap'].forEach(id => show(id, strat));
   show('rc-live-sw-wrap', strat && !!STRAT_DEFS[LIVE.strat.type].w);
-  const perp = liveMode && LIVE.kind === 'perp';
+  const india = liveMode && LIVE.kind === 'india', perp = liveMode && (LIVE.kind === 'perp' || india);
+  const symLab = document.querySelector('#rc-live-symbol-wrap .field-label'); if (symLab) symLab.textContent = india ? 'Symbol (NSE)' : 'Symbol (Delta)';
+  const tfSel2 = document.getElementById('live-timeframe');
+  if (tfSel2) Array.from(tfSel2.options).forEach(o => { const ok = india ? ['1d', '1w', '1M'].includes(o.value) : !['1w', '1M'].includes(o.value); o.hidden = !ok; o.disabled = !ok; });
+  if (india) inxFillLiveSymbols(liveIsIndiaSym(LIVE.symbol) ? LIVE.symbol : (LIVE.lastIndia || 'NIFTY'));
+  const pp = document.getElementById('paper-panel'); if (pp) pp.style.display = india ? 'none' : '';
+  const subT = document.getElementById('replay-sub'); if (subT && liveMode) subT.textContent = india ? 'India: NSE end-of-day candles with indicators, drawings and scanner signals. Paper orders are crypto-only for now.' : 'Paper: live Delta Exchange prices with simulated money. No real orders are placed.';
+  try { renderQuickTradeBar(); } catch (e) { /* not ready */ }
   show('rc-live-scan-wrap', true);   // signals also work on Replay data
   if (typeof sscanFillApply === 'function') sscanFillApply();
   if (!liveMode && typeof sscanApplied !== 'undefined' && sscanApplied && typeof scanOverlay !== 'undefined' && scanOverlay && !scanOverlay.replay) setTimeout(() => { try { sscanApplyRefresh(); } catch (e) { /* ignore */ } }, 0);
@@ -9561,6 +9639,17 @@ async function onLiveKindChange() {
   if (!liveMode) return;
   const kind = document.getElementById('live-kind').value;
   if (kind === LIVE.kind) return;
+  if (kind !== 'india') { const tfN = document.getElementById('live-timeframe'); if (tfN && (tfN.value === '1w' || tfN.value === '1M')) tfN.value = '1d'; }
+  if (kind === 'india') {
+    await indiaListReady;
+    const tfI = document.getElementById('live-timeframe'); if (tfI) tfI.value = '1d';
+    LIVE.kind = 'india';
+    const want = LIVE.lastIndia || 'NIFTY'; LIVE.lastIndia = want;
+    inxFillLiveSymbols(want);
+    liveApplyKindUi();
+    liveSwitch('Instrument switched');
+    return;
+  }
   if (kind === 'options') {
     liveSetStatus('connecting', 'Loading option contracts…');
     try {
@@ -10143,7 +10232,9 @@ function applyDataModeUi() {
     ['rc-instrument-wrap', 'rc-month-wrap', 'rc-jumpdate-wrap', 'replay-playback'].forEach(id => show(id, true));
   }
   const sub = document.getElementById('replay-sub');
-  if (sub) sub.textContent = liveMode
+  if (sub) sub.textContent = liveMode && LIVE.kind === 'india'
+    ? 'India: NSE end-of-day candles for charting and scanner signals. Paper orders are crypto-only for now.'
+    : liveMode
     ? 'Paper: live Delta Exchange prices with simulated money. No real orders are placed.'
     : 'Replay: step through past candles and practice. No real orders are placed.';
 }
@@ -10183,7 +10274,7 @@ function liveSwitch(reason) {
   if (position) closePosition(reason);
   if (pendingOrder) cancelPendingOrder();
   LIVE.symbol = sym; LIVE.res = res;
-  if (!/^[CP]-/.test(sym)) LIVE.lastPerp = sym;
+  if (liveIsIndiaSym(sym)) LIVE.lastIndia = sym; else if (!/^[CP]-/.test(sym)) LIVE.lastPerp = sym;
   scheduleSave();
   if (typeof sscanApplyRefresh === 'function') sscanApplyRefresh();
   liveStart();
@@ -10210,8 +10301,11 @@ function liveStart() {
   const gen = ++LIVE.gen;
   liveTeardownTransport();
   LIVE.retry = 0; LIVE.lastTickAt = 0; LIVE.csp = null; LIVE.diag = null; liveRenderLastTick();
+  const inIdx = liveIsIndiaSym(LIVE.symbol);
+  if (inIdx) { if (!['1d', '1w', '1M'].includes(LIVE.res)) LIVE.res = '1d'; LIVE.kind = 'india'; LIVE.lastIndia = LIVE.symbol; }
   const symSel = document.getElementById('live-symbol');
-  if (symSel) {
+  if (symSel && inIdx) inxFillLiveSymbols(LIVE.symbol);
+  else if (symSel) {
     if (!/^[CP]-|^S~/.test(LIVE.symbol)) {
       LIVE.lastPerp = LIVE.symbol;
       if (!Array.from(symSel.options).some(o => o.value === LIVE.symbol)) liveRenderSymbolOptions(LIVE.products || LIVE_FALLBACK_SYMBOLS);
@@ -10220,33 +10314,40 @@ function liveStart() {
   }
   const tfSel = document.getElementById('live-timeframe');
   if (tfSel) tfSel.value = LIVE.res;
-  LIVE.kind = /^S~/.test(LIVE.symbol) ? 'strategy' : /^[CP]-/.test(LIVE.symbol) ? 'options' : 'perp';
+  LIVE.kind = inIdx ? 'india' : /^S~/.test(LIVE.symbol) ? 'strategy' : /^[CP]-/.test(LIVE.symbol) ? 'options' : 'perp';
   LIVE.legs = LIVE.kind === 'strategy' ? [] : [{ symbol: LIVE.symbol, w: 1 }];
   LIVE.legData = {};
   const stratInfo = LIVE.kind === 'strategy' ? liveParseStratSymbol(LIVE.symbol) : null;
-  const liveName = stratInfo ? liveStratLabel(stratInfo, LIVE.symbol) : LIVE.symbol;
-  currentInstrument = { id: 'live-' + LIVE.symbol, label: liveName, assetClass: 'Crypto', type: LIVE.kind === 'perp' ? 'futures' : 'options', months: [], live: true };
+  const liveName = stratInfo ? liveStratLabel(stratInfo, LIVE.symbol) : inIdx ? incShort(LIVE.symbol) : LIVE.symbol;
+  currentInstrument = { id: 'live-' + LIVE.symbol, label: liveName, assetClass: inIdx ? 'Equity' : 'Crypto', type: inIdx ? 'equity' : LIVE.kind === 'perp' ? 'futures' : 'options', months: [], live: true };
   liveApplyKindUi();
-  if (LIVE.kind !== 'perp') liveLoadOptionProducts().then(() => {
+  if (LIVE.kind === 'options' || LIVE.kind === 'strategy') liveLoadOptionProducts().then(() => {
     if (gen !== LIVE.gen) return;
     if (LIVE.kind === 'options') liveRenderOptionSelectors(LIVE.symbol); else liveRenderStratSelectors(LIVE.symbol);
   }).catch(() => {});
   currentMonth = null;
   replayCandles = []; replayIndex = 1;
-  document.getElementById('replay-symbol-label').textContent = liveName + ' — live · ' + LIVE.res;
+  document.getElementById('replay-symbol-label').textContent = inIdx ? liveName + ' · NSE · ' + ({ '1d': '1D', '1w': '1W', '1M': '1M' }[LIVE.res]) : liveName + ' — live · ' + LIVE.res;
   document.getElementById('replay-nodata').style.display = 'none';
   const canvas = document.getElementById('chart-canvas');
   if (canvas) canvas.style.display = '';
   updateLeverageStatus();
   setTicketEnabled(false);
   renderChart(true);
-  liveLoadProducts().then(list => { if (gen === LIVE.gen) liveRenderSymbolOptions(list); }).catch(() => { /* fallback list stays */ });
+  if (!inIdx) liveLoadProducts().then(list => { if (gen === LIVE.gen) liveRenderSymbolOptions(list); }).catch(() => { /* fallback list stays */ });
   liveLoadAndConnect(gen);
 }
 async function liveLoadAndConnect(gen) {
   const symbol = LIVE.symbol, res = LIVE.res;
   liveSetStatus('connecting', 'Loading ' + symbol + ' ' + res + '…');
   try {
+    if (LIVE.kind === 'india') {      // end-of-day NSE data: no websocket, no order ticket
+      const ics = await inxChartCandles(symbol, res);
+      if (gen !== LIVE.gen) return;
+      liveInstallCandles(ics); setTicketEnabled(false);
+      liveSetStatus('live', 'End-of-day data · last close ' + incDate(ics[ics.length - 1].t) + ' · refreshes after 15:30 IST');
+      return;
+    }
     const secs = LIVE_RES[res];
     const end = Math.floor(Date.now() / 1000);
     let candles;
@@ -10272,6 +10373,7 @@ async function liveLoadAndConnect(gen) {
     liveConnectWs(gen);
   } catch (e) {
     if (gen !== LIVE.gen) return;
+    if (LIVE.kind === 'india') { liveSetStatus('error', (e && e.message) || 'Could not load India data'); return; }
     await liveDiagnose(e);
     if (gen !== LIVE.gen) return;
     if (LIVE.csp) {
@@ -10960,7 +11062,7 @@ function renderQuickTradeBar() {
   if (!bar) return;
   const replayView = document.getElementById('view-replay');
   const replayActive = replayView && replayView.style.display !== 'none';
-  if (!replayActive || !replayCandles.length) { bar.classList.remove('open'); return; }
+  if (!replayActive || !replayCandles.length || (liveMode && LIVE.kind === 'india')) { bar.classList.remove('open'); return; }   // India is chart-only for now
   bar.classList.add('open');
   const ccy = instrumentCurrency();
   const info = document.getElementById('qtb-info');
@@ -12278,6 +12380,8 @@ const inxEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': 
 const inxOk = v => typeof v === 'number' && isFinite(v);
 const inxPct = v => !inxOk(v) ? '–' : Math.abs(v) < 0.005 ? '0.00%' : (v >= 0 ? '▲ +' : '▼ ') + Math.abs(v).toFixed(2) + '%';
 const inxSm = v => (Math.abs(v) < 0.05 ? '0.0' : (v > 0 ? '+' : '') + v.toFixed(1)) + '%';
+const INX_SEC = { 'financial services': 'Financials', 'information technology': 'IT', 'oil gas & consumable fuels': 'Energy', 'power': 'Energy', 'automobile and auto components': 'Auto', 'fast moving consumer goods': 'FMCG', 'healthcare': 'Healthcare', 'metals & mining': 'Metals', 'construction': 'Infra & Industrials', 'capital goods': 'Infra & Industrials', 'construction materials': 'Infra & Industrials', 'services': 'Infra & Industrials', 'telecommunication': 'Telecom', 'consumer durables': 'Consumer', 'consumer services': 'Consumer', 'textiles': 'Consumer', 'media entertainment & publication': 'Consumer', 'chemicals': 'Others', 'realty': 'Others', 'diversified': 'Others', 'forest materials': 'Others' };
+const inxSec = n => { const k = String(n || '').toLowerCase().trim().replace(/\s+/g, ' '); return INX_SEC[k] || n || 'Other'; };
 const inxCls = v => !inxOk(v) ? '' : v >= 0 ? 'inx-up' : 'inx-dn';
 const inxNum = (v, d) => v.toLocaleString('en-IN', { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d });
 const inxDate = s => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(s || ''); return m ? (+m[3]) + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+m[2] - 1] : ''; };
@@ -12355,7 +12459,7 @@ function inxPulseEnter() {
   mktStamp();
 }
 function inxSet(k, v) { INX[k] = v; inxPaneRender(); }
-function inxPick(s) { INX.sel = s; inxMapRender(); inxPeekRender(); }
+function inxPick(s) { if (INX.sel === s) { openIndiaChart(s); return; } INX.sel = s; inxMapRender(); inxPeekRender(); }
 function inxPaneRender() {
   const el = document.getElementById('inx-pane'); if (!el) return;
   if (!INX.snap) {
@@ -12371,29 +12475,36 @@ function inxPaneRender() {
     ${INX.hasSector ? `<div class="g"><span class="inx-lab">Group</span>${seg('grp', [['Sector', 'S'], ['None', 'N']])}</div>` : ''}
   </div>
   <div class="inx-wrap"><div><div class="inx-map" id="inx-map" role="group" aria-label="India stock heatmap"></div>
-    <div class="inx-legend"><span>−${mx}%</span><i></i><span>+${mx}%</span><span style="margin-left:auto">Tile area = ${INX.size === 'T' ? 'turnover (close × volume)' : 'equal'}. Colour = ${INX.met} change.</span></div></div>
+    <div class="inx-legend"><span>−${mx}%</span><i></i><span>+${mx}%</span><span style="margin-left:auto">Tile area = ${INX.size === 'T' ? 'turnover (close × volume, scaled)' : 'equal'}. Colour = ${INX.met} change.</span><span id="inx-note" style="flex-basis:100%"></span></div></div>
     <div id="inx-peek"></div></div>`;
   inxMapRender(); inxPeekRender();
 }
 function inxMapRender() {
   const map = document.getElementById('inx-map'); if (!map) return;
   const L = inxUniverse(); if (!L.length) { map.innerHTML = '<div class="inx-msg">No stocks with data for this view.</div>'; return; }
-  const W = map.clientWidth || 800, H = map.clientHeight || 540, VW = 1000, VH = 600, key = INX.met, k = INX_KEY[key], mx = INX_MAX[key], wt = d => INX.size === 'T' ? Math.max(1, d.turnover) : 1;
-  let tiles = '', secs = '';
+  const W = map.clientWidth || 800, H = map.clientHeight || 540, VW = W, VH = H, key = INX.met, k = INX_KEY[key], mx = INX_MAX[key], wt = d => INX.size === 'T' ? Math.sqrt(Math.max(1, d.turnover)) : 1;
+  const draw = L => {
+  let tiles = '', secs = '', unl = 0;
   const tile = r => {
-    const d = r.d, v = d[k], pw = r.w / VW * W, ph = r.h / VH * H, big = pw > 78 && ph > 46, mid = pw > 44 && ph > 28, fs = big ? Math.min(15, 10 + pw / 45) : 10;
+    const d = r.d, v = d[k], pw = r.w / VW * W, ph = r.h / VH * H, big = pw > 78 && ph > 46, mid = pw > 38 && ph > 24, fs = big ? Math.min(15, 10 + pw / 45) : 10; if (!mid) unl++;
     tiles += `<button type="button" class="inx-t${INX.sel === d.sym ? ' sel' : ''}" onclick="inxPick('${inxEsc(d.sym).replace(/'/g, '')}')" aria-label="${inxEsc(d.sym)} ${inxEsc(inxPct(v))}" style="left:${(r.x / VW * 100).toFixed(2)}%;top:${(r.y / VH * 100).toFixed(2)}%;width:${(r.w / VW * 100).toFixed(2)}%;height:${(r.h / VH * 100).toFixed(2)}%;background:${inxTint(v, mx)}">${mid ? `<span style="font-size:${fs.toFixed(1)}px"><b>${inxEsc(d.sym)}</b>${big ? inxEsc(inxPct(v)) : inxSm(v)}</span>` : ''}</button>`;
   };
   if (INX.grp === 'S' && INX.hasSector) {
-    const m = {}; L.forEach(d => { (m[d.sector || 'Other'] = m[d.sector || 'Other'] || []).push(d); });
+    const m = {}; L.forEach(d => { const sn = inxSec(d.sector); (m[sn] = m[sn] || []).push(d); });
     const gs = Object.keys(m).map(n => ({ n, list: m[n] }));
     inxLay(gs, 0, 0, VW, VH, g => g.list.reduce((a, d) => a + wt(d), 0)).forEach(gr => {
       const g = gr.d, avg = g.list.reduce((a, d) => a + d[k], 0) / g.list.length, hh = 18 / H * VH;
-      secs += `<div class="inx-sec" style="left:${(gr.x / VW * 100).toFixed(2)}%;top:${(gr.y / VH * 100).toFixed(2)}%;width:${(gr.w / VW * 100).toFixed(2)}%">${inxEsc(g.n)} <span style="opacity:.85">${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%</span></div>`;
-      inxLay(g.list, gr.x, gr.y + hh, gr.w, Math.max(4, gr.h - hh), wt).forEach(tile);
+      const head = gr.w > 72 && gr.h > 70 && g.list.length > 1;     // tiny blocks get no label strip, just their tiles
+      if (head) secs += `<div class="inx-sec" style="left:${(gr.x / VW * 100).toFixed(2)}%;top:${(gr.y / VH * 100).toFixed(2)}%;width:${(gr.w / VW * 100).toFixed(2)}%">${inxEsc(g.n)} <span style="opacity:.85">${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%</span></div>`;
+      inxLay(g.list, gr.x, gr.y + (head ? hh : 0), gr.w, Math.max(4, gr.h - (head ? hh : 0)), wt).forEach(tile);
     });
   } else inxLay(L, 0, 0, VW, VH, wt).forEach(tile);
-  map.innerHTML = tiles + secs;
+  return { html: tiles + secs, unl };
+  };
+  let n = L.length, out = draw(L);
+  while (n > 16 && out.unl / n > 0.06) { n -= 2; out = draw(L.slice(0, n)); }   // drop the smallest stocks until (almost) every tile can carry its name
+  map.innerHTML = out.html;
+  const nt = document.getElementById('inx-note'); if (nt) nt.textContent = (n < L.length ? 'Showing the ' + n + ' biggest of ' + L.length + ' by turnover so every tile stays readable. ' : '') + 'Tap a tile for details, tap it again to open its chart.';
 }
 function inxPeekRender() {
   const el = document.getElementById('inx-peek'); if (!el) return;
@@ -12405,7 +12516,7 @@ function inxPeekRender() {
     <svg class="inx-svg ${dn ? 'inx-dn-s' : ''}" viewBox="0 0 320 100" role="img" aria-label="Last 30 sessions"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop class="inx-gs" offset="0" style="stop-opacity:.28"/><stop class="inx-gs" offset="1" style="stop-opacity:0"/></linearGradient></defs><path d="${a.area}" fill="url(#${gid})"/><path class="inx-line" d="${a.line}"/></svg>
     <div style="font:11.5px var(--mono);color:var(--text-muted);margin:2px 0 6px">Last 30 sessions · daily close</div>
     ${row('1 week', inxPct(d.ret1w), inxCls(d.ret1w))}${row('1 month', inxPct(d.ret1m), inxCls(d.ret1m))}${row('3 months', inxPct(d.ret3m), inxCls(d.ret3m))}${row('Turnover', '₹' + inxNum(tc, tc >= 100 ? 0 : 1) + ' cr')}
-    <div style="margin-top:10px"><div class="inx-lab" style="margin-bottom:6px">52 week range</div><div style="position:relative;height:6px;background:var(--surface-2);border-radius:3px"><i style="position:absolute;left:${Math.max(0, Math.min(100, pos)).toFixed(0)}%;top:-4px;width:3px;height:14px;background:var(--text);border-radius:2px"></i></div><div style="display:flex;justify-content:space-between;font:12px var(--mono);margin-top:8px"><span>${inxNum(lo, 0)}</span><span style="color:var(--text-muted)">${((1 - d.c / hi) * 100).toFixed(1)}% from high</span><span>${inxNum(hi, 0)}</span></div></div></div>`;
+    <div style="margin-top:10px"><div class="inx-lab" style="margin-bottom:6px">52 week range</div><div style="position:relative;height:6px;background:var(--surface-2);border-radius:3px"><i style="position:absolute;left:${Math.max(0, Math.min(100, pos)).toFixed(0)}%;top:-4px;width:3px;height:14px;background:var(--text);border-radius:2px"></i></div><div style="display:flex;justify-content:space-between;font:12px var(--mono);margin-top:8px"><span>${inxNum(lo, 0)}</span><span style="color:var(--text-muted)">${((1 - d.c / hi) * 100).toFixed(1)}% from high</span><span>${inxNum(hi, 0)}</span></div></div><button class="inx-btn" style="width:100%;margin-top:14px;background:var(--accent);border-color:var(--accent);color:var(--on-accent)" onclick="openIndiaChart('${inxEsc(d.sym).replace(/'/g, '')}')">Open chart</button></div>`;
 }
 let inxRz = 0; window.addEventListener('resize', () => { clearTimeout(inxRz); inxRz = setTimeout(() => { const p = document.getElementById('inx-pane'); if (p && p.style.display !== 'none' && INX.snap) inxMapRender(); }, 150); });
 
@@ -12421,8 +12532,8 @@ function inxHome() {
   let grid = ''; for (let i = 1; i < 4; i++) grid += 'M0 ' + (i * 62.5) + 'L640 ' + (i * 62.5);
   const main = `<div class="inx-card ${dn ? 'inx-dn-s' : ''}"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start"><div><div style="display:flex;gap:8px;align-items:center"><b style="font-size:16px;font-weight:600">Nifty 50</b><span class="inx-tag">NSE</span></div><div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span style="font:500 28px var(--mono)">${inxNum(nf.c)}</span><span class="${inxCls(nf.chgPct)}" style="font-family:var(--mono)">${inxPct(nf.chgPct)}</span></div></div><div class="inx-seg" role="group" aria-label="Nifty range">${rg}</div></div>
     <svg class="inx-svg" viewBox="0 0 640 250" role="img" aria-label="Nifty 50 trend" style="margin-top:6px"><defs><linearGradient id="inxh" x1="0" y1="0" x2="0" y2="1"><stop class="inx-gs" offset="0" style="stop-opacity:.26"/><stop class="inx-gs" offset="1" style="stop-opacity:0"/></linearGradient></defs><path class="inx-grid" d="${grid}"/><path d="${a.area}" fill="url(#inxh)"/><path class="inx-line" d="${a.line}"/><circle class="inx-dot" cx="${Math.min(a.last[0], 634).toFixed(1)}" cy="${a.last[1].toFixed(1)}" r="4"/></svg>
-    <div style="font:12px var(--mono);color:var(--text-muted);margin-top:4px">52w ${inxNum(Math.min.apply(null, y), 0)} – ${inxNum(Math.max.apply(null, y), 0)}</div></div>`;
-  const bnc = bn ? (() => { const b = inxArea(bn.spark.slice(-60), 96, 32, 3); return `<div class="inx-card ${bn.chgPct < 0 ? 'inx-dn-s' : ''}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="display:flex;gap:8px;align-items:center"><b style="font-weight:600">Bank Nifty</b><span class="inx-tag">NSE</span></div><svg viewBox="0 0 96 32" width="96" height="32" aria-hidden="true"><path class="inx-line" style="stroke-width:1.8" d="${b.line}"/></svg></div><div style="display:flex;gap:12px;align-items:baseline"><span style="font:500 22px var(--mono)">${inxNum(bn.c)}</span><span class="${inxCls(bn.chgPct)}" style="font-family:var(--mono)">${inxPct(bn.chgPct)}</span></div></div>`; })() : '';
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><span style="font:12px var(--mono);color:var(--text-muted)">52w ${inxNum(Math.min.apply(null, y), 0)} – ${inxNum(Math.max.apply(null, y), 0)}</span><button class="inx-link" onclick="openIndiaChart('NIFTY')">Full chart ›</button></div></div>`;
+  const bnc = bn ? (() => { const b = inxArea(bn.spark.slice(-60), 96, 32, 3); return `<div class="inx-card ${bn.chgPct < 0 ? 'inx-dn-s' : ''}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="display:flex;gap:8px;align-items:center"><b style="font-weight:600">Bank Nifty</b><span class="inx-tag">NSE</span></div><svg viewBox="0 0 96 32" width="96" height="32" aria-hidden="true"><path class="inx-line" style="stroke-width:1.8" d="${b.line}"/></svg></div><div style="display:flex;gap:12px;align-items:baseline"><span style="font:500 22px var(--mono)">${inxNum(bn.c)}</span><span class="${inxCls(bn.chgPct)}" style="font-family:var(--mono)">${inxPct(bn.chgPct)}</span><button class="inx-link" style="margin-left:auto;padding:0;min-height:24px" onclick="openIndiaChart('BANKNIFTY')">Chart ›</button></div></div>`; })() : '';
   const bl = S.stocks.filter(s => inxOk(s.chgPct) && (!INX.hasIdx || s.idx === 'N50')), adv = bl.filter(s => s.chgPct > 0).length, dec = bl.filter(s => s.chgPct < 0).length, flat = bl.length - adv - dec;
   const brd = bl.length ? `<div class="inx-card"><div style="display:flex;justify-content:space-between;align-items:center"><span class="inx-lab">Breadth · ${bl.length} stocks</span></div><div style="display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px;margin:10px 0 8px"><i style="flex:${adv};background:var(--green)"></i><i style="flex:${flat};background:var(--text-faint)"></i><i style="flex:${dec};background:var(--red)"></i></div><div style="display:flex;justify-content:space-between;font:12.5px var(--mono)"><span class="inx-up">▲ ${adv}</span><span style="color:var(--text-muted)">${flat} flat</span><span class="inx-dn">▼ ${dec}</span></div></div>` : '';
   const top = S.stocks.filter(s => inxOk(s.chgPct) && inxOk(s.turnover) && (!INX.hasIdx || s.idx === 'N50')).sort((p, q) => q.turnover - p.turnover).slice(0, 8);
