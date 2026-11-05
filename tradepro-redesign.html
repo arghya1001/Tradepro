@@ -1395,7 +1395,43 @@
 .inx-mini button{border:0;border-radius:4px;color:var(--text);font:500 10.5px var(--mono);text-align:left;padding:3px 5px;cursor:pointer;overflow:hidden;min-width:0}
 .inx-head{display:flex;justify-content:space-between;align-items:center;margin:4px 0 8px}
 @media (max-width:880px){.inx-wrap,.inx-home{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:700px){.inx-map{height:560px}.inx-legend i{width:120px}}
+/* ---- India heatmap v2: cleaner tiles, stacked sectors on phones, bottom sheet ---- */
+.inx-t{border:1.5px solid transparent;background-clip:padding-box;border-radius:8px;outline:0;font-family:var(--sans)}
+.inx-t.sel{outline:2px solid var(--text);outline-offset:-2px}
+.inx-t span{padding:7px 8px;line-height:1.2}
+.inx-t b{font-size:1em;font-weight:600;letter-spacing:.01em}
+.inx-t em{display:block;font:500 .84em var(--mono);font-style:normal;opacity:.92;margin-top:2px}
+.inx-t i{display:block;font:.72em var(--mono);font-style:normal;opacity:.6;margin-top:3px}
+.inx-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:12px;color:var(--text);cursor:pointer;font-family:var(--sans)}
+.inx-sv{display:flex;align-items:baseline;gap:10px;margin-top:3px;font:500 20px var(--mono);flex-wrap:wrap}.inx-sv span+span{font-size:13px}
+.inx-br{flex:0 0 38%;min-width:110px}
+.inx-bb{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px}.inx-bb i{display:block;min-width:0}
+.inx-bl{display:flex;justify-content:space-between;font:12px var(--mono);margin-top:6px}
+.inx-ctl{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.inx-fill{display:flex;width:100%}.inx-fill button{flex:1;min-height:34px}
+.inx-r2{display:flex;gap:8px;align-items:stretch}.inx-r2 .inx-seg{flex:1}
+.inx-opt{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:0 12px;font:500 12px var(--mono);cursor:pointer}
+.inx-opt.on{color:var(--accent);border-color:var(--accent)}.inx-opt svg{width:14px;height:14px}
+.inx-opts{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;padding:10px 12px;background:var(--surface);border:1px solid var(--border-soft);border-radius:10px}
+.inx-opts .g{display:flex;align-items:center;gap:8px}
+.inx-blk{margin-bottom:14px}
+.inx-bh{display:flex;align-items:center;gap:8px;padding:0 2px 7px}
+.inx-bn{font:600 13px var(--sans);letter-spacing:.01em}
+.inx-bc{font:11px var(--mono);color:var(--text-faint)}
+.inx-bp{margin-left:auto;font:500 12px var(--mono);padding:2px 8px;border-radius:10px;background:var(--surface)}
+.inx-bt{position:relative}
+.inx-map.inx-stk{height:auto;overflow:visible;border:0;background:none;border-radius:0}
+.inx-x{display:none;position:absolute;top:10px;right:12px;width:30px;height:30px;border-radius:15px;border:0;background:var(--surface-2);color:var(--text-muted);font-size:14px;cursor:pointer}
+.inx-scrim{display:none}
+@media (max-width:700px){
+  .inx-legend i{width:110px}
+  .inx-wrap{display:block}
+  #inx-peek{display:none}
+  #inx-peek.open{display:block;position:fixed;left:0;right:0;bottom:0;z-index:330}
+  #inx-peek.open .inx-peek{position:relative;border-radius:18px 18px 0 0;border-bottom:0;padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px));max-height:80vh;overflow:auto;box-shadow:0 -12px 40px rgba(0,0,0,.5)}
+  #inx-peek.open .inx-x{display:block}
+  .inx-scrim.open{display:block;position:fixed;inset:0;z-index:320;background:rgba(0,0,0,.55)}
+}
 </style>
 </head>
 <body>
@@ -12372,7 +12408,7 @@ setInterval(spkTick, 30000); setTimeout(spkTick, 8000);
 /* ===== India markets: data snapshot, heatmap (Markets > Pulse) and Home strip =====
    Data: INDIA_DATA_BASE + 'india_snapshot.json' (written by build_india_snapshot.py in the daily Action).
    If that file is not there yet, the snapshot is built in the browser from the daily candle files (first 80 stocks). */
-const INX = { snap: null, err: null, busy: null, at: 0, mk: 'in', met: '1D', size: 'T', grp: 'S', idx: 'N50', sel: null, rng: 66, hasSector: false, hasIdx: false, prog: '' };
+const INX = { snap: null, err: null, busy: null, at: 0, mk: 'in', met: '1D', size: 'T', grp: 'S', idx: 'N50', sel: null, rng: 66, hasSector: false, hasIdx: false, prog: '', opt: false, sheet: false };
 try { const m = localStorage.getItem('tp-inx-mk'); if (m === 'in' || m === 'crypto') INX.mk = m; } catch (e) { /* ignore */ }
 const INX_MAX = { '1D': 3, '1W': 6, '1M': 12, '3M': 20 };
 const INX_KEY = { '1D': 'chgPct', '1W': 'ret1w', '1M': 'ret1m', '3M': 'ret3m' };
@@ -12459,59 +12495,86 @@ function inxPulseEnter() {
   mktStamp();
 }
 function inxSet(k, v) { INX[k] = v; inxPaneRender(); }
-function inxPick(s) { if (INX.sel === s) { openIndiaChart(s); return; } INX.sel = s; inxMapRender(); inxPeekRender(); }
+function inxPick(s) {
+  if (window.innerWidth <= 700) { INX.sel = s; INX.sheet = true; inxMapRender(); inxPeekRender(); inxSheetSync(); return; }   // phones: details open as a bottom sheet
+  if (INX.sel === s) { openIndiaChart(s); return; } INX.sel = s; inxMapRender(); inxPeekRender();
+}
+function inxSheetSync() { const a = document.getElementById('inx-scrim'), b = document.getElementById('inx-peek'); if (a) a.classList.toggle('open', !!INX.sheet); if (b) b.className = INX.sheet ? 'open' : ''; }
+function inxClose() { INX.sheet = false; inxSheetSync(); }
 function inxPaneRender() {
   const el = document.getElementById('inx-pane'); if (!el) return;
+  INX.sheet = false;
   if (!INX.snap) {
     el.innerHTML = INX.err ? `<div class="inx-msg">${inxEsc(INX.err)}<br><br><button class="inx-btn" onclick="inxLoad(true);inxPaneRender()">Retry</button> <button class="inx-btn" onclick="inxSetMk('crypto')">Show crypto</button></div>` : `<div class="inx-msg">Loading India market… <span id="inx-prog">${inxEsc(INX.prog)}</span></div>`;
     return;
   }
-  const seg = (key, arr) => `<div class="inx-seg" role="group">${arr.map(([l, v]) => `<button type="button" class="${INX[key] === v ? 'on' : ''}" onclick="inxSet('${key}','${v}')">${l}</button>`).join('')}</div>`;
-  const mx = INX_MAX[INX.met];
-  el.innerHTML = `<div class="inx-bar">
-    ${INX.hasIdx ? `<div class="g">${seg('idx', [['Nifty 50', 'N50'], ['Next 50', 'NN50'], ['All', 'ALL']])}</div>` : ''}
-    <div class="g"><span class="inx-lab">Colour</span>${seg('met', [['1D', '1D'], ['1W', '1W'], ['1M', '1M'], ['3M', '3M']])}</div>
-    <div class="g"><span class="inx-lab">Size</span>${seg('size', [['Turnover', 'T'], ['Equal', 'E']])}</div>
-    ${INX.hasSector ? `<div class="g"><span class="inx-lab">Group</span>${seg('grp', [['Sector', 'S'], ['None', 'N']])}</div>` : ''}
-  </div>
+  const seg = (key, arr, cls) => `<div class="inx-seg ${cls || ''}" role="group">${arr.map(([l, v]) => `<button type="button" class="${INX[key] === v ? 'on' : ''}" onclick="inxSet('${key}','${v}')">${l}</button>`).join('')}</div>`;
+  const mx = INX_MAX[INX.met], nf = INX.snap.indices && INX.snap.indices.NIFTY;
+  let B = INX.snap.stocks.filter(x => inxOk(x.chgPct));
+  if (INX.hasIdx && INX.idx === 'N50') B = B.filter(x => x.idx === 'N50'); else if (INX.hasIdx && INX.idx === 'NN50') B = B.filter(x => x.idx === 'NN50');
+  const adv = B.filter(x => x.chgPct > 0).length, dec = B.filter(x => x.chgPct < 0).length, flat = B.length - adv - dec;
+  const sum = nf ? `<button type="button" class="inx-sum" onclick="openIndiaChart('NIFTY')" aria-label="Open Nifty 50 chart"><div><div class="inx-lab">Nifty 50 · NSE</div><div class="inx-sv"><span>${inxNum(nf.c)}</span><span class="${inxCls(nf.chgPct)}">${inxPct(nf.chgPct)}</span></div></div><div class="inx-br"><div class="inx-bb"><i style="flex:${adv};background:var(--green)"></i><i style="flex:${flat};background:var(--text-faint)"></i><i style="flex:${dec};background:var(--red)"></i></div><div class="inx-bl"><span class="inx-up">▲ ${adv}</span><span class="inx-dn">▼ ${dec}</span></div></div></button>` : '';
+  const gear = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>';
+  const opts = INX.opt ? `<div class="inx-opts"><div class="g"><span class="inx-lab">Size</span>${seg('size', [['Turnover', 'T'], ['Equal', 'E']])}</div>${INX.hasSector ? `<div class="g"><span class="inx-lab">Group</span>${seg('grp', [['Sector', 'S'], ['None', 'N']])}</div>` : ''}</div>` : '';
+  el.innerHTML = `${sum}<div class="inx-ctl">
+    ${INX.hasIdx ? seg('idx', [['Nifty 50', 'N50'], ['Next 50', 'NN50'], ['All', 'ALL']], 'inx-fill') : ''}
+    <div class="inx-r2">${seg('met', [['1D', '1D'], ['1W', '1W'], ['1M', '1M'], ['3M', '3M']], 'inx-fill')}<button type="button" class="inx-opt${INX.opt ? ' on' : ''}" onclick="inxSet('opt',${!INX.opt})" aria-expanded="${INX.opt}">${gear}View</button></div>
+    ${opts}</div>
   <div class="inx-wrap"><div><div class="inx-map" id="inx-map" role="group" aria-label="India stock heatmap"></div>
-    <div class="inx-legend"><span>−${mx}%</span><i></i><span>+${mx}%</span><span style="margin-left:auto">Tile area = ${INX.size === 'T' ? 'turnover (close × volume, scaled)' : 'equal'}. Colour = ${INX.met} change.</span><span id="inx-note" style="flex-basis:100%"></span></div></div>
-    <div id="inx-peek"></div></div>`;
+    <div class="inx-legend"><span>−${mx}%</span><i></i><span>+${mx}%</span><span style="margin-left:auto">Area = ${INX.size === 'T' ? 'turnover' : 'equal'} · Colour = ${INX.met} change</span><span id="inx-note" style="flex-basis:100%"></span></div></div>
+    <div id="inx-peek"></div></div><div class="inx-scrim" id="inx-scrim" onclick="inxClose()"></div>`;
   inxMapRender(); inxPeekRender();
 }
 function inxMapRender() {
   const map = document.getElementById('inx-map'); if (!map) return;
   const L = inxUniverse(); if (!L.length) { map.innerHTML = '<div class="inx-msg">No stocks with data for this view.</div>'; return; }
-  const W = map.clientWidth || 800, H = map.clientHeight || 540, VW = W, VH = H, key = INX.met, k = INX_KEY[key], mx = INX_MAX[key], wt = d => INX.size === 'T' ? Math.sqrt(Math.max(1, d.turnover)) : 1;
-  const draw = L => {
-  let tiles = '', secs = '', unl = 0;
-  const tile = r => {
-    const d = r.d, v = d[k], pw = r.w / VW * W, ph = r.h / VH * H, big = pw > 78 && ph > 46, mid = pw > 38 && ph > 24, fs = big ? Math.min(15, 10 + pw / 45) : 10; if (!mid) unl++;
-    tiles += `<button type="button" class="inx-t${INX.sel === d.sym ? ' sel' : ''}" onclick="inxPick('${inxEsc(d.sym).replace(/'/g, '')}')" aria-label="${inxEsc(d.sym)} ${inxEsc(inxPct(v))}" style="left:${(r.x / VW * 100).toFixed(2)}%;top:${(r.y / VH * 100).toFixed(2)}%;width:${(r.w / VW * 100).toFixed(2)}%;height:${(r.h / VH * 100).toFixed(2)}%;background:${inxTint(v, mx)}">${mid ? `<span style="font-size:${fs.toFixed(1)}px"><b>${inxEsc(d.sym)}</b>${big ? inxEsc(inxPct(v)) : inxSm(v)}</span>` : ''}</button>`;
+  const mob = window.innerWidth <= 700; map.classList.toggle('inx-stk', mob);
+  const W = map.clientWidth || (mob ? window.innerWidth - 32 : 800), H = mob ? 0 : (map.clientHeight || 540), key = INX.met, k = INX_KEY[key], mx = INX_MAX[key];
+  const raw = d => INX.size === 'T' ? Math.sqrt(Math.max(1, d.turnover)) : 1, smax = Math.max.apply(null, L.map(raw)), wt = d => Math.max(raw(d), smax * 0.3);   // floor so small stocks stay big enough to read
+  const sGroups = INX.grp === 'S' && INX.hasSector;
+  const groups = () => { if (!sGroups) return [{ n: '', list: L }]; const m = {}; L.forEach(d => { const sn = inxSec(d.sector); (m[sn] = m[sn] || []).push(d); }); return Object.keys(m).map(n => ({ n, list: m[n] })); };
+  const avgOf = g => g.list.reduce((a, d) => a + d[k], 0) / g.list.length, avgTxt = g => (avgOf(g) >= 0 ? '+' : '') + avgOf(g).toFixed(1) + '%';
+  const tile = (r, cw, ch, st) => {
+    const d = r.d, v = d[k], big = r.w >= 96 && r.h >= 60, mid = r.w >= 46 && r.h >= 34, sm = r.w >= 34 && r.h >= 20, fs = big ? Math.min(15, 11.5 + r.w / 70) : 11.5;
+    if (!sm) st.unl++;
+    const inner = mid ? `<span style="font-size:${fs.toFixed(1)}px"><b>${inxEsc(d.sym)}</b><em>${inxSm(v)}</em>${big && r.h >= 82 && inxOk(d.c) ? `<i>₹${inxNum(d.c, d.c >= 1000 ? 0 : 2)}</i>` : ''}</span>` : sm ? `<span style="font-size:10px"><b>${inxEsc(d.sym)}</b></span>` : '';
+    return `<button type="button" class="inx-t${INX.sel === d.sym ? ' sel' : ''}" onclick="inxPick('${inxEsc(d.sym).replace(/'/g, '')}')" aria-label="${inxEsc(d.sym)} ${inxEsc(inxPct(v))}" style="left:${(r.x / cw * 100).toFixed(2)}%;top:${(r.y / ch * 100).toFixed(2)}%;width:${(r.w / cw * 100).toFixed(2)}%;height:${(r.h / ch * 100).toFixed(2)}%;background-color:${inxTint(v, mx)}">${inner}</button>`;
   };
-  if (INX.grp === 'S' && INX.hasSector) {
-    const m = {}; L.forEach(d => { const sn = inxSec(d.sector); (m[sn] = m[sn] || []).push(d); });
-    const gs = Object.keys(m).map(n => ({ n, list: m[n] }));
-    inxLay(gs, 0, 0, VW, VH, g => g.list.reduce((a, d) => a + wt(d), 0)).forEach(gr => {
-      const g = gr.d, avg = g.list.reduce((a, d) => a + d[k], 0) / g.list.length, hh = 18 / H * VH;
-      const head = gr.w > 72 && gr.h > 70 && g.list.length > 1;     // tiny blocks get no label strip, just their tiles
-      if (head) secs += `<div class="inx-sec" style="left:${(gr.x / VW * 100).toFixed(2)}%;top:${(gr.y / VH * 100).toFixed(2)}%;width:${(gr.w / VW * 100).toFixed(2)}%">${inxEsc(g.n)} <span style="opacity:.85">${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%</span></div>`;
-      inxLay(g.list, gr.x, gr.y + (head ? hh : 0), gr.w, Math.max(4, gr.h - (head ? hh : 0)), wt).forEach(tile);
+  const note = n => { const nt = document.getElementById('inx-note'); if (nt) nt.textContent = (n < L.length ? 'Showing the ' + n + ' biggest of ' + L.length + ' by turnover so every tile stays readable. ' : '') + (mob ? 'Tap a stock for details.' : 'Tap a tile for details, tap it again to open its chart.'); };
+  if (mob) {   // phones: sectors stacked top to bottom, each with its own labelled mini-map, every stock shown
+    const gs = groups().sort((a, b) => b.list.reduce((x, d) => x + wt(d), 0) - a.list.reduce((x, d) => x + wt(d), 0)), tot = gs.reduce((a, g) => a + g.list.reduce((x, d) => x + wt(d), 0), 0) || 1;
+    const Htot = Math.max(520, L.length * 19), st = { unl: 0 }; let html = '';
+    gs.forEach(g => {
+      const share = g.list.reduce((x, d) => x + wt(d), 0) / tot, gh = Math.round(Math.max(g.list.length === 1 ? 70 : 92, Math.ceil(g.list.length / 4) * 64, share * Htot));   // at least ~4 stocks per row so names fit
+      const tiles = inxLay(g.list, 0, 0, W, gh, wt).map(r => tile(r, W, gh, st)).join('');
+      html += `<section class="inx-blk">${sGroups ? `<div class="inx-bh"><span class="inx-bn">${inxEsc(g.n)}</span><span class="inx-bc">${g.list.length}</span><span class="inx-bp ${inxCls(avgOf(g))}">${avgTxt(g)}</span></div>` : ''}<div class="inx-bt" style="height:${gh}px">${tiles}</div></section>`;
     });
-  } else inxLay(L, 0, 0, VW, VH, wt).forEach(tile);
-  return { html: tiles + secs, unl };
+    map.innerHTML = html; note(L.length); return;
+  }
+  const draw = L2 => {   // desktop / tablet: one treemap
+    const st = { unl: 0 }; let tiles = '', secs = '';
+    if (sGroups) {
+      const m = {}; L2.forEach(d => { const sn = inxSec(d.sector); (m[sn] = m[sn] || []).push(d); });
+      const gs = Object.keys(m).map(n => ({ n, list: m[n] }));
+      inxLay(gs, 0, 0, W, H, g => g.list.reduce((a, d) => a + wt(d), 0)).forEach(gr => {
+        const g = gr.d, head = gr.w > 72 && gr.h > 70 && g.list.length > 1, hh = 20;
+        if (head) secs += `<div class="inx-sec" style="left:${(gr.x / W * 100).toFixed(2)}%;top:${(gr.y / H * 100).toFixed(2)}%;width:${(gr.w / W * 100).toFixed(2)}%">${inxEsc(g.n)} <span style="opacity:.85">${avgTxt(g)}</span></div>`;
+        inxLay(g.list, gr.x, gr.y + (head ? hh : 0), gr.w, Math.max(4, gr.h - (head ? hh : 0)), wt).forEach(r => { tiles += tile(r, W, H, st); });
+      });
+    } else inxLay(L2, 0, 0, W, H, wt).forEach(r => { tiles += tile(r, W, H, st); });
+    return { html: tiles + secs, unl: st.unl };
   };
   let n = L.length, out = draw(L);
-  while (n > 16 && out.unl / n > 0.06) { n -= 2; out = draw(L.slice(0, n)); }   // drop the smallest stocks until (almost) every tile can carry its name
-  map.innerHTML = out.html;
-  const nt = document.getElementById('inx-note'); if (nt) nt.textContent = (n < L.length ? 'Showing the ' + n + ' biggest of ' + L.length + ' by turnover so every tile stays readable. ' : '') + 'Tap a tile for details, tap it again to open its chart.';
+  while (n > 16 && out.unl / n > 0.06) { n -= 2; out = draw(L.slice(0, n)); }
+  map.innerHTML = out.html; note(n);
 }
 function inxPeekRender() {
   const el = document.getElementById('inx-peek'); if (!el) return;
+  el.className = INX.sheet ? 'open' : '';
   const d = INX.snap && INX.snap.stocks.find(s => s.sym === INX.sel); if (!d) { el.innerHTML = ''; return; }
   const a = inxArea(d.spark, 320, 100, 6), dn = d.spark[d.spark.length - 1] < d.spark[0], tc = d.turnover / 1e7, hi = d.hi52, lo = d.lo52, pos = hi > lo ? (d.c - lo) / (hi - lo) * 100 : 50, gid = 'inxp';
   const row = (l, v, c) => `<div class="inx-row"><span>${l}</span><span class="${c || ''}" style="font-family:var(--mono)">${v}</span></div>`;
-  el.innerHTML = `<div class="inx-peek"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><b style="font-size:18px;font-weight:600">${inxEsc(d.sym)}</b>${d.sector ? ` <span class="inx-tag">${inxEsc(d.sector)}</span>` : ''}<div style="font-size:12.5px;color:var(--text-muted)">${inxEsc(d.name)}</div></div></div>
+  el.innerHTML = `<div class="inx-peek"><button type="button" class="inx-x" aria-label="Close" onclick="inxClose()">✕</button><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><b style="font-size:18px;font-weight:600">${inxEsc(d.sym)}</b>${d.sector ? ` <span class="inx-tag">${inxEsc(d.sector)}</span>` : ''}<div style="font-size:12.5px;color:var(--text-muted)">${inxEsc(d.name)}</div></div></div>
     <div style="display:flex;align-items:baseline;gap:12px;margin:8px 0 2px;flex-wrap:wrap"><span style="font:500 24px var(--mono)">₹${inxNum(d.c)}</span><span class="${inxCls(d.chgPct)}" style="font-family:var(--mono)">${inxPct(d.chgPct)}</span></div>
     <svg class="inx-svg ${dn ? 'inx-dn-s' : ''}" viewBox="0 0 320 100" role="img" aria-label="Last 30 sessions"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop class="inx-gs" offset="0" style="stop-opacity:.28"/><stop class="inx-gs" offset="1" style="stop-opacity:0"/></linearGradient></defs><path d="${a.area}" fill="url(#${gid})"/><path class="inx-line" d="${a.line}"/></svg>
     <div style="font:11.5px var(--mono);color:var(--text-muted);margin:2px 0 6px">Last 30 sessions · daily close</div>
