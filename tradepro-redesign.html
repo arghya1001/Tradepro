@@ -12028,17 +12028,17 @@ const alrWall = a => a.type === 'callwall' || a.type === 'putwall';
 const alrLabel = a => alrName(a) + (a.type === 'price' ? ' price' : a.type === 'funding' ? ' funding' : a.type === 'callwall' ? ' call wall' : a.type === 'putwall' ? ' put wall' : a.type === 'trend' ? ' ' + TR_LAB[a.tf] + ' trend' : ' PCR (all expiries)');
 const alrFmt = (a, v) => v == null ? '–' : alrWall(a) ? mktFmt(v) : a.type === 'trend' ? (TR_NAME[v] || v) : a.type === 'price' ? mkUsd(v) : a.type === 'funding' ? v.toFixed(4) + '%' : v.toFixed(2);
 function alrCur(a) { if (a.type === 'trend') { const d = TR.cache[a.sym + '|' + a.tf]; return d && d.data ? d.data.state : null; } if (a.type === 'pcr') return (ALR.opt[a.sym] || {}).pcr; const q = MKT.pt[a.sym]; return q && mktAge(MKT.ptAt) < 90 ? (a.type === 'price' ? q.price : q.fund) : null; }
-function alrSync() { const g = id => { const e = document.getElementById(id); return e ? e.value : null; }; ALR.draft = { type: g('alr-type') || 'price', sym: g('alr-sym') || ALR.draft.sym, op: g('alr-op') || '>', val: g('alr-val') || '' }; }
+function alrSync() { const g = id => { const e = document.getElementById(id); return e ? e.value : null; }; const ak = document.getElementById('alr-always'); ALR.draft = { type: g('alr-type') || 'price', sym: g('alr-sym') || ALR.draft.sym, op: g('alr-op') || '>', val: g('alr-val') || '', always: ak ? ak.checked : !!ALR.draft.always }; }
 function alrType() { alrSync(); ALR.draft.sym = ['pcr', 'callwall', 'putwall'].includes(ALR.draft.type) ? 'BTC' : 'BTCUSD'; alrRender(); }
 function alrPrefill(sym) { const q = MKT.pt[sym]; ALR.draft = { type: 'price', sym, op: '>', val: q ? String(q.price) : '' }; mktSeg('alerts'); }
 function alrAdd() {
   alrSync(); const d = ALR.draft, v = parseFloat(d.val);
   if (d.type === 'callwall' || d.type === 'putwall') { ALR.list.unshift({ id: Date.now(), type: d.type, sym: d.sym, on: true, hit: null, base: null }); alrSave(); alrRender(); alrCheck(); return; }
   if (!isFinite(v)) { alrToast('Enter a number for the alert level.'); return; }
-  ALR.list.unshift({ id: Date.now(), type: d.type, sym: d.sym, op: d.op, val: v, on: true, hit: null }); ALR.draft.val = ''; alrSave(); alrRender(); alrCheck();
+  ALR.list.unshift({ id: Date.now(), ver: Date.now(), type: d.type, sym: d.sym, op: d.op, val: v, on: true, hit: null, always: !!d.always }); ALR.draft.val = ''; alrSave(); alrRender(); alrCheck(); phSyncSoon();
 }
-function alrDel(id) { ALR.list = ALR.list.filter(a => a.id !== id); alrSave(); alrRender(); }
-function alrRearm(id) { const a = ALR.list.find(x => x.id === id); if (a) { a.hit = null; a.base = null; alrSave(); alrRender(); alrCheck(); } }
+function alrDel(id) { ALR.list = ALR.list.filter(a => a.id !== id); alrSave(); alrRender(); phSyncSoon(); }
+function alrRearm(id) { const a = ALR.list.find(x => x.id === id); if (a) { a.hit = null; a.base = null; a.ver = Date.now(); alrSave(); alrRender(); alrCheck(); phSyncSoon(); } }
 function alrToast(msg) {
   const t = document.createElement('div'); t.textContent = msg; t.setAttribute('role', 'status');
   t.style.cssText = 'position:fixed;left:16px;right:16px;bottom:90px;z-index:9999;background:var(--surface-2);color:var(--text);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;font:14px var(--sans);box-shadow:0 8px 24px rgba(0,0,0,.4);cursor:pointer';
@@ -12049,6 +12049,7 @@ function alrFire(a, c) {
   alrToast(msg);
   try { if ('Notification' in window && Notification.permission === 'granted') new Notification('TradePro alert', { body: msg }); } catch (e) { /* not supported */ }
   try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { /* not supported */ }
+  try { phSyncSoon(); } catch (e) { /* phone alerts not set up */ }
 }
 async function alrOpt(u) {
   const json = await liveFetchJson('/v2/tickers?contract_types=call_options,put_options&underlying_asset_symbols=' + u), t = new Date().toISOString().slice(0, 10), rows = []; let c = 0, p = 0, spot = null, near = null;
@@ -12074,7 +12075,7 @@ async function alrCheck() {
 function alrRow(a) {
   const w = alrWall(a), t = a.type === 'trend', title = t ? mktEsc(alrLabel(a)) + ' changes' : w ? mktEsc(alrLabel(a)) + ' moves' : mktEsc(alrLabel(a)) + (a.op === '>' ? ' above ' : ' below ') + alrFmt(a, a.val);
   const sub = a.hit ? (t ? 'Changed from ' + TR_NAME[a.base] + ' to ' + TR_NAME[a.at] : w ? 'Moved from ' + mktFmt(a.base) + ' to ' + mktFmt(a.at) : 'Triggered at ' + alrFmt(a, a.at)) + ' · ' + new Date(a.hit).toLocaleString() : t ? (a.base == null ? 'Reading the current trend…' : 'Watching: ' + TR_NAME[a.base]) : w ? (a.base == null ? 'Reading the current wall…' : 'Watching ' + mktFmt(a.base)) : 'Now ' + alrFmt(a, alrCur(a));
-  return `<div class="mkt-ev"><div class="n">${title}<small>${sub}</small></div><span class="mkt-tag ${a.hit ? 'hol' : ''}">${a.hit ? 'Hit' : 'Active'}</span>${a.hit ? `<button class="mkt-chipbtn" onclick="alrRearm(${a.id})">Re-arm</button>` : ''}<button class="mkt-chipbtn" aria-label="Delete alert" onclick="alrDel(${a.id})">Delete</button></div>`;
+  return `<div class="mkt-ev"><div class="n">${title}<small>${sub}</small></div><span class="mkt-tag ${a.hit ? 'hol' : ''}">${a.hit ? 'Hit' : 'Active'}</span>${a.hit ? `<button class="mkt-chipbtn" onclick="alrRearm(${a.id})">Re-arm</button>` : ''}${PH_TYPES.includes(a.type) ? `<button class="mkt-chipbtn" aria-label="Toggle quiet hours override" onclick="phAlways(${a.id})">${a.always ? 'Always notify' : 'Respects quiet hrs'}</button>` : ''}<button class="mkt-chipbtn" aria-label="Delete alert" onclick="alrDel(${a.id})">Delete</button></div>`;
 }
 function alrRender() {
   const el = document.getElementById('mkt-alr'); if (!el) return; const d = ALR.draft;
@@ -12088,10 +12089,56 @@ function alrRender() {
     <select id="alr-sym" aria-label="Instrument" onchange="alrSync()">${syms.map(s => `<option value="${s}"${s === d.sym ? ' selected' : ''}>${s.replace(/USD$/, '')}</option>`).join('')}</select>
     ${wallT ? '<div style="grid-column:1/-1;font-size:12px;color:var(--text-muted)">Alerts when the strike with the most OI (nearest expiry, above spot for calls, below for puts) changes.</div>' : `<select id="alr-op" aria-label="Condition" onchange="alrSync()"><option value=">"${d.op === '>' ? ' selected' : ''}>Rises above</option><option value="<"${d.op === '<' ? ' selected' : ''}>Falls below</option></select>
     <input id="alr-val" inputmode="decimal" placeholder="Level" value="${mktEsc(d.val)}" onchange="alrSync()">`}</div>
-    <div class="mkt-acts"><button class="mkt-btn pri" onclick="alrAdd()">Add alert</button>${canNote ? '<button class="mkt-btn" onclick="Notification.requestPermission().then(alrRender)">Enable notifications</button>' : ''}</div></div>
+    ${['price', 'funding', 'pcr'].includes(d.type) ? `<label style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-muted);margin:8px 0 0"><input type="checkbox" id="alr-always" style="width:auto" onchange="alrSync()"${d.always ? ' checked' : ''}> Always notify, even during quiet hours</label>` : ''}<div class="mkt-acts"><button class="mkt-btn pri" onclick="alrAdd()">Add alert</button>${canNote ? '<button class="mkt-btn" onclick="Notification.requestPermission().then(alrRender)">Enable notifications</button>' : ''}</div></div>
   ${rows || '<div class="mkt-empty">No alerts yet. Add one above, or tap a tile in Pulse and choose Set alert.</div>'}
-  <div class="mkt-note">Alerts are checked every 30 seconds, only while TradePro is open in a browser tab. Phones may pause background tabs, so don't rely on this for time-critical exits. Use stop-losses for that.</div>`;
+  ${phCard()}<div class="mkt-note">In-app alerts are checked every 30 seconds while TradePro is open. Phone alerts (Telegram) cover price, funding and PCR when the app is closed. Wall and trend alerts work only while the app is open. Never rely on alerts for time-critical exits. Use stop-losses for that.</div>`;
 }
+/* ---------- Phone alerts (Telegram via your own Cloudflare Worker) + quiet hours ---------- */
+const PH_KEY = 'tradepro_phone_v1', PH_TYPES = ['price', 'funding', 'pcr'];
+const PH = { url: '', token: '', on: true, linked: false, bot: '', msg: '', busy: false, quiet: { on: false, start: '23:30', end: '07:00', tz: 'Asia/Kolkata', mode: 'hold' }, timer: null };
+try { Object.assign(PH, JSON.parse(localStorage.getItem(PH_KEY) || '{}'), { busy: false, timer: null, msg: '' }); } catch (e) { /* storage unavailable */ }
+try { const z = Intl.DateTimeFormat().resolvedOptions().timeZone; if (z && !localStorage.getItem(PH_KEY)) PH.quiet.tz = z; } catch (e) { /* ignore */ }
+const phSave = () => { try { localStorage.setItem(PH_KEY, JSON.stringify({ url: PH.url, token: PH.token, on: PH.on, linked: PH.linked, bot: PH.bot, quiet: PH.quiet })); } catch (e) { /* storage unavailable */ } };
+const phEsc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function phToken() { if (!PH.token) { const a = new Uint8Array(16); crypto.getRandomValues(a); PH.token = Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); phSave(); } return PH.token; }
+const phReady = () => /^https:\/\//.test(PH.url || '');
+function phRules() { return ALR.list.filter(a => PH_TYPES.includes(a.type) && a.on !== false && isFinite(a.val)).map(a => ({ id: a.id, type: a.type, sym: a.sym, op: a.op, val: a.val, ver: a.ver || a.id, hit: a.hit || 0, always: !!a.always })); }
+async function phCall(path, opt) { const r = await fetch(PH.url.replace(/\/+$/, '') + path, opt); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+function phMerge(j) {
+  if (!j || !j.ok) return; PH.linked = !!j.linked; if (j.bot) PH.bot = j.bot;
+  let ch = false; Object.entries(j.hits || {}).forEach(([id, h]) => { const a = ALR.list.find(x => String(x.id) === id); if (a && !a.hit && h && h.t >= (a.ver || a.id)) { a.hit = h.t; a.at = h.v != null ? h.v : a.at; ch = true; } });
+  phSave(); if (ch) alrSave(); if (MKT.seg === 'alerts') alrRender();
+}
+async function phSync(manual) {
+  if (!phReady() || PH.busy) return; PH.busy = true;
+  try { phMerge(await phCall('/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), on: PH.on, rules: phRules(), quiet: PH.quiet }) })); if (manual) PH.msg = 'Synced.'; }
+  catch (e) { PH.msg = 'Could not reach your Worker. Check the URL.'; }
+  PH.busy = false; if (MKT.seg === 'alerts') alrRender();
+}
+function phSyncSoon() { if (!phReady()) return; clearTimeout(PH.timer); PH.timer = setTimeout(() => phSync(false), 800); }
+async function phPoll() { if (!phReady() || document.hidden || PH.busy) return; try { phMerge(await phCall('/state?token=' + phToken())); } catch (e) { /* offline */ } }
+function phSetUrl() { const e = document.getElementById('ph-url'); if (!e) return; const u = e.value.trim().replace(/\/+$/, ''); if (!/^https:\/\/[\w.-]+/.test(u)) { PH.msg = 'Enter the full https:// Worker URL.'; alrRender(); return; } PH.url = u; PH.msg = ''; phSave(); phSync(true); }
+function phDisconnect() { PH.url = ''; PH.linked = false; PH.msg = ''; phSave(); alrRender(); }
+function phLink() { phToken(); phSync(false).then(() => { if (!PH.bot || /YOUR_BOT/.test(PH.bot)) { PH.msg = 'Worker has no bot username set.'; alrRender(); return; } window.open('https://t.me/' + encodeURIComponent(PH.bot) + '?start=' + PH.token, '_blank'); setTimeout(phPoll, 6000); setTimeout(phPoll, 15000); }); }
+async function phTest() { try { const j = await phCall('/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken() }) }); PH.msg = j.ok ? 'Test sent. Check Telegram.' : 'Test failed.'; } catch (e) { PH.msg = 'Link Telegram first, then test.'; } alrRender(); }
+function phOn(v) { PH.on = !!v; phSave(); phSyncSoon(); alrRender(); }
+function phQ(k, v) { PH.quiet[k] = k === 'on' ? !!v : v; phSave(); phSyncSoon(); alrRender(); }
+function phAlways(id) { const a = ALR.list.find(x => x.id === id); if (!a) return; a.always = !a.always; alrSave(); alrRender(); phSyncSoon(); }
+function phCard() {
+  const q = PH.quiet, body = !phReady()
+    ? `<div class="alr-f" style="grid-template-columns:1fr"><input id="ph-url" placeholder="https://tradepro-alerts.yourname.workers.dev" autocapitalize="off" autocomplete="off"></div><div class="mkt-acts"><button class="mkt-btn pri" onclick="phSetUrl()">Connect Worker</button></div><div class="mkt-note">One-time setup: deploy the alerts Worker (see SETUP.md), then paste its URL here.</div>`
+    : `<div class="mkt-ev"><div class="n">Telegram<small>${PH.linked ? 'Linked. Alerts reach your phone even when the app is closed.' : 'Not linked yet. Tap Link Telegram, then press Start in the bot chat.'}</small></div><span class="mkt-tag ${PH.linked ? '' : 'hol'}">${PH.linked ? 'Linked' : 'Not linked'}</span></div>
+      <div class="mkt-acts"><button class="mkt-btn pri" onclick="phLink()">${PH.linked ? 'Re-link Telegram' : 'Link Telegram'}</button><button class="mkt-btn" onclick="phTest()">Send test</button><button class="mkt-btn" onclick="phPoll().then(alrRender)">Refresh</button></div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:12px 0 0"><input type="checkbox" onchange="phOn(this.checked)"${PH.on ? ' checked' : ''}> Send alerts to my phone when the app is closed</label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:10px 0 6px"><input type="checkbox" onchange="phQ('on',this.checked)"${q.on ? ' checked' : ''}> Quiet hours (no alerts while I sleep)</label>
+      ${q.on ? `<div class="alr-f"><label style="font-size:12px;color:var(--text-muted)">From<input type="time" value="${phEsc(q.start)}" onchange="phQ('start',this.value)"></label><label style="font-size:12px;color:var(--text-muted)">Until<input type="time" value="${phEsc(q.end)}" onchange="phQ('end',this.value)"></label>
+      <select style="grid-column:1/-1" aria-label="During quiet hours" onchange="phQ('mode',this.value)"><option value="hold"${q.mode !== 'drop' ? ' selected' : ''}>Hold alerts and send one summary when quiet hours end</option><option value="drop"${q.mode === 'drop' ? ' selected' : ''}>Drop them (only shown in the app)</option></select></div>
+      <div class="mkt-note">Time zone: ${phEsc(q.tz)}. Alerts marked "Always notify" ignore quiet hours.</div>` : ''}
+      <div class="mkt-acts" style="margin-top:10px"><button class="mkt-btn" onclick="phDisconnect()">Disconnect Worker</button></div>`;
+  return `<div class="mkt-card"><div style="font:600 14px var(--sans);margin-bottom:8px">Phone alerts (Telegram)</div>${body}${PH.msg ? `<div class="mkt-note" role="status">${phEsc(PH.msg)}</div>` : ''}</div>`;
+}
+setInterval(phPoll, 60000); setTimeout(() => phSync(false), 6000);
+
 setInterval(alrCheck, 30000); setTimeout(alrCheck, 4000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) alrCheck(); });
 
@@ -12396,7 +12443,7 @@ function spkChart(canvas, yAt, rh, W, H, g) {
   for (let j = items.length - 1; j >= 0; j--) items[j].top = Math.min(items[j].y - 19, j === items.length - 1 ? maxTop : items[j + 1].top - 21);
   let h = '';
   items.forEach(it => { const c = it.c, col = c.sev >= 3 ? '#F6465D' : c.sev === 2 ? '#F5A524' : '#17C3B2', T = MKT_SIGT[c.ty];
-    h += `<div style="position:absolute;left:0;right:${W}px;top:${it.y}px;border-top:1.5px dashed ${col}"></div>` + (it.out ? '' : `<div class="spk-ring" style="position:absolute;right:0;top:${it.y - rh / 2 - 2}px;width:${W}px;height:${rh + 4}px;border:2px solid ${col};border-radius:4px;box-shadow:0 0 8px ${col}"></div>`) + `<div style="position:absolute;left:6px;top:${it.top}px;background:${col};color:#fff;font:700 10.5px var(--mono);padding:2px 6px;border-radius:4px;white-space:nowrap;max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis">${it.out ? (it.raw < lo ? '▲ ' : '▼ ') : ''}${mktFmt(c.k)} ${c.t === 'C' ? 'CE' : 'PE'} ${T.g} ${mktPct(c.pct)} · ${MKT_SEV[c.sev]} · ${mktAgo(now - c.seen)}</div>`; });
+    h += `<div style="position:absolute;left:0;right:${W}px;top:${it.y}px;border-top:1.5px dashed ${col};opacity:.4"></div>` + (it.out ? '' : `<div class="spk-ring" style="position:absolute;right:0;top:${it.y - rh / 2 - 2}px;width:${W}px;height:${rh + 4}px;border:2px solid ${col};border-radius:4px;box-shadow:0 0 8px ${col}"></div>`) + `<div style="position:absolute;right:2px;top:${it.top}px;background:${col}D9;color:#fff;font:700 10px var(--mono);padding:1px 5px;border-radius:4px;white-space:nowrap;max-width:${W - 4}px;overflow:hidden;text-overflow:ellipsis">${it.out ? (it.raw < lo ? '▲ ' : '▼ ') : ''}${mktFmt(c.k)} ${c.t === 'C' ? 'CE' : 'PE'} ${mktPct(c.pct)}</div>`; });
   const ov = document.createElement('div'); ov.id = 'spk-hl'; ov.style.cssText = `position:absolute;top:0;left:0;right:62px;height:${H}px;pointer-events:none;z-index:6`; ov.innerHTML = h; canvas.appendChild(ov);
 }
 function spkTick() { const v = document.getElementById('view-markets'), on = v && v.style.display !== 'none' && MKT.seg === 'options'; if (!on && !MKT.busy && mktAge(MKT.oat) > 25) mktOptLoad(); spkUi(); }
