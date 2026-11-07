@@ -12102,7 +12102,7 @@ const phSave = () => { try { localStorage.setItem(PH_KEY, JSON.stringify({ url: 
 const phEsc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function phToken() { if (!PH.token) { const a = new Uint8Array(16); crypto.getRandomValues(a); PH.token = Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); phSave(); } return PH.token; }
 const phReady = () => /^https:\/\//.test(PH.url || '');
-function phRules() { return ALR.list.filter(a => PH_TYPES.includes(a.type) && a.on !== false && isFinite(a.val)).map(a => ({ id: a.id, type: a.type, sym: a.sym, op: a.op, val: a.val, ver: a.ver || a.id, hit: a.hit || 0, always: !!a.always })); }
+function phRules() { return ALR.list.filter(a => PH_TYPES.includes(a.type) && a.on !== false && isFinite(a.val)).map(a => ({ id: a.id, type: a.type, sym: a.sym, op: a.op, val: a.val, ver: a.ver || a.id, hit: 0, always: !!a.always })); }
 async function phCall(path, opt) { const r = await fetch(PH.url.replace(/\/+$/, '') + path, opt); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
 function phMerge(j) {
   if (!j || !j.ok) return; PH.linked = !!j.linked; if (j.bot) PH.bot = j.bot;
