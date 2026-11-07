@@ -1,0 +1,15 @@
+{
+  // TradePro alerts Worker: deployed automatically from GitHub by Cloudflare.
+  "name": "cryptoalertsbtcusd",
+  "main": "worker.js",
+  "compatibility_date": "2025-01-01",
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    "BOT_USERNAME": "Crypto_alrtBot",
+    "ALLOWED_ORIGIN": "https://arghya1001.github.io"
+  },
+  "kv_namespaces": [
+    { "binding": "TP", "id": "559bc94ffea94d24ad24f393389a5708" }
+  ],
+  "observability": { "enabled": true }
+}
