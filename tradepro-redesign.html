@@ -12091,27 +12091,27 @@ function alrRender() {
     <input id="alr-val" inputmode="decimal" placeholder="Level" value="${mktEsc(d.val)}" onchange="alrSync()">`}</div>
     ${['price', 'funding', 'pcr'].includes(d.type) ? `<label style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-muted);margin:8px 0 0"><input type="checkbox" id="alr-always" style="width:auto" onchange="alrSync()"${d.always ? ' checked' : ''}> Always notify, even during quiet hours</label>` : ''}<div class="mkt-acts"><button class="mkt-btn pri" onclick="alrAdd()">Add alert</button>${canNote ? '<button class="mkt-btn" onclick="Notification.requestPermission().then(alrRender)">Enable notifications</button>' : ''}</div></div>
   ${rows || '<div class="mkt-empty">No alerts yet. Add one above, or tap a tile in Pulse and choose Set alert.</div>'}
-  ${phCard()}<div class="mkt-note">In-app alerts are checked every 30 seconds while TradePro is open. Phone alerts (Telegram) cover price, funding and PCR when the app is closed. Wall and trend alerts work only while the app is open. Never rely on alerts for time-critical exits. Use stop-losses for that.</div>`;
+  ${phCard()}<div class="mkt-note">In-app alerts are checked every 30 seconds while TradePro is open. Phone alerts (Telegram) cover price, funding, PCR and Guppy alerts, with the app open or closed. Wall and trend alerts work only while the app is open. Never rely on alerts for time-critical exits. Use stop-losses for that.</div>`;
 }
 /* ---------- Phone alerts (Telegram via your own Cloudflare Worker) + quiet hours ---------- */
 const PH_KEY = 'tradepro_phone_v1', PH_TYPES = ['price', 'funding', 'pcr'];
-const PH = { url: '', token: '', on: true, linked: false, bot: '', msg: '', busy: false, quiet: { on: false, start: '23:30', end: '07:00', tz: 'Asia/Kolkata', mode: 'hold' }, timer: null };
+const PH = { url: '', token: '', on: true, linked: false, bot: '', msg: '', busy: false, sc: {}, bars: {}, quiet: { on: false, start: '23:30', end: '07:00', tz: 'Asia/Kolkata', mode: 'hold' }, timer: null };
 try { Object.assign(PH, JSON.parse(localStorage.getItem(PH_KEY) || '{}'), { busy: false, timer: null, msg: '' }); } catch (e) { /* storage unavailable */ }
 try { const z = Intl.DateTimeFormat().resolvedOptions().timeZone; if (z && !localStorage.getItem(PH_KEY)) PH.quiet.tz = z; } catch (e) { /* ignore */ }
-const phSave = () => { try { localStorage.setItem(PH_KEY, JSON.stringify({ url: PH.url, token: PH.token, on: PH.on, linked: PH.linked, bot: PH.bot, quiet: PH.quiet })); } catch (e) { /* storage unavailable */ } };
+const phSave = () => { try { localStorage.setItem(PH_KEY, JSON.stringify({ url: PH.url, token: PH.token, on: PH.on, linked: PH.linked, bot: PH.bot, quiet: PH.quiet, sc: PH.sc })); } catch (e) { /* storage unavailable */ } };
 const phEsc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function phToken() { if (!PH.token) { const a = new Uint8Array(16); crypto.getRandomValues(a); PH.token = Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); phSave(); } return PH.token; }
 const phReady = () => /^https:\/\//.test(PH.url || '');
 function phRules() { return ALR.list.filter(a => PH_TYPES.includes(a.type) && a.on !== false && isFinite(a.val)).map(a => ({ id: a.id, type: a.type, sym: a.sym, op: a.op, val: a.val, ver: a.ver || a.id, hit: 0, always: !!a.always })); }
 async function phCall(path, opt) { const r = await fetch(PH.url.replace(/\/+$/, '') + path, opt); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
 function phMerge(j) {
-  if (!j || !j.ok) return; PH.linked = !!j.linked; if (j.bot) PH.bot = j.bot;
+  if (!j || !j.ok) return; PH.linked = !!j.linked; PH.bars = j.bars || {}; if (j.bot) PH.bot = j.bot;
   let ch = false; Object.entries(j.hits || {}).forEach(([id, h]) => { const a = ALR.list.find(x => String(x.id) === id); if (a && !a.hit && h && h.t >= (a.ver || a.id)) { a.hit = h.t; a.at = h.v != null ? h.v : a.at; ch = true; } });
   phSave(); if (ch) alrSave(); if (MKT.seg === 'alerts') alrRender();
 }
 async function phSync(manual) {
   if (!phReady() || PH.busy) return; PH.busy = true;
-  try { phMerge(await phCall('/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), on: PH.on, rules: phRules(), quiet: PH.quiet }) })); if (manual) PH.msg = 'Synced.'; }
+  try { phMerge(await phCall('/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), on: PH.on, rules: phRules(), scans: phScans(), quiet: PH.quiet }) })); if (manual) PH.msg = 'Synced.'; }
   catch (e) { PH.msg = 'Could not reach your Worker. Check the URL.'; }
   PH.busy = false; if (MKT.seg === 'alerts') alrRender();
 }
@@ -12124,6 +12124,48 @@ async function phTest() { try { const j = await phCall('/test', { method: 'POST'
 function phOn(v) { PH.on = !!v; phSave(); phSyncSoon(); alrRender(); }
 function phQ(k, v) { PH.quiet[k] = k === 'on' ? !!v : v; phSave(); phSyncSoon(); alrRender(); }
 function phAlways(id) { const a = ALR.list.find(x => x.id === id); if (!a) return; a.always = !a.always; alrSave(); alrRender(); phSyncSoon(); }
+
+/* ---------- Guppy / strategy alerts to the phone: pick timeframe + a weekly pause window per scan ---------- */
+const PH_SC_OK = ['gmma', 'gsq', 'st', 'ema', 'sma'], PH_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const phHash = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h || 1; };
+const phScanList = () => sscans.map((sc, i) => ({ sc, i })).filter(x => x.sc && x.sc.strat === 'Guppy crossover');
+const phSupported = sc => Array.isArray(sc.conds) && sc.conds.length > 0 && sc.conds.every(c => PH_SC_OK.includes(c.k));
+function phCfg(name) { if (!PH.sc[name]) PH.sc[name] = { on: false, tf: '15m', ver: 0, pause: { on: true, sd: 5, st: '19:00', ed: 0, et: '19:00', tz: 'Asia/Kolkata' } }; return PH.sc[name]; }
+function phScans() {
+  return phScanList().filter(({ sc }) => PH.sc[sc.name] && PH.sc[sc.name].on && phSupported(sc)).map(({ sc }) => {
+    const cf = PH.sc[sc.name];
+    return { id: phHash(sc.name), name: sc.name, side: sc.side, und: String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u)), tf: cf.tf, ver: cf.ver, conds: sc.conds, pause: cf.pause };
+  });
+}
+function stOn(i, v) { const sc = sscans[i]; if (!sc) return; const c = phCfg(sc.name); c.on = !!v; if (v) c.ver = Date.now(); phSave(); phSyncSoon(); alrRender(); }
+function stTf(i, v) { const sc = sscans[i]; if (!sc) return; const c = phCfg(sc.name); c.tf = v; c.ver = Date.now(); phSave(); phSyncSoon(); alrRender(); }
+function stPause(i, k, v) { const sc = sscans[i]; if (!sc) return; const c = phCfg(sc.name); c.pause[k] = k === 'on' ? !!v : (k === 'sd' || k === 'ed') ? +v : v; phSave(); phSyncSoon(); alrRender(); }
+async function stCheck() {
+  PH.msg = 'Checking...'; alrRender(); clearTimeout(PH.timer); PH.busy = false; await phSync(false);
+  try { const j = await phCall('/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken() }) }); PH.msg = j.ok ? 'Sent. Check Telegram for the result.' : 'Check failed.'; }
+  catch (e) { PH.msg = 'Link Telegram and switch on a Guppy alert first.'; }
+  alrRender();
+}
+function stratCard() {
+  const list = phScanList(); if (!list.length) return '';
+  const dayOpts = sel => PH_DAYS.map((d, k) => `<option value="${k}"${k === sel ? ' selected' : ''}>${d}</option>`).join('');
+  const tfOpts = sel => ['5m', '15m', '30m', '1h', '4h'].map(t => `<option${t === sel ? ' selected' : ''}>${t}</option>`).join('');
+  const lab = 'font-size:12px;color:var(--text-muted)';
+  const rows = list.map(({ sc, i }) => {
+    const cf = phCfg(sc.name), ok = phSupported(sc), id = phHash(sc.name), pz = cf.pause;
+    const unds = String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u)).join(', ');
+    const bars = Object.keys(PH.bars || {}).filter(k => k.split('|')[0] === String(id)).map(k => PH.bars[k]), last = bars.length ? new Date(Math.max(...bars)).toLocaleString() : '';
+    return `<div style="border-top:1px solid var(--border);padding:12px 0"><div style="font:600 13px var(--sans)">${phEsc(sc.name)}</div>
+      <div class="mkt-note" style="margin:2px 0 8px">${phEsc(unds || 'No supported markets')} · ${phEsc(sc.side)} signal${ok ? '' : ' · uses indicators phone alerts cannot check yet'}</div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" onchange="stOn(${i},this.checked)"${cf.on ? ' checked' : ''}${ok && unds ? '' : ' disabled'}> Phone alert</label>
+      ${cf.on ? `<div class="alr-f" style="margin-top:8px"><label style="grid-column:1/-1;${lab}">Candle timeframe<select onchange="stTf(${i},this.value)">${tfOpts(cf.tf)}</select></label></div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:10px"><input type="checkbox" onchange="stPause(${i},'on',this.checked)"${pz.on ? ' checked' : ''}> Pause alerts during a weekly window</label>
+      ${pz.on ? `<div class="alr-f" style="margin-top:8px"><label style="${lab}">From<select onchange="stPause(${i},'sd',this.value)">${dayOpts(pz.sd)}</select></label><label style="${lab}">at<input type="time" value="${phEsc(pz.st)}" onchange="stPause(${i},'st',this.value)"></label>
+      <label style="${lab}">Until<select onchange="stPause(${i},'ed',this.value)">${dayOpts(pz.ed)}</select></label><label style="${lab}">at<input type="time" value="${phEsc(pz.et)}" onchange="stPause(${i},'et',this.value)"></label></div><div class="mkt-note">Times are IST. Signals during the pause are skipped, not delayed.</div>` : ''}
+      <div class="mkt-note">${last ? 'Last alert: ' + phEsc(last) : 'No alert sent yet.'}</div>` : ''}</div>`;
+  }).join('');
+  return `<div class="mkt-card"><div style="font:600 14px var(--sans);margin-bottom:4px">Strategy alerts (Guppy)</div><div class="mkt-note" style="margin:0 0 8px">Checked by your Worker each time a candle closes, so it works with the app closed. Alerts fire once, when a fresh signal forms.</div>${rows}<div class="mkt-acts"><button class="mkt-btn" onclick="stCheck()">Check now (sends result to Telegram)</button></div></div>`;
+}
 function phCard() {
   const q = PH.quiet, body = !phReady()
     ? `<div class="alr-f" style="grid-template-columns:1fr"><input id="ph-url" placeholder="https://tradepro-alerts.yourname.workers.dev" autocapitalize="off" autocomplete="off"></div><div class="mkt-acts"><button class="mkt-btn pri" onclick="phSetUrl()">Connect Worker</button></div><div class="mkt-note">One-time setup: deploy the alerts Worker (see SETUP.md), then paste its URL here.</div>`
@@ -12135,7 +12177,7 @@ function phCard() {
       <select style="grid-column:1/-1" aria-label="During quiet hours" onchange="phQ('mode',this.value)"><option value="hold"${q.mode !== 'drop' ? ' selected' : ''}>Hold alerts and send one summary when quiet hours end</option><option value="drop"${q.mode === 'drop' ? ' selected' : ''}>Drop them (only shown in the app)</option></select></div>
       <div class="mkt-note">Time zone: ${phEsc(q.tz)}. Alerts marked "Always notify" ignore quiet hours.</div>` : ''}
       <div class="mkt-acts" style="margin-top:10px"><button class="mkt-btn" onclick="phDisconnect()">Disconnect Worker</button></div>`;
-  return `<div class="mkt-card"><div style="font:600 14px var(--sans);margin-bottom:8px">Phone alerts (Telegram)</div>${body}${PH.msg ? `<div class="mkt-note" role="status">${phEsc(PH.msg)}</div>` : ''}</div>`;
+  return `<div class="mkt-card"><div style="font:600 14px var(--sans);margin-bottom:8px">Phone alerts (Telegram)</div>${body}${PH.msg ? `<div class="mkt-note" role="status">${phEsc(PH.msg)}</div>` : ''}</div>${phReady() ? stratCard() : ''}`;
 }
 setInterval(phPoll, 60000); setTimeout(() => phSync(false), 6000);
 
