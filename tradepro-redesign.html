@@ -5,7 +5,61 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TradePro — Dashboard</title>
 <meta name="theme-color" content="#0A0D12">
-<script>(function(){var t='dark';try{t=localStorage.getItem('tp-theme')||'dark';}catch(e){}if(['dark','daylight','navygold'].indexOf(t)<0)t='dark';document.documentElement.setAttribute('data-theme',t);window.DRAW_INK=function(){return document.documentElement.getAttribute('data-theme')==='daylight'?'#1F2D3D':DRAW_INK();};})();</script>
+<script>(function(){var t='dark';try{t=localStorage.getItem('tp-theme')||'dark';}catch(e){}if(['dark','daylight','navygold'].indexOf(t)<0)t='dark';document.documentElement.setAttribute('data-theme',t);window.DRAW_INK=function(){return document.documentElement.getAttribute('data-theme')==='daylight'?'#1F2D3D':'#EEF2F6';};})();</script>
+<script>
+/* TradePro health: shows a calm warning when something fails, and keeps a short log you can copy. */
+(function () {
+  var KEY = 'tradepro_errlog_v1', MAX = 30, log = [], cool = {}, hideT = null;
+  try { log = JSON.parse(localStorage.getItem(KEY) || '[]') || []; if (!Array.isArray(log)) log = []; } catch (e) { log = []; }
+  function clean(s) { return String(s == null ? '' : s).replace(/[a-f0-9]{32}/gi, '…').replace(/bot\d+:[A-Za-z0-9_-]+/g, 'bot…').slice(0, 300); }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(log.slice(-MAX))); } catch (e) { /* storage unavailable */ } }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function rec(area, msg) { log.push({ t: Date.now(), a: area, m: clean(msg) }); if (log.length > MAX) log = log.slice(-MAX); save(); }
+  function toast(area, msg) {
+    if (!document.body) return;
+    var el = document.getElementById('tp-toast');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'tp-toast'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite');
+      el.style.cssText = 'position:fixed;left:12px;right:12px;bottom:80px;z-index:9999;display:none;gap:10px;align-items:center;background:var(--surface-2,#1b222c);color:var(--text,#e7ebf0);border:1px solid var(--warn,#f5c469);border-radius:10px;padding:10px 12px;font:13px var(--sans,sans-serif);box-shadow:0 6px 24px rgba(0,0,0,.35)';
+      document.body.appendChild(el);
+    }
+    el.innerHTML = '<span style="flex:1"><b>' + esc(area) + ':</b> ' + esc(clean(msg)) + '</span><button type="button" onclick="tpDiag()" style="background:none;border:1px solid var(--border,#444);color:inherit;border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer">Details</button><button type="button" aria-label="Dismiss" onclick="document.getElementById(\'tp-toast\').style.display=\'none\'" style="background:none;border:0;color:inherit;font-size:16px;cursor:pointer;padding:4px 6px">✕</button>';
+    el.style.display = 'flex'; clearTimeout(hideT); hideT = setTimeout(function () { el.style.display = 'none'; }, 9000);
+  }
+  window.tpWarn = function (area, msg, opt) {
+    rec(area, msg);
+    var now = Date.now(), c = (opt && opt.cool) || 60000;
+    if (cool[area] && now - cool[area] < c) return;
+    cool[area] = now; toast(area, msg);
+  };
+  window.tpDiag = function () {
+    var old = document.getElementById('tp-diag'); if (old) old.remove();
+    var rows = log.slice().reverse().map(function (r) { return '<div style="padding:8px 0;border-top:1px solid var(--border,#333)"><div style="font-size:12px;color:var(--text-muted,#999)">' + new Date(r.t).toLocaleString() + ' · ' + esc(r.a) + '</div><div>' + esc(r.m) + '</div></div>'; }).join('');
+    var d = document.createElement('div'); d.id = 'tp-diag';
+    d.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:flex-end';
+    d.innerHTML = '<div role="dialog" aria-label="App diagnostics" style="width:100%;max-height:80vh;overflow:auto;background:var(--surface,#121820);color:var(--text,#e7ebf0);border-radius:16px 16px 0 0;padding:16px;font:14px var(--sans,sans-serif)"><div style="font:600 16px var(--sans,sans-serif);margin-bottom:4px">App diagnostics</div><div style="font-size:12px;color:var(--text-muted,#999);margin-bottom:8px">Recent problems. Nothing here includes passwords or tokens.</div>' + (rows || '<div style="padding:12px 0">No problems recorded.</div>') + '<div style="display:flex;gap:8px;margin-top:12px"><button type="button" id="tp-copy" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border,#444);background:none;color:inherit;font:inherit">Copy report</button><button type="button" id="tp-clear" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border,#444);background:none;color:inherit;font:inherit">Clear</button><button type="button" id="tp-close" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border,#444);background:none;color:inherit;font:inherit">Close</button></div><div id="tp-note" style="font-size:12px;color:var(--text-muted,#999);margin-top:8px" role="status"></div></div>';
+    document.body.appendChild(d);
+    document.getElementById('tp-close').onclick = function () { d.remove(); };
+    document.getElementById('tp-clear').onclick = function () { log = []; save(); d.remove(); };
+    document.getElementById('tp-copy').onclick = function () {
+      var txt = 'TradePro report ' + new Date().toISOString() + '\n' + navigator.userAgent + '\nTheme: ' + document.documentElement.getAttribute('data-theme') + '\n\n' + log.map(function (r) { return new Date(r.t).toISOString() + ' [' + r.a + '] ' + r.m; }).join('\n');
+      var done = function (ok) { var n = document.getElementById('tp-note'); if (n) n.textContent = ok ? 'Copied. Paste it into the chat.' : 'Could not copy. Select and copy the list above instead.'; };
+      try { navigator.clipboard.writeText(txt).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
+    };
+  };
+  window.addEventListener('error', function (e) {
+    var m = String((e && e.message) || ''); if (!m || /ResizeObserver|^Script error\.?$/i.test(m)) return;
+    window.tpWarn('App', m + (e.filename ? ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')' : ''), { cool: 30000 });
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var m = String((e && e.reason && (e.reason.message || e.reason)) || 'Unknown error');
+    if (/Abort|aborted/i.test(m)) return;
+    if (/Failed to fetch|NetworkError|Load failed|network/i.test(m)) window.tpWarn('Network', 'A network request failed. Check your connection.', { cool: 120000 });
+    else window.tpWarn('App', m, { cool: 30000 });
+  });
+})();
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -5086,7 +5140,7 @@ async function mkTick() {
     mkTitle();
     if (MK.open && (++MK.tick % 2 === 0)) mkLoadChart();
   } catch (e) {
-    if (!MK.live) { const st = document.getElementById('mk-status'); if (st) st.textContent = 'live prices unavailable · demo values'; }
+    if (!MK.live) { const st = document.getElementById('mk-status'); if (st) st.textContent = 'live prices unavailable · demo values'; tpWarn('Home', 'Live prices unavailable. Showing demo values.', { cool: 600000 }); }
   }
 }
 function mkInit() {
@@ -11583,6 +11637,7 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
     document.addEventListener('pointerdown', () => parent.postMessage({ tp: 'activate' }, '*'), true);
     let lastInfo = '';
     setInterval(() => {
+      if (document.hidden) return;
       const bar = $('quick-trade-bar'), inf = $('qtb-info'), act = $('qtb-actions'); if (!bar || !inf || !act) return;
       const m = { tp: 'info', open: bar.classList.contains('open'), info: inf.innerHTML, actions: act.innerHTML };
       const j = JSON.stringify(m); if (j !== lastInfo) { lastInfo = j; parent.postMessage(m, '*'); }
@@ -11700,7 +11755,7 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
     if (e.data.tp === 'activate') setActive(1);
     if (e.data.tp === 'info') { remote = e.data; if (isTwo() && S.active === 1) { try { renderQuickTradeBar(); } catch (x) {} } }
   });
-  setInterval(() => { refresh(); paintActive(); }, 800);
+  setInterval(() => { if (document.hidden) return; refresh(); paintActive(); }, 800);
   refresh(); paintActive();
 })();
 </script>
@@ -12063,7 +12118,8 @@ async function alrCheck() {
     if (act.some(a => a.type === 'price' || a.type === 'funding')) await mktPulseLoad();
     for (const u of new Set(act.filter(a => a.type === 'pcr' || alrWall(a)).map(a => a.sym))) ALR.opt[u] = await alrOpt(u);
     for (const k of new Set(act.filter(a => a.type === 'trend').map(a => a.sym + '|' + a.tf))) { const [sy, tf] = k.split('|'); await trGet(sy, tf); }
-  } catch (e) { /* try again next tick */ }
+    ALR.fail = 0;
+  } catch (e) { ALR.fail = (ALR.fail || 0) + 1; if (ALR.fail >= 3) tpWarn('Alerts', 'Could not fetch market data for in-app alerts, so they may be late. Phone alerts run separately.', { cool: 600000 }); }
   ALR.busy = false;
   act.forEach(a => {
     if (a.type === 'trend') { const d = TR.cache[a.sym + '|' + a.tf], st = d && d.data && d.data.state; if (!st) return; if (a.base == null) { a.base = st; return; } if (st !== a.base) { a.hit = Date.now(); a.at = st; alrFire(a, st); } return; }
@@ -12091,7 +12147,7 @@ function alrRender() {
     <input id="alr-val" inputmode="decimal" placeholder="Level" value="${mktEsc(d.val)}" onchange="alrSync()">`}</div>
     ${['price', 'funding', 'pcr'].includes(d.type) ? `<label style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-muted);margin:8px 0 0"><input type="checkbox" id="alr-always" style="width:auto" onchange="alrSync()"${d.always ? ' checked' : ''}> Always notify, even during quiet hours</label>` : ''}<div class="mkt-acts"><button class="mkt-btn pri" onclick="alrAdd()">Add alert</button>${canNote ? '<button class="mkt-btn" onclick="Notification.requestPermission().then(alrRender)">Enable notifications</button>' : ''}</div></div>
   ${rows || '<div class="mkt-empty">No alerts yet. Add one above, or tap a tile in Pulse and choose Set alert.</div>'}
-  ${phCard()}<div class="mkt-note">In-app alerts are checked every 30 seconds while TradePro is open. Phone alerts (Telegram) cover price, funding, PCR and Guppy alerts, with the app open or closed. Wall and trend alerts work only while the app is open. Never rely on alerts for time-critical exits. Use stop-losses for that.</div>`;
+  ${phCard()}<div class="mkt-note">In-app alerts are checked every 30 seconds while TradePro is open. Phone alerts (Telegram) cover price, funding, PCR and Guppy alerts, with the app open or closed. Wall and trend alerts work only while the app is open. Never rely on alerts for time-critical exits. Use stop-losses for that.</div><div style="margin-top:8px"><button class="mkt-chipbtn" onclick="tpDiag()">App diagnostics</button></div>`;
 }
 /* ---------- Phone alerts (Telegram via your own Cloudflare Worker) + quiet hours ---------- */
 const PH_KEY = 'tradepro_phone_v1', PH_TYPES = ['price', 'funding', 'pcr'];
@@ -12104,19 +12160,25 @@ function phToken() { if (!PH.token) { const a = new Uint8Array(16); crypto.getRa
 const phReady = () => /^https:\/\//.test(PH.url || '');
 function phRules() { return ALR.list.filter(a => PH_TYPES.includes(a.type) && a.on !== false && isFinite(a.val)).map(a => ({ id: a.id, type: a.type, sym: a.sym, op: a.op, val: a.val, ver: a.ver || a.id, hit: 0, always: !!a.always })); }
 async function phCall(path, opt) { const r = await fetch(PH.url.replace(/\/+$/, '') + path, opt); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+function phFail() { PH.fails = (PH.fails || 0) + 1; if (PH.fails >= 3) tpWarn('Phone alerts', 'Cannot reach your alert Worker. Phone alerts may not reach you.', { cool: 1800000 }); }
+function phHealth(r) {
+  if (!r) return;
+  if (r.err) tpWarn('Phone alerts', 'The alert checker reported a problem: ' + r.err, { cool: 1800000 });
+  else if (Date.now() - r.t > 1500000) tpWarn('Phone alerts', 'The alert checker has not run for ' + Math.round((Date.now() - r.t) / 60000) + ' minutes. Check Cloudflare.', { cool: 1800000 });
+}
 function phMerge(j) {
-  if (!j || !j.ok) return; PH.linked = !!j.linked; PH.bars = j.bars || {}; if (j.bot) PH.bot = j.bot;
+  if (!j || !j.ok) return; PH.linked = !!j.linked; PH.bars = j.bars || {}; phHealth(j.run); if (j.bot) PH.bot = j.bot;
   let ch = false; Object.entries(j.hits || {}).forEach(([id, h]) => { const a = ALR.list.find(x => String(x.id) === id); if (a && !a.hit && h && h.t >= (a.ver || a.id)) { a.hit = h.t; a.at = h.v != null ? h.v : a.at; ch = true; } });
   phSave(); if (ch) alrSave(); if (MKT.seg === 'alerts') alrRender();
 }
 async function phSync(manual) {
   if (!phReady() || PH.busy) return; PH.busy = true;
   try { phMerge(await phCall('/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), on: PH.on, rules: phRules(), scans: phScans(), quiet: PH.quiet }) })); if (manual) PH.msg = 'Synced.'; }
-  catch (e) { PH.msg = 'Could not reach your Worker. Check the URL.'; }
+  catch (e) { PH.msg = 'Could not reach your Worker. Check the URL.'; phFail(); }
   PH.busy = false; if (MKT.seg === 'alerts') alrRender();
 }
 function phSyncSoon() { if (!phReady()) return; clearTimeout(PH.timer); PH.timer = setTimeout(() => phSync(false), 800); }
-async function phPoll() { if (!phReady() || document.hidden || PH.busy) return; try { phMerge(await phCall('/state?token=' + phToken())); } catch (e) { /* offline */ } }
+async function phPoll() { if (!phReady() || document.hidden || PH.busy) return; try { phMerge(await phCall('/state?token=' + phToken())); PH.fails = 0; } catch (e) { phFail(); } }
 function phSetUrl() { const e = document.getElementById('ph-url'); if (!e) return; const u = e.value.trim().replace(/\/+$/, ''); if (!/^https:\/\/[\w.-]+/.test(u)) { PH.msg = 'Enter the full https:// Worker URL.'; alrRender(); return; } PH.url = u; PH.msg = ''; phSave(); phSync(true); }
 function phDisconnect() { PH.url = ''; PH.linked = false; PH.msg = ''; phSave(); alrRender(); }
 function phLink() { phToken(); phSync(false).then(() => { if (!PH.bot || /YOUR_BOT/.test(PH.bot)) { PH.msg = 'Worker has no bot username set.'; alrRender(); return; } window.open('https://t.me/' + encodeURIComponent(PH.bot) + '?start=' + PH.token, '_blank'); setTimeout(phPoll, 6000); setTimeout(phPoll, 15000); }); }
@@ -12276,7 +12338,8 @@ function wkRender() {
   <div class="mkt-note">Based only on your own trades and tags. Not a prediction.</div>`;
 }
 document.addEventListener('input', () => { try { rskTick(); } catch (e) { /* not ready */ } });
-setInterval(rskTick, 1000);
+setInterval(() => { if (!document.hidden) rskTick(); }, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { try { rskTick(); } catch (e) { /* not ready */ } } });
 try { rskRender(); wkRender(); wkStrip(); rskTick(); } catch (e) { /* not ready */ }
 
 </script>

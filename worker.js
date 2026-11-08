@@ -85,7 +85,8 @@ function cleanScans(list) {
   }).filter(Boolean);
 }
 
-const reply = (env, d) => json(env, { ok: true, linked: !!d.chat, bot: env.BOT_USERNAME || '', hits: d.hits, bars: d.bars || {} });
+const lastRun = async env => { const l = JSON.parse((await env.TP.get('last')) || 'null'); return l ? { t: l.t, err: l.err || null } : null; };
+const reply = async (env, d) => json(env, { ok: true, linked: !!d.chat, bot: env.BOT_USERNAME || '', hits: d.hits, bars: d.bars || {}, run: await lastRun(env) });
 async function sync(req, env) {
   const b = await body(req); if (!TOKEN_RE.test(b.token || '')) return json(env, { ok: false, error: 'bad token' }, 400);
   const d = (await getDev(env, b.token)) || newDev();
@@ -101,7 +102,7 @@ async function sync(req, env) {
 }
 async function state(url, env) {
   const t = url.searchParams.get('token') || ''; if (!TOKEN_RE.test(t)) return json(env, { ok: false, error: 'bad token' }, 400);
-  const d = await getDev(env, t); return d ? reply(env, d) : json(env, { ok: true, linked: false, bot: env.BOT_USERNAME || '', hits: {}, bars: {} });
+  const d = await getDev(env, t); return d ? reply(env, d) : json(env, { ok: true, linked: false, bot: env.BOT_USERNAME || '', hits: {}, bars: {}, run: await lastRun(env) });
 }
 async function test(req, env) {
   const b = await body(req), d = TOKEN_RE.test(b.token || '') ? await getDev(env, b.token) : null;
@@ -297,7 +298,7 @@ async function run(env) {
   let s;
   try { s = await watch(env); } catch (e) { s = { err: String(e).slice(0, 200) }; }
   const now = Date.now(), prev = JSON.parse((await env.TP.get('last')) || 'null');
-  if (!prev || now - prev.t > 600000 || s.err || s.fired) await env.TP.put('last', JSON.stringify({ t: now, ...s }));
+  if (!prev || now - prev.t > 600000 || s.fired || (s.err && (!prev.err || now - prev.t > 300000)) || (prev.err && !s.err)) await env.TP.put('last', JSON.stringify({ t: now, ...s }));
 }
 async function debug(env) {
   const devs = await loadDevs(env), log = [], now = Date.now(), m = await market(devs, now, log);
@@ -347,5 +348,6 @@ async function watch(env) {
     }
     if (dirty) await putDev(env, t, d);
   }
-  return { devices: devs.length, fired, perp: Object.keys(m.perp).length, fetch: log };
+  const down = log.length > 0 && !log.some(x => /HTTP 200/.test(x));
+  return { devices: devs.length, fired, perp: Object.keys(m.perp).length, fetch: log, err: down ? ('Delta data unavailable: ' + log.slice(-2).join('; ')).slice(0, 200) : undefined };
 }
