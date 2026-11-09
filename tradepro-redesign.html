@@ -75,8 +75,8 @@
     --border: #232A35;
     --border-soft: #1B212B;
     --text: #E7EBF0;
-    --text-muted: #808B9C;
-    --text-faint: #4E5766;
+    --text-muted: #8E99AA;
+    --text-faint: #6E7888;
     --green: #35D68C;
     --green-dim: #1E7A52;
     --red: #FF5D5D;
@@ -93,7 +93,7 @@
     color-scheme: light;
     --bg: #F5F7FA; --surface: #FFFFFF; --surface-2: #EEF2F6;
     --border: #D6DDE6; --border-soft: #E4E9F0;
-    --text: #12202E; --text-muted: #5A6878; --text-faint: #7B889A;
+    --text: #12202E; --text-muted: #55636F; --text-faint: #667385;
     --green: #13995F; --green-dim: #BFE6D3;
     --red: #D93F3F; --red-dim: #F3C5C5;
     --accent: #0F9D8F; --accent-dim: #0B6E65;
@@ -103,7 +103,7 @@
     color-scheme: dark;
     --bg: #0E1A2E; --surface: #162540; --surface-2: #1D2F50;
     --border: #2A3F63; --border-soft: #213556;
-    --text: #F1F4FA; --text-muted: #9AA9C2; --text-faint: #6A7C98;
+    --text: #F1F4FA; --text-muted: #A5B3CA; --text-faint: #8596B0;
     --green: #3DDC97; --green-dim: #1E7A52;
     --red: #FF7A7A; --red-dim: #7A2B2B;
     --accent: #D4A93A; --accent-dim: #8A6D1E;
@@ -1365,7 +1365,7 @@
 .mkt-tag.hol{background:color-mix(in srgb, var(--accent) 15%, transparent);color:var(--accent)}.mkt-tag.hi{background:color-mix(in srgb, var(--red) 15%, transparent);color:var(--red)}.mkt-tag.ex{background:rgba(245,165,36,.15);color:var(--warn)}
 .mkt-empty{padding:28px 12px;text-align:center;color:var(--text-muted);font-size:13px;grid-column:1/-1}
 .mkt-read p{margin:8px 0;font-size:13px;line-height:1.5}.mkt-read b{font-weight:500}.mkt-disc{font-size:12px!important;color:var(--text-faint);border-top:1px solid var(--border);padding-top:8px}
-.mkt-note{font-size:12px;color:var(--text-faint);margin-top:10px}
+.mkt-note{font-size:12.5px;line-height:1.5;color:var(--text-muted);margin-top:10px}
 .jrn-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin:8px 0}
 .jrn-cal .d{font-size:11px;color:var(--text-faint);text-align:center}
 .jrn-cal button{aspect-ratio:1;border:0;border-radius:5px;color:var(--text);font:11px var(--mono);cursor:pointer}.jrn-cal button:disabled{color:var(--text-faint);cursor:default}.jrn-cal button.sel{outline:2px solid var(--accent)}
@@ -1486,6 +1486,65 @@
   #inx-peek.open .inx-x{display:block}
   .inx-scrim.open{display:block;position:fixed;inset:0;z-index:320;background:rgba(0,0,0,.55)}
 }
+.inx-t b{white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.15}
+
+  .search-in { display: block; flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--text); font: inherit; font-size: 15px; }
+  .search-in::placeholder { color: var(--text-muted); }
+  .search-txt { display: none; }
+  .av-menu { min-width: 220px; }
+  .av-menu .av-h { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); padding: 8px 10px 4px; }
+  .av-ccy { padding: 2px 10px 8px; }
+  .av-ccy .ccy-seg { display: flex; width: 100%; }
+  .av-ccy .ccy-seg button { flex: 1; text-align: center; padding: 8px 6px; font-size: 13px; }
+  button.avatar { cursor: pointer; padding: 0; font-family: inherit; }
+  @media (max-width: 700px) {
+    .tb-desk { display: none !important; }
+    #tb-search { flex: 0 0 auto; width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 8px; max-width: none; cursor: pointer; }
+    #tb-search .search-txt { display: none; }
+    #tb-search .search-in { display: none; }
+    #tb-search svg { width: 17px; height: 17px; color: var(--text-muted); }
+    .topbar-spacer { display: block; }
+    .topbar.search-open > :not(#tb-search) { display: none !important; }
+    .topbar.search-open #tb-search { flex: 1; width: auto; height: 38px; padding: 0 12px; justify-content: flex-start; }
+    .topbar.search-open #tb-search .search-in { display: block; }
+    .av-menu { right: 0; left: auto; top: 40px; }
+  }
+
+  #sr-res { position: fixed; z-index: 340; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.45); overflow-y: auto; overscroll-behavior: contain; display: none; padding: 4px 0 8px; }
+  #sr-res.open { display: block; }
+  .sr-h { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); padding: 10px 14px 4px; }
+  .sr-row { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 14px; cursor: pointer; color: var(--text); }
+  .sr-row:hover, .sr-row:focus-visible { background: var(--surface-2); }
+  .sr-ic { width: 30px; height: 30px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font: 600 11px var(--mono); color: var(--accent); flex-shrink: 0; }
+  .sr-m { flex: 1; min-width: 0; }
+  .sr-m b { display: block; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sr-m small { display: block; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sr-p { text-align: right; font: 13px var(--mono); flex-shrink: 0; }
+  .sr-p small { display: block; font: 12px var(--mono); }
+  .sr-note { padding: 14px; font-size: 13px; color: var(--text-muted); text-align: center; }
+  #sr-scrim { position: fixed; inset: 0; z-index: 350; background: rgba(0,0,0,.55); display: none; }
+  #sr-scrim.open { display: block; }
+  #sr-sheet { position: fixed; z-index: 360; display: none; left: 0; right: 0; bottom: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 18px 18px 0 0; padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px)); max-height: 86vh; overflow-y: auto; box-shadow: 0 -12px 40px rgba(0,0,0,.5); }
+  #sr-sheet.open { display: block; }
+  #sr-sheet .sr-x { position: absolute; top: 10px; right: 12px; width: 30px; height: 30px; border-radius: 15px; border: 0; background: var(--surface-2); color: var(--text-muted); font-size: 14px; cursor: pointer; }
+  .sr-btns { display: flex; gap: 8px; margin-top: 14px; }
+  .sr-btns button { flex: 1; }
+  @media (min-width: 701px) { #sr-sheet { left: 50%; right: auto; bottom: auto; top: 50%; transform: translate(-50%, -50%); width: 420px; border-radius: 14px; } }
+
+  .sr-tools { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0 4px; }
+  .sr-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .sr-chips button { border: 1px solid var(--border); background: none; color: var(--text-muted); font: 500 12.5px var(--sans); padding: 5px 9px; min-height: 30px; border-radius: 7px; cursor: pointer; }
+  .sr-chips button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .sr-seg { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+  .sr-seg button { border: 0; background: none; width: 36px; height: 30px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .sr-seg button.on { background: var(--surface-2); color: var(--accent); }
+  .sr-seg svg { width: 18px; height: 18px; }
+  .sr-chart { touch-action: pan-y; }
+  .sr-chart svg { display: block; width: 100%; height: auto; }
+  .sr-load { padding: 40px 0; text-align: center; font-size: 13px; color: var(--text-muted); }
+  .sr-cap { font: 12px var(--mono); color: var(--text-muted); margin: 4px 0 6px; min-height: 36px; line-height: 1.5; }
+  .sr-cap b { color: var(--text); font-weight: 500; }
+  .sr-ch { font: 13px var(--mono); }
 </style>
 </head>
 <body>
@@ -1509,24 +1568,32 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div class="status-row"><span class="status-dot"></span>Live market</div>
-      <div class="status-row">Connected</div>
+      <div class="status-row"><span class="status-dot" id="side-dot"></span><span id="side-st1">Checking feed</span></div>
+      <div class="status-row" id="side-st2">&nbsp;</div>
     </div>
   </aside>
 
   <main>
-    <div class="topbar">
-      <div class="search">
+    <div class="topbar" id="topbar">
+      <div class="search" id="tb-search" role="search" aria-label="Search" onclick="tbSearchOpen();document.getElementById('tb-search-in').focus()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        Search instruments, symbols, strategies&hellip;
+        <span class="search-txt">Search instruments, symbols, strategies&hellip;</span>
+        <input class="search-in" id="tb-search-in" type="search" placeholder="Search instruments, symbols&hellip;" aria-label="Search instruments, symbols, strategies" autocomplete="off">
         <kbd>⌘K</kbd>
       </div>
       <div class="topbar-spacer"></div>
       <div class="icon-btn" role="button" tabindex="0" aria-label="Alerts" onclick="showView('markets');mktSeg('alerts')"><span class="ping" id="bell-ping" style="display:none"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
-      <div class="theme-wrap"><button class="icon-btn" id="theme-btn" type="button" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button><div class="theme-menu" id="theme-menu" hidden><button type="button" data-t="dark" onclick="setTheme('dark')"><i class="th-dot" style="background:linear-gradient(135deg,#0A0D12 50%,#17C3B2 50%)"></i>Classic dark</button><button type="button" data-t="daylight" onclick="setTheme('daylight')"><i class="th-dot" style="background:linear-gradient(135deg,#F5F7FA 50%,#0F9D8F 50%)"></i>Daylight</button><button type="button" data-t="navygold" onclick="setTheme('navygold')"><i class="th-dot" style="background:linear-gradient(135deg,#0E1A2E 50%,#D4A93A 50%)"></i>Navy and gold</button></div></div>
-      <div class="ccy-seg" title="Show money in ₹ or $ (1 USD = ₹85)"><button data-c="INR" onclick="setDisplayCcy('INR')">₹</button><button data-c="USD" onclick="setDisplayCcy('USD')">$</button></div>
-      <div class="avatar">AB</div>
-      <div class="clock"><strong>09:41</strong><br>Wed, 20 Aug 2026</div>
+      <div class="theme-wrap tb-desk"><button class="icon-btn" id="theme-btn" type="button" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" onclick="toggleThemeMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button><div class="theme-menu" id="theme-menu" hidden><button type="button" data-t="dark" onclick="setTheme('dark')"><i class="th-dot" style="background:linear-gradient(135deg,#0A0D12 50%,#17C3B2 50%)"></i>Classic dark</button><button type="button" data-t="daylight" onclick="setTheme('daylight')"><i class="th-dot" style="background:linear-gradient(135deg,#F5F7FA 50%,#0F9D8F 50%)"></i>Daylight</button><button type="button" data-t="navygold" onclick="setTheme('navygold')"><i class="th-dot" style="background:linear-gradient(135deg,#0E1A2E 50%,#D4A93A 50%)"></i>Navy and gold</button></div></div>
+      <div class="ccy-seg tb-desk" title="Show money in ₹ or $ (1 USD = ₹85)"><button data-c="INR" onclick="setDisplayCcy('INR')">₹</button><button data-c="USD" onclick="setDisplayCcy('USD')">$</button></div>
+      <div class="theme-wrap av-wrap"><button type="button" class="avatar" id="av-btn" aria-label="Account menu" aria-haspopup="true" aria-expanded="false" onclick="toggleAvMenu(event)">AB</button><div class="theme-menu av-menu" id="av-menu" hidden>
+        <div class="av-h">Theme</div>
+        <button type="button" data-t="dark" onclick="setTheme('dark')"><i class="th-dot" style="background:linear-gradient(135deg,#0A0D12 50%,#17C3B2 50%)"></i>Classic dark</button>
+        <button type="button" data-t="daylight" onclick="setTheme('daylight')"><i class="th-dot" style="background:linear-gradient(135deg,#F5F7FA 50%,#0F9D8F 50%)"></i>Daylight</button>
+        <button type="button" data-t="navygold" onclick="setTheme('navygold')"><i class="th-dot" style="background:linear-gradient(135deg,#0E1A2E 50%,#D4A93A 50%)"></i>Navy &amp; gold</button>
+        <div class="av-h">Show money in</div>
+        <div class="av-ccy"><div class="ccy-seg" title="1 USD = ₹85"><button type="button" data-c="INR" onclick="setDisplayCcy('INR')">₹ Rupees</button><button type="button" data-c="USD" onclick="setDisplayCcy('USD')">$ Dollars</button></div></div>
+      </div></div>
+      <div class="clock"><strong id="clk-t">--:--</strong><br><span id="clk-d"></span></div>
     </div>
 
     <div class="content">
@@ -1535,22 +1602,22 @@
 
       <section class="hero">
         <div class="hero-left">
-          <div class="hero-label">Total portfolio value</div>
-          <div class="hero-value"><span class="rupee">₹</span>3,24,856</div>
-          <div class="hero-change"><span class="up">▲ +12,482 (+4.00%)</span><span class="label">today</span></div>
+          <div class="hero-label">Paper account value</div>
+          <div class="hero-value" id="hero-val"><span class="rupee">₹</span>0</div>
+          <div class="hero-change"><span class="up" id="hero-chg">–</span><span class="label">today</span></div>
         </div>
         <div class="hero-stats">
           <div>
             <div class="hero-stat-label">Available margin</div>
-            <div class="hero-stat-value">₹1,12,400</div>
+            <div class="hero-stat-value" id="hero-avail">–</div>
           </div>
           <div>
             <div class="hero-stat-label">Used margin</div>
-            <div class="hero-stat-value">₹1,85,230</div>
+            <div class="hero-stat-value" id="hero-used">–</div>
           </div>
           <div>
             <div class="hero-stat-label">Day P&amp;L</div>
-            <div class="hero-stat-value pos">+₹12,482</div>
+            <div class="hero-stat-value pos" id="hero-day">–</div>
           </div>
         </div>
       </section>
@@ -5338,7 +5405,7 @@ function setDisplayCcy(c) {
   displayCcy = c;
   try { localStorage.setItem('tradepro_display_ccy', c); } catch (e) { /* ignore */ }
   syncCcyUi();
-  ['renderAccountBalance', 'renderTicket', 'renderPnlBadge', 'updateTicketEstimate', 'renderTradeLog'].forEach(fn => { try { if (typeof window[fn] === 'function') window[fn](); } catch (e) { /* not ready */ } });
+  ['renderAccountBalance', 'homeHero', 'renderTicket', 'renderPnlBadge', 'updateTicketEstimate', 'renderTradeLog'].forEach(fn => { try { if (typeof window[fn] === 'function') window[fn](); } catch (e) { /* not ready */ } });
 }
 function fmtPrice(v) {
   // Display-layer guard against long floating-point tails (e.g. from the synthesized
@@ -10417,7 +10484,7 @@ function liveStart() {
   }).catch(() => {});
   currentMonth = null;
   replayCandles = []; replayIndex = 1;
-  document.getElementById('replay-symbol-label').textContent = inIdx ? liveName + ' · NSE · ' + ({ '1d': '1D', '1w': '1W', '1M': '1M' }[LIVE.res]) : liveName + ' — live · ' + LIVE.res;
+  document.getElementById('replay-symbol-label').textContent = inIdx ? liveName + ' · NSE · ' + ({ '1d': '1D', '1w': '1W', '1M': '1M' }[LIVE.res]) : liveName + ' · ' + LIVE.res;
   document.getElementById('replay-nodata').style.display = 'none';
   const canvas = document.getElementById('chart-canvas');
   if (canvas) canvas.style.display = '';
@@ -12421,7 +12488,7 @@ function setTheme(t){
   document.documentElement.setAttribute('data-theme',t);
   try{localStorage.setItem('tp-theme',t);}catch(e){}
   var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',TP_THEMES[t]);
-  document.querySelectorAll('#theme-menu button').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-t')===t);});
+  document.querySelectorAll('#theme-menu button, #av-menu button[data-t]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-t')===t);});
   closeThemeMenu();
 }
 function toggleThemeMenu(e){
@@ -12517,6 +12584,21 @@ function spkScan() {
   SPK.log = SPK.log.slice(0, 40);
   SPK.log.forEach(l => { if (l.und !== MKT.und || !MKT.spot || !l.spot) return; [15, 30, 60].forEach((m, i) => { const age = now - l.at; if (l.o[i] == null && age >= m * 60000) l.o[i] = age < (m + 25) * 60000 ? (MKT.spot - l.spot) / l.spot * 100 : 'na'; }); });
   spkSave(); spkUi(); try { oiRender(); } catch (e) { /* chart not ready */ }
+  try { spkBackfill(); } catch (e) { /* ignore */ }
+}
+/* Fill missing 15/30/60m outcomes from 5m candles, so rows flagged while the app was closed still get real numbers. */
+async function spkBackfill() {
+  if (SPK.bf || !MKT.und) return; const now = Date.now(), WIN = [15, 30, 60];
+  const need = SPK.log.filter(l => l.und === MKT.und && l.spot && !l.bf && l.o.some((v, i) => (v == null || v === 'na') && now - l.at >= WIN[i] * 60000));
+  if (!need.length) return; SPK.bf = true;
+  try {
+    const from = Math.min.apply(null, need.map(l => l.at));
+    const json = await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(MKT.und + 'USD')}&resolution=5m&start=${Math.floor(from / 1000) - 300}&end=${Math.floor(now / 1000)}`);
+    const arr = ((json && json.result) || []).map(r => ({ t: liveEpochSeconds(r.time) * 1000, c: +r.close })).filter(r => isFinite(r.t) && isFinite(r.c)).sort((a, b) => a.t - b.t);
+    if (!arr.length) return;
+    need.forEach(l => { WIN.forEach((m, i) => { if ((l.o[i] == null || l.o[i] === 'na') && now - l.at >= m * 60000) { const tg = l.at + m * 60000, cd = arr.find(x => x.t + 300000 >= tg); if (cd && cd.t <= tg) l.o[i] = (cd.c - l.spot) / l.spot * 100; } }); l.bf = 1; });
+    spkSave(true); if (MKT.seg === 'options') mktOptRender();
+  } catch (e) { /* offline: try again on the next scan */ } finally { SPK.bf = false; }
 }
 const spkUnacked = () => (SPK.live || []).filter(c => !SPK.ack[c.id] && Date.now() - c.seen < 1800000);
 function spkAck(id) { SPK.ack[id] = Date.now(); spkSave(true); spkUi(); if (MKT.seg === 'options') mktOptRender(); }
@@ -12533,7 +12615,7 @@ function spkAlrPanel() {
   const un = spkUnacked().slice(0, 5); ap.innerHTML = un.length ? `<div class="mkt-card" style="margin-top:0;border-color:var(--red)"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">OI spikes</b><span>${mktEsc(SPK.und || '')}</span></div>${un.map(c => `<div class="mkt-ev" style="padding:8px 0"><div class="n">${mktEsc(spkText(c))}<small>${mktAgo(Date.now() - c.seen)} · ${liveExpLabel(c.exp)}</small></div><button class="mkt-chipbtn" onclick="spkView('${c.id}')">View</button><button class="mkt-chipbtn" onclick="spkAck('${c.id}')">Snooze</button></div>`).join('')}</div>` : '';
 }
 function spkLogHtml() {
-  const rows = SPK.log.filter(l => l.und === MKT.und).slice(0, 10), fmt = v => v == null ? '…' : v === 'na' ? '–' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%', cl = v => typeof v === 'number' ? (v >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-faint)';
+  const rows = SPK.log.filter(l => l.und === MKT.und).slice(0, 10), fmt = v => v == null ? '…' : v === 'na' ? '–' : Math.abs(v) < 0.005 ? '0.00%' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2) + '%', cl = v => typeof v === 'number' ? (Math.abs(v) < 0.005 ? 'var(--text-muted)' : v >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-faint)';
   const ist = t => new Date(t + 19800000).toISOString().slice(11, 16);
   return `<div class="mkt-card"><div class="mkt-row" style="font-size:15px"><b style="font-weight:500">Spike log</b><span>${MKT.und}</span></div>
   <div class="mkt-chips" style="margin:6px 0"><span style="font-size:12px;color:var(--text-muted)">Sensitivity</span>${['low', 'med', 'high'].map(v => `<button class="${SPK.sens === v ? 'on' : ''}" onclick="spkSens('${v}')">${{ low: 'Low', med: 'Medium', high: 'High' }[v]}</button>`).join('')}</div>
@@ -12687,10 +12769,10 @@ function inxMapRender() {
   const groups = () => { if (!sGroups) return [{ n: '', list: L }]; const m = {}; L.forEach(d => { const sn = inxSec(d.sector); (m[sn] = m[sn] || []).push(d); }); return Object.keys(m).map(n => ({ n, list: m[n] })); };
   const avgOf = g => g.list.reduce((a, d) => a + d[k], 0) / g.list.length, avgTxt = g => (avgOf(g) >= 0 ? '+' : '') + avgOf(g).toFixed(1) + '%';
   const tile = (r, cw, ch, st) => {
-    const d = r.d, v = d[k], big = r.w >= 96 && r.h >= 60, mid = r.w >= 46 && r.h >= 34, sm = r.w >= 34 && r.h >= 20, fs = big ? Math.min(15, 11.5 + r.w / 70) : 11.5;
+    const d = r.d, v = d[k], big = r.w >= 96 && r.h >= 60, mid = r.w >= 46 && r.h >= 34, sm = r.w >= 34 && r.h >= 20, fs = big ? Math.min(15, 11.5 + r.w / 70) : (r.w < 72 ? 10 : 11.5);
     if (!sm) st.unl++;
     const inner = mid ? `<span style="font-size:${fs.toFixed(1)}px"><b>${inxEsc(d.sym)}</b><em>${inxSm(v)}</em>${big && r.h >= 82 && inxOk(d.c) ? `<i>₹${inxNum(d.c, d.c >= 1000 ? 0 : 2)}</i>` : ''}</span>` : sm ? `<span style="font-size:10px"><b>${inxEsc(d.sym)}</b></span>` : '';
-    return `<button type="button" class="inx-t${INX.sel === d.sym ? ' sel' : ''}" onclick="inxPick('${inxEsc(d.sym).replace(/'/g, '')}')" aria-label="${inxEsc(d.sym)} ${inxEsc(inxPct(v))}" style="left:${(r.x / cw * 100).toFixed(2)}%;top:${(r.y / ch * 100).toFixed(2)}%;width:${(r.w / cw * 100).toFixed(2)}%;height:${(r.h / ch * 100).toFixed(2)}%;background-color:${inxTint(v, mx)}">${inner}</button>`;
+    return `<button type="button" class="inx-t${INX.sel === d.sym ? ' sel' : ''}" onclick="inxPick('${inxEsc(d.sym).replace(/'/g, '')}')" aria-label="${inxEsc(d.sym)} ${inxEsc(inxPct(v))}" title="${inxEsc(d.sym)} ${inxEsc(inxPct(v))}" style="left:${(r.x / cw * 100).toFixed(2)}%;top:${(r.y / ch * 100).toFixed(2)}%;width:${(r.w / cw * 100).toFixed(2)}%;height:${(r.h / ch * 100).toFixed(2)}%;background-color:${inxTint(v, mx)}">${inner}</button>`;
   };
   const note = n => { const nt = document.getElementById('inx-note'); if (nt) nt.textContent = (n < L.length ? 'Showing the ' + n + ' biggest of ' + L.length + ' by turnover so every tile stays readable. ' : '') + (mob ? 'Tap a stock for details.' : 'Tap a tile for details, tap it again to open its chart.'); };
   if (mob) {   // phones: sectors stacked top to bottom, each with its own labelled mini-map, every stock shown
@@ -12762,6 +12844,293 @@ function inxRenderAll() {
   try { mktStamp(); } catch (e) { /* ignore */ }
 }
 inxHome();
+</script>
+<script>
+/* Home hero, clock and feed status: real values instead of the old placeholders. */
+function homeClock() {
+  try {
+    const n = new Date(), o = { timeZone: 'Asia/Kolkata' };
+    const t = document.getElementById('clk-t'), d = document.getElementById('clk-d');
+    if (t) t.textContent = n.toLocaleTimeString('en-GB', Object.assign({ hour: '2-digit', minute: '2-digit' }, o)) + ' IST';
+    if (d) d.textContent = n.toLocaleDateString('en-GB', Object.assign({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }, o));
+  } catch (e) { /* ignore */ }
+}
+function homeHero() {
+  try {
+    const set = (id, v, cls) => { const el = document.getElementById(id); if (el) { el.textContent = v; if (cls) el.style.color = cls; } };
+    const signed = v => (v > 0 ? '+' : v < 0 ? '-' : '') + fmtMoney(Math.abs(v));
+    const colr = v => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text-muted)';
+    const unreal = (typeof position !== 'undefined' && position) ? (positionPnl() || 0) : 0;
+    const equity = account.balance + unreal;
+    const midnightIST = Math.floor((Date.now() + 19800000) / 86400000) * 86400000 - 19800000;
+    const closedToday = tradeHistory.filter(t => t.closedAt >= midnightIST).reduce((a, t) => a + (t.pnl || 0), 0);
+    const day = closedToday + unreal;
+    const used = (typeof position !== 'undefined' && position) ? (position.notionalAtEntry || 0) / (position.leverage || 1) : 0;
+    const f = fmtMoney(equity), m = f.match(/^-?[₹$]/), hv = document.getElementById('hero-val');
+    if (hv) hv.innerHTML = '<span class="rupee">' + (m ? m[0] : '') + '</span>' + f.slice(m ? m[0].length : 0);
+    const base = equity - day, pct = base ? day / base * 100 : 0;
+    const chg = document.getElementById('hero-chg');
+    if (chg) { chg.textContent = (day > 0 ? '▲ ' : day < 0 ? '▼ ' : '') + signed(day) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)'; chg.style.color = colr(day); }
+    set('hero-avail', fmtMoney(Math.max(0, account.balance - used)));
+    set('hero-used', fmtMoney(used));
+    set('hero-day', signed(day), colr(day));
+  } catch (e) { /* account not ready */ }
+}
+function homeFeed() {
+  try {
+    const dot = document.getElementById('side-dot'), a = document.getElementById('side-st1'), b = document.getElementById('side-st2');
+    if (!dot || !a || !b) return;
+    let c, t1, t2;
+    const ls = (typeof LIVE !== 'undefined') ? LIVE.state : null, mk = (typeof MK !== 'undefined') ? MK.live : undefined;
+    if (ls === 'live') { c = 'var(--green)'; t1 = 'Live feed'; t2 = 'Streaming'; }
+    else if (ls === 'polling' || mk === true) { c = 'var(--green)'; t1 = 'Live prices'; t2 = ls === 'polling' ? 'Updating every 5s' : 'Connected'; }
+    else if (mk === false || ls === 'error') { c = 'var(--warn)'; t1 = 'Prices unavailable'; t2 = 'Showing demo values'; }
+    else { c = 'var(--text-faint)'; t1 = 'Checking feed'; t2 = ' '; }
+    dot.style.background = c; dot.style.boxShadow = 'none'; a.textContent = t1; b.textContent = t2;
+  } catch (e) { /* ignore */ }
+}
+homeClock(); homeHero(); homeFeed();
+setInterval(homeClock, 15000); setInterval(function () { homeHero(); homeFeed(); }, 3000);
+</script>
+<script>
+/* Top bar: search icon that expands (mobile) and the avatar menu (theme + currency). */
+function tbSearchOpen() {
+  if (window.innerWidth > 700) return;
+  var bar = document.getElementById('topbar'), inp = document.getElementById('tb-search-in');
+  if (!bar || bar.classList.contains('search-open')) return;
+  bar.classList.add('search-open'); if (inp) setTimeout(function () { inp.focus(); }, 0);
+}
+function tbSearchClose() { var bar = document.getElementById('topbar'); if (bar) bar.classList.remove('search-open'); }
+(function () {
+  var inp = document.getElementById('tb-search-in'); if (!inp) return;
+  inp.addEventListener('blur', function () { if (!inp.value) tbSearchClose(); });
+  inp.addEventListener('keydown', function (e) { if (e.key === 'Escape') { inp.value = ''; inp.blur(); tbSearchClose(); } });
+})();
+function toggleAvMenu(e) {
+  if (e) e.stopPropagation();
+  var m = document.getElementById('av-menu'), b = document.getElementById('av-btn'); if (!m || !b) return;
+  var open = m.hasAttribute('hidden'); if (open) m.removeAttribute('hidden'); else m.setAttribute('hidden', '');
+  b.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function closeAvMenu() { var m = document.getElementById('av-menu'), b = document.getElementById('av-btn'); if (m) m.setAttribute('hidden', ''); if (b) b.setAttribute('aria-expanded', 'false'); }
+document.addEventListener('click', function (e) { if (!e.target.closest || !e.target.closest('.av-wrap')) closeAvMenu(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAvMenu(); });
+try { setTheme(document.documentElement.getAttribute('data-theme') || 'dark'); syncCcyUi(); } catch (e) { /* ignore */ }
+</script>
+<script>
+/* ===== Search: stocks, indices, crypto perps, option underlyings and strategies. Tap a result for a summary, then open its chart. ===== */
+const SR_KEY = 'tradepro_search_recent_v1';
+let srQ = '';
+const srE = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function srRecents() { try { const a = JSON.parse(localStorage.getItem(SR_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function srRemember(t, k) { try { const a = srRecents().filter(x => !(x.t === t && String(x.k) === String(k))); a.unshift({ t: t, k: k }); localStorage.setItem(SR_KEY, JSON.stringify(a.slice(0, 6))); } catch (e) { /* no storage */ } }
+function srScore(q, sym, name) {
+  const s = sym.toLowerCase(), n = (name || '').toLowerCase();
+  return s === q ? 0 : s.startsWith(q) ? 1 : n.startsWith(q) ? 2 : n.split(/[^a-z0-9]+/).some(w => w.startsWith(q)) ? 3 : (s.includes(q) || n.includes(q)) ? 4 : 99;
+}
+function srLoadData() {
+  try { if (typeof INX !== 'undefined' && !INX.snap && !INX.busy) inxLoad(); } catch (e) { /* ignore */ }
+  try { if (typeof MKT !== 'undefined' && !Object.keys(MKT.pt).length) mktPulseLoad(); } catch (e) { /* ignore */ }
+}
+function srRow(t, k, ic, title, sub, price, chg) {
+  const cls = chg == null ? '' : chg >= 0 ? 'inx-up' : 'inx-dn';
+  return `<button type="button" class="sr-row" data-t="${srE(t)}" data-k="${srE(k)}"><span class="sr-ic">${srE(ic)}</span><span class="sr-m"><b>${srE(title)}</b><small>${srE(sub)}</small></span>${price ? `<span class="sr-p">${price}${chg == null ? '' : `<small class="${cls}">${chg >= 0 ? '+' : '−'}${Math.abs(chg).toFixed(2)}%</small>`}</span>` : ''}</button>`;
+}
+function srStockRow(d, isIdx) { return srRow(isIdx ? 'index' : 'stock', d.sym || d.key, isIdx ? 'IDX' : (d.sym || '').slice(0, 2), isIdx ? d.name : d.sym, isIdx ? 'Index · NSE' : (d.name || '') + (d.sector ? ' · ' + d.sector : ''), (isIdx ? '' : '₹') + inxNum(d.c), d.chgPct); }
+function srCryptoRow(sym) { const q = MKT.pt[sym]; return srRow('crypto', sym, sym.replace(/USD$/, '').slice(0, 3), sym.replace(/USD$/, '') + '/USD', 'Perpetual · live', q ? mkUsd(q.price) : '', q ? q.chg : null); }
+function srIdxList() { const S = INX && INX.snap; if (!S) return []; return Object.keys(S.indices || {}).map(k => Object.assign({ key: k, sym: k }, S.indices[k])); }
+function srRender() {
+  const box = document.getElementById('sr-res'); if (!box) return; const q = srQ.trim().toLowerCase(); let h = '';
+  const snap = INX && INX.snap, haveCrypto = MKT && Object.keys(MKT.pt).length;
+  if (!q) {
+    const rec = srRecents(), items = [];
+    rec.forEach(r => {
+      if (r.t === 'stock' && snap) { const d = snap.stocks.find(x => x.sym === r.k); if (d) items.push(srStockRow(d, false)); }
+      else if (r.t === 'index' && snap) { const d = srIdxList().find(x => x.key === r.k); if (d) items.push(srStockRow(d, true)); }
+      else if (r.t === 'crypto') items.push(haveCrypto && MKT.pt[r.k] ? srCryptoRow(r.k) : srRow('crypto', r.k, r.k.slice(0, 3), r.k.replace(/USD$/, '') + '/USD', 'Perpetual', '', null));
+      else if (r.t === 'opt') items.push(srRow('opt', r.k, r.k, r.k + ' options', 'Open interest, PCR, strikes', '', null));
+    });
+    if (items.length) h += '<div class="sr-h">Recent</div>' + items.join('');
+    const quick = [];
+    srIdxList().forEach(d => quick.push(srStockRow(d, true)));
+    ['BTCUSD', 'ETHUSD'].forEach(s => { if (haveCrypto && MKT.pt[s]) quick.push(srCryptoRow(s)); });
+    if (quick.length) h += '<div class="sr-h">Popular</div>' + quick.join('');
+    if (!h) h = '<div class="sr-note">Type a stock, index, crypto symbol or strategy name.</div>';
+  } else {
+    const st = [];
+    srIdxList().forEach(d => { const sc = srScore(q, d.key === 'NIFTY' ? 'nifty' : 'banknifty', d.name); if (sc < 99 || (d.name || '').toLowerCase().includes(q)) st.push({ sc: Math.min(sc, 4), tn: 1e18, h: srStockRow(d, true) }); });
+    if (snap) snap.stocks.forEach(d => { const sc = srScore(q, d.sym, d.name); if (sc < 99) st.push({ sc, tn: d.turnover || 0, h: srStockRow(d, false) }); });
+    st.sort((a, b) => a.sc - b.sc || b.tn - a.tn);
+    if (st.length) h += '<div class="sr-h">Stocks &amp; indices</div>' + st.slice(0, 6).map(x => x.h).join('');
+    const cr = Object.keys(MKT.pt).map(s => ({ s, sc: srScore(q, s.replace(/USD$/, ''), ''), tn: MKT.pt[s].turn || 0 })).filter(x => x.sc < 99).sort((a, b) => a.sc - b.sc || b.tn - a.tn).slice(0, 5);
+    if (cr.length) h += '<div class="sr-h">Crypto</div>' + cr.map(x => srCryptoRow(x.s)).join('');
+    const op = ['BTC', 'ETH'].filter(u => u.toLowerCase().startsWith(q) || 'options'.startsWith(q) || q.includes('opt'));
+    if (op.length) h += '<div class="sr-h">Options</div>' + op.map(u => srRow('opt', u, u, u + ' options', 'Open interest, PCR, strikes', '', null)).join('');
+    const sg = [];
+    savedStrategies.forEach((v, i) => { if (v.name.toLowerCase().includes(q)) sg.push(srRow('saved', i, 'STR', v.name, 'Saved · ' + (v.cat || '') + ' · ' + (v.asset || '').toUpperCase(), '', null)); });
+    Object.keys(STRAT_DEFS).forEach(k => { if (STRAT_DEFS[k].label.toLowerCase().includes(q)) sg.push(srRow('def', k, 'STR', STRAT_DEFS[k].label, 'Options strategy', '', null)); });
+    if (sg.length) h += '<div class="sr-h">Strategies</div>' + sg.slice(0, 4).join('');
+    if (!h) h = '<div class="sr-note">' + ((INX && INX.busy) || (!snap && !(INX && INX.err)) ? 'Loading market data…' : 'No matches for “' + srE(srQ.trim()) + '”.') + '</div>';
+    if (INX && INX.err && !snap) h += '<div class="sr-note">Indian stock data is not available right now.</div>';
+  }
+  box.innerHTML = h; srPlace(); box.classList.add('open');
+}
+function srPlace() {
+  const box = document.getElementById('sr-res'), bar = document.getElementById('tb-search'); if (!box || !bar) return;
+  const r = bar.getBoundingClientRect(), mob = window.innerWidth <= 700, top = r.bottom + 8;
+  box.style.top = top + 'px'; box.style.maxHeight = Math.max(160, window.innerHeight - top - (mob ? 84 : 20)) + 'px';
+  if (mob) { box.style.left = '8px'; box.style.right = '8px'; box.style.width = 'auto'; } else { box.style.left = r.left + 'px'; box.style.right = 'auto'; box.style.width = Math.max(r.width, 420) + 'px'; }
+}
+function srHide() { const b = document.getElementById('sr-res'); if (b) b.classList.remove('open'); }
+function srCloseSheet() { const a = document.getElementById('sr-sheet'), b = document.getElementById('sr-scrim'); if (a) a.classList.remove('open'); if (b) b.classList.remove('open'); }
+function srShowSheet(html) {
+  const a = document.getElementById('sr-sheet'), b = document.getElementById('sr-scrim'); if (!a || !b) return;
+  a.innerHTML = '<button type="button" class="sr-x" aria-label="Close" onclick="srCloseSheet()">✕</button>' + html; a.classList.add('open'); b.classList.add('open'); a.scrollTop = 0;
+}
+function srFinish() { srHide(); srCloseSheet(); const i = document.getElementById('tb-search-in'); if (i) { i.value = ''; srQ = ''; i.blur(); } tbSearchClose(); }
+const srRow2 = (l, v, c) => `<div class="inx-row"><span>${l}</span><span class="${c || ''}" style="font-family:var(--mono)">${v}</span></div>`;
+function srSparkSvg(vals, gid) {
+  if (!vals || vals.length < 2) return '';
+  const a = inxArea(vals, 320, 100, 6), dn = vals[vals.length - 1] < vals[0];
+  return `<svg class="inx-svg ${dn ? 'inx-dn-s' : ''}" viewBox="0 0 320 100" role="img" aria-label="Recent price trend"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop class="inx-gs" offset="0" style="stop-opacity:.28"/><stop class="inx-gs" offset="1" style="stop-opacity:0"/></linearGradient></defs><path d="${a.area}" fill="url(#${gid})"/><path class="inx-line" d="${a.line}"/></svg>`;
+}
+function srSheetStock(sym, isIdx) {
+  const S = INX.snap; if (!S) return;
+  const d = isIdx ? (S.indices[sym] && Object.assign({ sym }, S.indices[sym])) : S.stocks.find(x => x.sym === sym); if (!d) return;
+  const cur = isIdx ? '' : '₹', hi = d.hi52, lo = d.lo52, pos = hi > lo ? (d.c - lo) / (hi - lo) * 100 : 50, tc = (d.turnover || 0) / 1e7;
+  srShowSheet(`<div><b style="font-size:18px;font-weight:600">${srE(isIdx ? d.name : d.sym)}</b>${d.sector ? ` <span class="inx-tag">${srE(d.sector)}</span>` : ''}${isIdx ? ' <span class="inx-tag">NSE</span>' : ''}<div style="font-size:12.5px;color:var(--text-muted)">${srE(isIdx ? 'Index · end of day ' + inxDate(d.asOf) : d.name)}</div></div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin:8px 0 2px;flex-wrap:wrap"><span style="font:500 24px var(--mono)">${cur}${inxNum(d.c)}</span><span class="${inxCls(d.chgPct)}" style="font-family:var(--mono)">${inxPct(d.chgPct)}</span></div>
+    ${srChartShell('in', srSparkSvg(d.spark, 'srg'))}
+    ${srRow2('1 week', inxPct(d.ret1w), inxCls(d.ret1w))}${srRow2('1 month', inxPct(d.ret1m), inxCls(d.ret1m))}${srRow2('3 months', inxPct(d.ret3m), inxCls(d.ret3m))}${isIdx ? '' : srRow2('Turnover', '₹' + inxNum(tc, tc >= 100 ? 0 : 1) + ' cr')}
+    <div style="margin-top:10px"><div class="inx-lab" style="margin-bottom:6px">52 week range</div><div style="position:relative;height:6px;background:var(--surface-2);border-radius:3px"><i style="position:absolute;left:${Math.max(0, Math.min(100, pos)).toFixed(0)}%;top:-4px;width:3px;height:14px;background:var(--text);border-radius:2px"></i></div><div style="display:flex;justify-content:space-between;font:12px var(--mono);margin-top:8px"><span>${inxNum(lo, 0)}</span><span style="color:var(--text-muted)">${((1 - d.c / hi) * 100).toFixed(1)}% from high</span><span>${inxNum(hi, 0)}</span></div></div>
+    <div class="sr-btns"><button class="inx-btn" style="background:var(--accent);border-color:var(--accent);color:var(--on-accent)" onclick="srFinish();openIndiaChart(${JSON.stringify(sym).replace(/"/g, '&quot;')})">Open full chart</button></div>`);
+  srChartInit('in', sym, d.spark);
+}
+async function srSheetCrypto(sym) {
+  const q = MKT.pt[sym]; if (!q) return; const base = sym.replace(/USD$/, '');
+  srShowSheet(`<div><b style="font-size:18px;font-weight:600">${srE(base)}/USD</b> <span class="inx-tag">Perpetual</span><div style="font-size:12.5px;color:var(--text-muted)">Live price, 24h figures</div></div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin:8px 0 2px;flex-wrap:wrap"><span style="font:500 24px var(--mono)">${mkUsd(q.price)}</span><span class="${q.chg >= 0 ? 'inx-up' : 'inx-dn'}" style="font-family:var(--mono)">${mkPct(q.chg)}</span></div>
+    ${srChartShell('cr', '<div class="sr-load">Loading chart…</div>')}
+    ${srRow2('Funding', q.fund == null ? '–' : q.fund.toFixed(4) + '%')}${srRow2('OI change', q.oiChg == null ? '–' : mktSgn(q.oiChg))}${q.oiUsd ? srRow2('Open interest', '$' + mktCompact(q.oiUsd)) : ''}${srRow2('24h volume', '$' + mktCompact(q.turn))}
+    <div class="sr-btns"><button class="inx-btn" style="background:var(--accent);border-color:var(--accent);color:var(--on-accent)" onclick="srFinish();mkPractice('${srE(sym)}')">Open full chart</button><button class="inx-btn" onclick="srFinish();alrPrefill('${srE(sym)}')">Set alert</button></div>`);
+  srChartInit('cr', sym);
+}
+function srSheetSaved(i) {
+  const v = savedStrategies[i]; if (!v) return; const crypto = v.asset === 'btc' || v.asset === 'eth';
+  srShowSheet(`<div><b style="font-size:17px;font-weight:600;padding-right:34px;display:block">${srE(v.name)}</b><div style="font-size:12.5px;color:var(--text-muted)">Saved strategy · ${srE(v.cat || '')} · ${srE((v.asset || '').toUpperCase())}</div></div><div style="margin-top:10px">${(v.legs || []).map(l => srRow2(srE(l.action + ' ' + l.type), srE(l.strike))).join('')}</div>
+    ${crypto ? `<div class="sr-btns"><button class="inx-btn" style="background:var(--accent);border-color:var(--accent);color:var(--on-accent)" onclick="srFinish();openSavedCandles(${i})">View candles</button></div>` : '<div class="mkt-note">Live candles for this one are available for crypto only, for now.</div>'}`);
+}
+function srSheetDef(k) {
+  const d = STRAT_DEFS[k]; if (!d) return;
+  srShowSheet(`<div><b style="font-size:17px;font-weight:600;padding-right:34px;display:block">${srE(d.label)}</b><div style="font-size:12.5px;color:var(--text-muted)">Options strategy · built in</div></div><div class="mkt-note">Opens on the live BTC options chart with the legs placed around the current price.</div><div class="sr-btns"><button class="inx-btn" style="background:var(--accent);border-color:var(--accent);color:var(--on-accent)" onclick="srFinish();openStrategyChart('${srE(k)}')">Open on chart</button></div>`);
+}
+function srOpen(t, k) {
+  if (t !== 'saved' && t !== 'def') srRemember(t, k);
+  srHide(); const i = document.getElementById('tb-search-in'); if (i) i.blur();
+  if (t === 'stock') srSheetStock(k, false);
+  else if (t === 'index') srSheetStock(k, true);
+  else if (t === 'crypto') srSheetCrypto(k);
+  else if (t === 'opt') { srFinish(); showView('markets'); mktSeg('options'); mktUnd(k); }
+  else if (t === 'saved') srSheetSaved(+k);
+  else if (t === 'def') srSheetDef(k);
+}
+(function () {
+  const inp = document.getElementById('tb-search-in'); if (!inp) return;
+  const box = document.createElement('div'); box.id = 'sr-res'; box.setAttribute('role', 'listbox');
+  const scr = document.createElement('div'); scr.id = 'sr-scrim'; scr.onclick = srCloseSheet;
+  const sh = document.createElement('div'); sh.id = 'sr-sheet'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-label', 'Summary');
+  document.body.appendChild(box); document.body.appendChild(scr); document.body.appendChild(sh);
+  box.addEventListener('mousedown', e => e.preventDefault());
+  box.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.sr-row'); if (b) srOpen(b.dataset.t, b.dataset.k); });
+  inp.addEventListener('focus', () => { srLoadData(); srQ = inp.value; srRender(); });
+  inp.addEventListener('input', () => { srQ = inp.value; srLoadData(); srRender(); });
+  inp.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== inp) srHide(); }, 120); });
+  inp.addEventListener('keydown', e => { if (e.key === 'Escape') srHide(); if (e.key === 'Enter') { const f = box.querySelector('.sr-row'); if (f) srOpen(f.dataset.t, f.dataset.k); } });
+  window.addEventListener('resize', () => { if (box.classList.contains('open')) srPlace(); });
+  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); tbSearchOpen(); inp.focus(); inp.select(); } if (e.key === 'Escape') srCloseSheet(); });
+  setInterval(() => { if (box.classList.contains('open') && box.scrollTop < 4) srRender(); }, 5000);
+})();
+</script>
+<script>
+/* Summary card chart: line or candles, with time ranges (and D/W/M candle size for Indian stocks). */
+const SRC = { kind: '', sym: '', ivl: 'D', type: 'line', raw: null, cache: {}, tok: 0, spark: null };
+try { const t = localStorage.getItem('tradepro_sr_ctype'); if (t === 'line' || t === 'candle') SRC.type = t; } catch (e) { /* ignore */ }
+const SR_IN_N = { D: 63, W: 260, M: 1300 }, SR_CR_DAYS = { D: 90, W: 400, M: 1000 };
+const SR_IVL_NAME = { D: 'Daily', W: 'Weekly', M: 'Monthly' }, SR_SPAN = { in: { D: 'last 3 months', W: 'last year', M: 'last 5 years' }, cr: { D: 'last 3 months', W: 'last year', M: 'last 3 years' } };
+function srChartShell(kind, first) {
+  return `<div class="sr-tools"><div class="sr-chips" id="sr-ivl">${['D', 'W', 'M'].map(v => `<button type="button" data-ivl="${v}">${SR_IVL_NAME[v]}</button>`).join('')}</div>
+    <div class="sr-seg" id="sr-type"><button type="button" data-ty="line" aria-label="Line chart" title="Line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 8-9"/></svg></button><button type="button" data-ty="candle" aria-label="Candlestick chart" title="Candles"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 4v3M7 15v4M17 6v2M17 17v3"/><rect x="5" y="7" width="4" height="8" rx="1"/><rect x="15" y="8" width="4" height="9" rx="1"/></svg></button></div></div>
+    <div class="sr-chart" id="sr-chart">${first}</div><div class="sr-cap" id="sr-cap"></div>`;
+}
+function srAgg(c, ivl) {
+  if (ivl === 'D') return c; const out = []; let key = null, cur = null;
+  c.forEach(x => {
+    let k; if (ivl === 'M') k = x.t.slice(0, 7); else { const d = new Date(x.t + 'T00:00:00Z'), dd = (d.getUTCDay() + 6) % 7; k = new Date(d.getTime() - dd * 864e5).toISOString().slice(0, 10); }
+    if (k !== key) { key = k; cur = { t: x.t, o: x.o, h: x.h, l: x.l, c: x.c, v: x.v || 0 }; out.push(cur); } else { cur.h = Math.max(cur.h, x.h); cur.l = Math.min(cur.l, x.l); cur.c = x.c; cur.v += x.v || 0; }
+  });
+  return out;
+}
+function srBars() {
+  if (SRC.kind === 'in') return SRC.raw ? srAgg(SRC.raw.slice(-SR_IN_N[SRC.ivl]), SRC.ivl) : null;
+  return SRC.cache[SRC.ivl] || null;
+}
+function srUi() {
+  const q = (sel, f) => document.querySelectorAll(sel).forEach(f);
+  q('#sr-type button', b => b.classList.toggle('on', b.dataset.ty === SRC.type));
+  q('#sr-ivl button', b => b.classList.toggle('on', b.dataset.ivl === SRC.ivl));
+}
+const srFmtV = v => SRC.kind === 'in' ? (SRC.sym === 'NIFTY' || SRC.sym === 'BANKNIFTY' ? '' : '₹') + inxNum(v) : mkUsd(v);
+function srCapDefault(bars) {
+  const ch = bars && bars.length > 1 ? (bars[bars.length - 1].c / bars[0].o - 1) * 100 : null;
+  return SR_IVL_NAME[SRC.ivl] + (SRC.type === 'candle' ? ' candles' : ' closes') + ' · ' + SR_SPAN[SRC.kind][SRC.ivl] + (ch == null ? '' : ` · <span class="sr-ch ${ch >= 0 ? 'inx-up' : 'inx-dn'}">${ch >= 0 ? '▲ +' : '▼ '}${Math.abs(ch).toFixed(2)}%</span>`) + ' · touch the chart for values';
+}
+function srDraw() {
+  const box = document.getElementById('sr-chart'), cap = document.getElementById('sr-cap'); if (!box) return; srUi();
+  const bars = srBars();
+  if (!bars) { if (SRC.kind === 'cr' || !SRC.spark) box.innerHTML = '<div class="sr-load">Loading chart…</div>'; return; }
+  if (bars.length < 2) { box.innerHTML = '<div class="sr-load">Not enough history for this range.</div>'; if (cap) cap.textContent = ''; return; }
+  const W = 320, H = 150, P = 8, n = bars.length; let svg;
+  if (SRC.type === 'line') {
+    const v = bars.map(b => b.c), a = inxArea(v, W, H, P), dn = v[n - 1] < v[0];
+    svg = `<svg viewBox="0 0 ${W} ${H}" class="inx-svg ${dn ? 'inx-dn-s' : ''}" role="img" aria-label="Price chart"><defs><linearGradient id="srgl" x1="0" y1="0" x2="0" y2="1"><stop class="inx-gs" offset="0" style="stop-opacity:.28"/><stop class="inx-gs" offset="1" style="stop-opacity:0"/></linearGradient></defs><path d="${a.area}" fill="url(#srgl)"/><path class="inx-line" d="${a.line}"/><line id="sr-x" x1="0" x2="0" y1="0" y2="${H}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 3" style="display:none"/></svg>`;
+  } else {
+    const hi = Math.max.apply(null, bars.map(b => b.h)), lo = Math.min.apply(null, bars.map(b => b.l)), rg = (hi - lo) || 1, y = v => P + (1 - (v - lo) / rg) * (H - 2 * P), st = W / n, bw = Math.max(1.2, Math.min(14, st * 0.62));
+    svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Candlestick chart">` + bars.map((b, i) => { const x = st * (i + 0.5), up = b.c >= b.o, col = up ? 'var(--green)' : 'var(--red)', t = y(Math.max(b.o, b.c)), bt = y(Math.min(b.o, b.c)); return `<line x1="${x.toFixed(2)}" x2="${x.toFixed(2)}" y1="${y(b.h).toFixed(1)}" y2="${y(b.l).toFixed(1)}" stroke="${col}" stroke-width="${bw > 3 ? 1.2 : 0.8}"/><rect x="${(x - bw / 2).toFixed(2)}" y="${t.toFixed(1)}" width="${bw.toFixed(2)}" height="${Math.max(1, bt - t).toFixed(1)}" fill="${col}"/>`; }).join('') + `<line id="sr-x" x1="0" x2="0" y1="0" y2="${H}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 3" style="display:none"/></svg>`;
+  }
+  box.innerHTML = svg; if (cap) cap.innerHTML = srCapDefault(bars);
+  const el = box.querySelector('svg'), xl = box.querySelector('#sr-x');
+  const at = ev => { const r = el.getBoundingClientRect(), f = Math.max(0, Math.min(0.9999, (ev.clientX - r.left) / r.width)), i = Math.floor(f * n), b = bars[i]; if (!b) return;
+    if (xl) { const x = SRC.type === 'line' ? f * W : (W / n) * (i + 0.5); xl.setAttribute('x1', x); xl.setAttribute('x2', x); xl.style.display = ''; }
+    if (cap) cap.innerHTML = SRC.type === 'line' ? `<b>${srE(b.t.slice(0, 10))}</b> · ${srFmtV(b.c)}` : `<b>${srE(b.t.slice(0, 10))}</b> O ${srFmtV(b.o)} H ${srFmtV(b.h)} L ${srFmtV(b.l)} C <b>${srFmtV(b.c)}</b>`; };
+  el.addEventListener('pointerdown', at); el.addEventListener('pointermove', at);
+  el.addEventListener('pointerleave', () => { if (xl) xl.style.display = 'none'; if (cap) cap.innerHTML = srCapDefault(bars); });
+}
+async function srCryptoLoad(ivl) {
+  const tok = SRC.tok; if (SRC.cache[ivl]) { srDraw(); return; }
+  try {
+    const days = SR_CR_DAYS[ivl], end = Math.floor(Date.now() / 1000), rows = [];
+    for (let from = end - days * 86400; from < end; from += 450 * 86400) {   // the API serves a limited number of candles per request
+      const j = await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(SRC.sym)}&resolution=1d&start=${from}&end=${Math.min(end, from + 450 * 86400)}`);
+      ((j && j.result) || []).forEach(r => rows.push({ t: new Date(+(r.time > 1e11 ? r.time / 1000 : r.time) * 1000).toISOString().slice(0, 10), o: +r.open, h: +r.high, l: +r.low, c: +r.close, v: +r.volume }));
+    }
+    const seen = {}, arr = rows.filter(r => [r.o, r.h, r.l, r.c].every(isFinite) && !seen[r.t] && (seen[r.t] = 1)).sort((a, b) => a.t < b.t ? -1 : 1);
+    if (tok !== SRC.tok) return; SRC.cache[ivl] = srAgg(arr, ivl);
+  } catch (e) { if (tok !== SRC.tok) return; const box = document.getElementById('sr-chart'); if (box) box.innerHTML = '<div class="sr-load">Chart data is unavailable right now.</div>'; return; }
+  if (SRC.ivl === ivl) srDraw();
+}
+async function srChartInit(kind, sym, spark) {
+  SRC.kind = kind; SRC.sym = sym; SRC.tok++; SRC.raw = null; SRC.cache = {}; SRC.spark = spark || null; SRC.ivl = 'D';
+  const tok = SRC.tok; srUi();
+  const cap = document.getElementById('sr-cap'); if (cap && kind === 'in') cap.textContent = 'Loading full history…';
+  if (kind === 'cr') { srCryptoLoad(SRC.ivl); return; }
+  try { const raw = await indiaCandles(sym, '1d'); if (tok !== SRC.tok) return; SRC.raw = raw; srDraw(); }
+  catch (e) { if (tok === SRC.tok && cap) cap.textContent = 'Detailed history is unavailable, showing the recent trend.'; }
+}
+document.addEventListener('click', function (e) {
+  const b = e.target.closest && e.target.closest('#sr-sheet button'); if (!b) return;
+  if (b.dataset.ty) { SRC.type = b.dataset.ty; try { localStorage.setItem('tradepro_sr_ctype', SRC.type); } catch (er) { /* ignore */ } srDraw(); }
+  else if (b.dataset.ivl) { SRC.ivl = b.dataset.ivl; if (SRC.kind === 'cr') srCryptoLoad(SRC.ivl); srDraw(); }
+});
 </script>
 </body>
 </html>
