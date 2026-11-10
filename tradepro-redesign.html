@@ -2454,12 +2454,13 @@
 <div class="modal-overlay" id="sscan-overlay" onclick="if(event.target===this) closeSScan()">
   <div class="modal">
     <div class="modal-head">
-      <div class="modal-title">Strategy scan</div>
+      <div class="modal-title" id="sscan-title">Strategy scan</div>
       <button class="collapse-btn" aria-label="Close" onclick="closeSScan()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
     <div class="modal-body">
+      <div class="strat-legs" id="sscan-dup-note" style="display:none; margin-bottom:8px"></div>
       <label class="field-label">Scan name</label>
       <input class="field-input" id="sscan-name" type="text" placeholder="e.g. Short straddle — downtrend">
 
@@ -2480,13 +2481,14 @@
       </div>
 
       <label class="field-label">Underlying</label>
-      <select class="field-input" id="sscan-und" onchange="sscanDraft.und=this.value">
+      <select class="field-input" id="sscan-und" onchange="sscanSetUnd(this.value)">
         <option value="BTC">BTC</option><option value="ETH">ETH</option><option value="BTC,ETH">BTC + ETH</option>
-        <option value="NIFTY">Nifty 50 (daily only)</option><option value="BANKNIFTY">Bank Nifty (daily only)</option><option value="NIFTY,BANKNIFTY">Nifty + Bank Nifty (daily only)</option>
+        <option value="NIFTY">Nifty 50 (end of day)</option><option value="BANKNIFTY">Bank Nifty (end of day)</option><option value="NIFTY,BANKNIFTY">Nifty + Bank Nifty (end of day)</option>
       </select>
 
       <label class="field-label">Timeframe</label>
       <select class="field-input" id="sscan-tf" onchange="sscanDraft.tf=this.value"></select>
+      <div class="strat-legs" id="sscan-tf-note" style="display:none">Indian stocks update once a day, after the 15:30 close, so only Daily, Weekly and Monthly are available. Weekly and Monthly are built from the daily candles.</div>
 
       <label class="field-label">Entry conditions — all must be true on the last closed candle</label>
       <div id="sscan-conds"></div>
@@ -3113,6 +3115,7 @@ function renderSScans() {
         <div class="sc2-acts">
           <button class="btn-primary" onclick="runSScan(${i})">Scan now</button>
           <button class="btn-ghost" onclick="openSScan(${i})">Edit</button>
+          <button class="btn-ghost" onclick="dupSScan(${i})" title="Copy this scan, e.g. for Indian stocks on Daily">Duplicate</button>
           <button class="btn-ghost danger" onclick="if(confirm('Delete this scan?')) removeSScan(${i})">Delete</button>
         </div>
       </div></details>`;
@@ -3236,7 +3239,40 @@ function sscanPresetGuppyBull() {   // Bullish Guppy crossover + close above Sup
   renderSScanConds();
 }
 function sscanAddCond() { sscanDraft.conds.push({ op: sscanDraft.side === 'Sell' ? 'below' : 'above', k: 'ema', p: 20 }); renderSScanConds(); }
+/* ---- Duplicate a scan (and move it to another market / timeframe) ----
+   Indian stocks only have end-of-day candles, so for them the timeframe list is Daily / Weekly / Monthly. */
+const SSCAN_TFS_IN = ['1d', '1w', '1M'], SSCAN_TF_NAMES = { '1d': 'Daily', '1w': 'Weekly', '1M': 'Monthly' };
+const sscanIsIndia = u => String(u || '').split(',').every(x => isIndiaUnd(x));
+function sscanFillTf() {   // timeframe options follow the market: intraday only for crypto
+  const india = sscanIsIndia(sscanDraft.und), list = india ? SSCAN_TFS_IN : SSCAN_TFS;
+  if (list.indexOf(sscanDraft.tf) < 0) sscanDraft.tf = '1d';
+  document.getElementById('sscan-tf').innerHTML = list.map(t => `<option value="${t}" ${t === sscanDraft.tf ? 'selected' : ''}>${india ? SSCAN_TF_NAMES[t] : t}</option>`).join('');
+  const n = document.getElementById('sscan-tf-note'); if (n) n.style.display = india ? '' : 'none';
+}
+function sscanSetUnd(v) { sscanDraft.und = v; sscanFillTf(); }
+function sscanSetDupNote(msg) {
+  const n = document.getElementById('sscan-dup-note'), t = document.getElementById('sscan-title');
+  if (n) { n.style.display = msg ? '' : 'none'; n.textContent = msg || ''; }
+  if (t) t.textContent = msg ? 'Duplicate scan' : 'Strategy scan';
+}
+function sscanUniqueName(base) { let n = base, k = 2; const has = x => sscans.some(s => s && s.name === x); while (has(n)) n = base + ' ' + k++; return n; }
+function dupSScan(i) {
+  const src = sscans[i]; if (!src) return;
+  openSScan(i);          // opens the editor pre-filled with this scan...
+  sscanEditing = null;   // ...but Save now adds a NEW scan, so the original stays exactly as it was (Cancel adds nothing)
+  const d = sscanDraft, wasIndia = sscanIsIndia(src.und);
+  if (!wasIndia) { d.und = INDIA_STOCKS.length ? INDIA_STOCKS.join(',') : 'NIFTY,BANKNIFTY'; d.tf = '1d'; d.minPrem = 0; }   // a crypto scan copied for the Indian market: Nifty 500 stocks on Daily candles
+  d.name = sscanUniqueName(src.name + (wasIndia ? ' (copy)' : ' (India Daily)'));
+  const sel = document.getElementById('sscan-und'); sel.value = d.und;
+  if (sel.value !== d.und) { d.und = 'NIFTY,BANKNIFTY'; sel.value = d.und; }   // stock list not loaded yet: fall back to the two indices
+  document.getElementById('sscan-name').value = d.name;
+  document.getElementById('sscan-minprem').value = d.minPrem || '';
+  sscanFillTf();
+  sscanSetDupNote(wasIndia ? 'Copy of "' + src.name + '". Change the market, timeframe or conditions, then Save. The original is not changed.'
+    : 'Copy of "' + src.name + '" set up for the Indian market on Daily candles. Switch to Weekly or Monthly, pick other stocks, or remove conditions, then Save. The original is not changed.');
+}
 function openSScan(idx, stratName) {
+  sscanSetDupNote(null);
   sscanEditing = idx == null ? null : idx;
   sscanDraft = idx == null
     ? { name: '', strat: stratName || 'Straddle', side: 'Sell', und: 'BTC', tf: '15m', fresh: false, minPrem: (stratName || 'Straddle') === 'Straddle' ? 600 : 0, conds: [{ op:'below', k:'ema', p:10 }, { op:'below', k:'ema', p:20 }, { op:'below', k:'st', p:10, m:2 }] }
@@ -3245,7 +3281,7 @@ function openSScan(idx, stratName) {
   document.getElementById('sscan-name').value = sscanDraft.name;
   document.getElementById('sscan-strat').innerHTML = SSCAN_STRATS.concat(SSCAN_STRATS.indexOf(sscanDraft.strat) < 0 ? [sscanDraft.strat] : []).map(n => `<option ${n === sscanDraft.strat ? 'selected' : ''}>${n}</option>`).join('');
   document.getElementById('sscan-und').value = sscanDraft.und;
-  document.getElementById('sscan-tf').innerHTML = SSCAN_TFS.map(t => `<option ${t === sscanDraft.tf ? 'selected' : ''}>${t}</option>`).join('');
+  sscanFillTf();
   document.getElementById('sscan-tf').onchange = e => { sscanDraft.tf = e.target.value; };
   document.getElementById('sscan-fresh').checked = !!sscanDraft.fresh;
   document.getElementById('sscan-minprem').value = sscanDraft.minPrem || '';
@@ -3294,8 +3330,8 @@ const indiaListReady = (async () => {
     if (typeof RS_MARKETS !== 'undefined' && RS_MARKETS.nifty50) { RS_MARKETS.nifty50.symbols = INDIA_SYMS.slice(); RS_MARKETS.nifty50.active = true; try { if (typeof rbDraft !== 'undefined' && rbDraft) rbRenderScope(); } catch (e) { /* builder closed */ } }
     const sel = document.getElementById('sscan-und');
     if (sel && !sel.querySelector('[data-india-stocks]')) {
-      const all = document.createElement('option'); all.value = INDIA_STOCKS.join(','); all.textContent = 'All Nifty 500 stocks (daily only)'; all.setAttribute('data-india-stocks', '1');
-      const grp = document.createElement('optgroup'); grp.label = 'Nifty 500 stocks (daily only)'; grp.setAttribute('data-india-stocks', '1');
+      const all = document.createElement('option'); all.value = INDIA_STOCKS.join(','); all.textContent = 'All Nifty 500 stocks (end of day)'; all.setAttribute('data-india-stocks', '1');
+      const grp = document.createElement('optgroup'); grp.label = 'Nifty 500 stocks (end of day)'; grp.setAttribute('data-india-stocks', '1');
       INDIA_STOCKS.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; grp.appendChild(o); });
       sel.appendChild(all); sel.appendChild(grp);
       if (typeof sscanDraft !== 'undefined' && sscanDraft && sscanDraft.und) sel.value = sscanDraft.und;
@@ -3381,9 +3417,22 @@ async function openIndiaChart(sym, scanIdx) {   // heatmap, Home strip and scann
     }
   } catch (e) { console.warn('openIndiaChart failed', e); }
 }
+/* Weekly / Monthly candles are built from the daily ones. A period only counts once it has closed, like the crypto scans that drop the forming candle. */
+function indiaClosedPeriod(cs, res) {
+  if (!cs.length) return cs;
+  const ist = new Date(Date.now() + 19800000), today = ist.toISOString().slice(0, 10), mins = ist.getUTCHours() * 60 + ist.getUTCMinutes(), dow = ist.getUTCDay(), last = cs[cs.length - 1];
+  if (res === '1M') return last.t.slice(0, 7) === today.slice(0, 7) ? cs.slice(0, -1) : cs;
+  const monday = d => { const m = new Date(d + 'T00:00:00Z'); m.setUTCDate(m.getUTCDate() - ((m.getUTCDay() + 6) % 7)); return m.toISOString().slice(0, 10); };
+  const weekOver = dow === 0 || dow === 6 || (dow === 5 && mins >= 15 * 60 + 35);
+  return monday(last.t) === monday(today) && !weekOver ? cs.slice(0, -1) : cs;
+}
 async function sscanCandles(und, res) {
   await indiaListReady;
-  if (isIndiaUnd(und)) return indiaCandles(und, res);
+  if (isIndiaUnd(und)) {
+    if (res === '1w') return indiaClosedPeriod(inxAgg(await indiaCandles(und, '1d'), 'W'), '1w');
+    if (res === '1M') return indiaClosedPeriod(await inxChartCandles(und, '1M'), '1M');
+    return indiaCandles(und, res);
+  }
   const key = und + 'USD|' + res, hit = sscanCache[key];
   if (hit && Date.now() - hit.at < 20000) return hit.candles;
   const secs = LIVE_RES[res], end = Math.floor(Date.now() / 1000);
@@ -3535,16 +3584,23 @@ async function runSScan(i) {
   sscanResults[i] = { at: Date.now(), rows };
   renderSScans();
 }
-async function runAllSScans() {
+async function runAllSScans(auto) {
   if (sscanBusy) return;
   sscanBusy = true;
-  try { for (let i = 0; i < sscans.length; i++) await runSScan(i); await rsRunAll(); } finally { sscanBusy = false; }
+  try {
+    for (let i = 0; i < sscans.length; i++) {
+      const sc = sscans[i], r = sscanResults[i];
+      if (auto === true && sc && sscanIsIndia(sc.und) && r && Date.now() - r.at < 21600000) continue;   // end-of-day data: no need to re-download every minute (Scan now always runs)
+      await runSScan(i);
+    }
+    await rsRunAll();
+  } finally { sscanBusy = false; }
 }
 function sscanToggleAuto() {
   if (sscanAutoTimer) { clearInterval(sscanAutoTimer); sscanAutoTimer = null; }
   if (document.getElementById('sscan-auto').checked) {
     runAllSScans();
-    sscanAutoTimer = setInterval(() => { const v = document.getElementById('view-scanner'); if (v && v.style.display !== 'none') runAllSScans(); }, 60000);
+    sscanAutoTimer = setInterval(() => { const v = document.getElementById('view-scanner'); if (v && v.style.display !== 'none') runAllSScans(true); }, 60000);
   }
 }
 function sscanOverlayMeta(sc, und) { // the chart evaluates the scan on its OWN candles (what you see), so no data needed here
@@ -4931,7 +4987,7 @@ function scLibRow(it) {
   const tagRow = it.scope === 'mine' ? `<div class="sc2-tagrow"><span>Tag</span><div class="seg">${['bullish', 'bearish', 'neutral'].map(c => `<button type="button" class="seg-btn${it.cat === c ? ' active' : ''}" onclick="scSetCat('${it.kind}',${it.ref},'${c}')">${scCatInfo(c).label}</button>`).join('')}</div></div>` : '';
   const acts = it.kind === 'preset' ? `<button class="btn-primary" onclick="scUseDefault(${it.ref})">Use this scanner</button>`
     : it.kind === 'custom' ? `<button class="btn-primary" onclick="scShowLive('custom',${it.ref})">Show in Live</button><button class="btn-ghost" onclick="rbOpen(${it.ref})">Edit</button><button class="btn-ghost" onclick="scDuplicate('custom',${it.ref})">Duplicate</button><button class="btn-ghost danger" onclick="scDelete('custom',${it.ref})">Delete</button>`
-    : it.kind === 'strategy' ? `<button class="btn-primary" onclick="scShowLive('strategy',${it.ref})">Show in Live</button><button class="btn-ghost" onclick="openSScan(${it.ref})">Edit</button><button class="btn-ghost danger" onclick="scDelete('strategy',${it.ref})">Delete</button>`
+    : it.kind === 'strategy' ? `<button class="btn-primary" onclick="scShowLive('strategy',${it.ref})">Show in Live</button><button class="btn-ghost" onclick="openSScan(${it.ref})">Edit</button><button class="btn-ghost" onclick="dupSScan(${it.ref})">Duplicate</button><button class="btn-ghost danger" onclick="scDelete('strategy',${it.ref})">Delete</button>`
     : `<button class="btn-ghost danger" onclick="scDelete('indicator',${it.ref})">Delete</button>`;
   const who = it.scope === 'default' ? 'Default scanner, same for everyone.' : it.vis === 'public' ? 'Marked public. Sharing starts when accounts launch; for now it stays on this device.' : 'Private to you.';
   const what = it.kind === 'preset' ? 'Opens in the builder so you can adjust it.' : it.kind === 'indicator' ? 'Saved indicator conditions (older scanner).' : 'Runs in the Live tab.';
@@ -4979,6 +5035,7 @@ function scSetCat(kind, ref, cat) {
 }
 function scUseDefault(ref) { const p = RS_PRESETS[ref]; if (p) rbOpenPreset(p.id); }
 function scDuplicate(kind, ref) {
+  if (kind === 'strategy') return dupSScan(ref);
   if (kind !== 'custom' || !rscans[ref]) return;
   const c = JSON.parse(JSON.stringify(rscans[ref])); c.name += ' (copy)'; c.id = 'r' + Date.now().toString(36); c.created = Date.now();
   rscans.unshift(c); rsPersist(); renderSScans(); rbOpen(0);
