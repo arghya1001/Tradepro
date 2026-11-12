@@ -591,6 +591,8 @@
   .scn-empty { padding: 18px 14px; text-align: center; font-size: 12.5px; color: var(--text-muted); line-height: 1.5; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 14px; } .scn-empty b { display: block; font-size: 14px; color: var(--text); margin-bottom: 2px; }
   .scn-foot { font-size: 11.5px; color: var(--text-faint); margin: 8px 0 0; text-align: center; }
   .scn-more { width: 100%; margin-top: 8px; }
+  .scn-dates { display: flex; gap: 10px; margin: 8px 0 2px; } .scn-dates label { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); min-width: 0; }
+  .scn-dates input { box-sizing: border-box; width: 100%; min-height: 42px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; color: var(--text); font-size: 14px; font-family: inherit; }
   .scn-sk { height: 14px; border-radius: 7px; background: var(--border-soft); margin: 12px 0; width: 100%; }
   .rs-line { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
   .rs-tbl { overflow-x: auto; margin-top: 6px; -webkit-overflow-scrolling: touch; }
@@ -4677,7 +4679,9 @@ function scnRefresh() { renderSScans(); try { if (typeof rbAutoR !== 'undefined'
 function scnSet(id, k, v) { const u = scnU(scnKeys[id]); u[k] = v; if (k === 'f' || k === 'sort') u.n = 20; scnRefresh(); }
 function scnTog(id, rk) { const u = scnU(scnKeys[id]); u.open[rk] = !u.open[rk]; scnRefresh(); }
 function scnMore(id) { scnU(scnKeys[id]).n += 20; scnRefresh(); }
-function scnSetRange(id, v) { scnRange = v; try { localStorage.setItem(SCN_RANGE_KEY, String(v)); } catch (e) { /* ignore */ } scnU(scnKeys[id]).dd = false; scnRefresh(); }
+function scnSetRange(id, v) { scnRange = v; try { localStorage.setItem(SCN_RANGE_KEY, String(v)); } catch (e) { /* ignore */ } const u = scnU(scnKeys[id]); u.dd = false; u.custom = false; scnRefresh(); }
+function scnPickDates(id) { const u = scnU(scnKeys[id]); u.custom = true; u.dd = false; scnRefresh(); }
+function scnSetDate(id, k, v) { const u = scnU(scnKeys[id]); if (!v) return; u[k] = v; if (u.from > u.to) { if (k === 'from') u.to = u.from; else u.from = u.to; } scnRefresh(); }
 function scnDay(ts, daily) { const d = new Date((daily ? ts : ts + 19800) * 1000); return SCN_DOW[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + RS_MON[d.getUTCMonth()]; }
 function scnDayKey(ts, daily) { return Math.floor((daily ? ts : ts + 19800) / 86400); }
 function scnPct(v) { return v == null ? '<span class="scn-na">—</span>' : `<span class="${v > 0 ? 'scn-up' : v < 0 ? 'scn-dn' : ''}">${v > 0 ? '+' : ''}${v.toFixed(2)}%</span>`; }
@@ -4724,19 +4728,22 @@ function scnCurHtml(id, u, M, last) {
 }
 
 function scnHistHtml(id, u, M, last) {
-  const ranges = scnRangeList(M), cur = ranges.find(r => r[0] === scnRange) || ranges.find(r => r[0] === 7) || ranges[0], days = cur[0], daily = M.daily;
+  const ranges = scnRangeList(M), cur = ranges.find(r => r[0] === scnRange) || ranges.find(r => r[0] === 7) || ranges[0], days = cur[0], daily = M.daily, cu = !!u.custom;
+  const lastStr = new Date((daily ? last : last + 19800) * 1000).toISOString().slice(0, 10);
+  if (cu) { if (!u.from) u.from = lastStr; if (!u.to) u.to = lastStr; }
+  const kOf = str => Math.floor(Date.parse(str + 'T00:00:00Z') / 86400000), loK = cu ? kOf(u.from) : 0, hiK = cu ? kOf(u.to) : 0;
   const cut = days === 0 ? last : last - days * 86400;
-  const ent = []; M.rows.forEach(r => { if (r.err) return; (r.trig || []).forEach(t => { if (t.ts >= cut) ent.push({ sym: r.sym, t }); }); });
+  const ent = []; M.rows.forEach(r => { if (r.err) return; (r.trig || []).forEach(t => { const k = scnDayKey(t.ts, daily); if (cu ? (k >= loK && k <= hiK) : t.ts >= cut) ent.push({ sym: r.sym, t }); }); });
   ent.sort((a, b) => (b.t.ts - a.t.ts) || (a.sym < b.sym ? -1 : 1));
-  let h = `<div class="scn-lbl">Show stocks that entered in</div><button type="button" class="scn-dd" aria-expanded="${u.dd}" onclick="scnSet(${id},'dd',${!u.dd})"><span>${cur[1]}</span><span aria-hidden="true">${u.dd ? '▴' : '▾'}</span></button>`;
-  if (u.dd) h += `<div class="scn-menu">${ranges.map(r => `<button type="button" class="scn-opt${r[0] === cur[0] ? ' cur' : ''}" onclick="scnSetRange(${id},${r[0]})"><span>${r[1]}</span>${r[0] === cur[0] ? '<span aria-hidden="true">✓</span>' : ''}</button>`).join('')}</div>`;
-  h += `<div class="scn-cap">Your choice is remembered for every scanner.</div>`;
+  let h = `<div class="scn-lbl">Show stocks that entered in</div><button type="button" class="scn-dd" aria-expanded="${u.dd}" onclick="scnSet(${id},'dd',${!u.dd})"><span>${cu ? 'Pick dates' : cur[1]}</span><span aria-hidden="true">${u.dd ? '▴' : '▾'}</span></button>`;
+  if (u.dd) h += `<div class="scn-menu">${ranges.map(r => `<button type="button" class="scn-opt${r[0] === cur[0] && !cu ? ' cur' : ''}" onclick="scnSetRange(${id},${r[0]})"><span>${r[1]}</span>${r[0] === cur[0] && !cu ? '<span aria-hidden="true">✓</span>' : ''}</button>`).join('')}<button type="button" class="scn-opt${cu ? ' cur' : ''}" onclick="scnPickDates(${id})"><span>Pick dates…</span>${cu ? '<span aria-hidden="true">✓</span>' : ''}</button></div>`;
+  h += cu ? `<div class="scn-dates"><label>From<input type="date" value="${u.from}" max="${lastStr}" onchange="scnSetDate(${id},'from',this.value)"></label><label>To<input type="date" value="${u.to}" max="${lastStr}" onchange="scnSetDate(${id},'to',this.value)"></label></div><div class="scn-cap">Trading days only: weekends and market holidays have no signals. Set both dates the same to see one day.</div>` : `<div class="scn-cap">Your choice is remembered for every scanner.</div>`;
   let meas = 0, up = 0, dn = 0; ent.forEach(e => { if (e.t.a5 != null) { meas++; if (e.t.a5 > 0) up++; else dn++; } });
   h += `<div class="scn-panel"><button type="button" class="scn-ph" aria-expanded="${u.past}" onclick="scnSet(${id},'past',${!u.past})"><span>Past signals in this range</span><span class="scn-dim">${ent.length} <span aria-hidden="true">${u.past ? '▴' : '▾'}</span></span></button>`;
   if (u.past) {
     let keys = [];
-    if (daily && M.sess && M.sess.length) keys = M.sess.filter(ts => ts >= cut).map(ts => scnDayKey(ts, true));
-    else { const k1 = scnDayKey(last, daily), k0 = Math.max(scnDayKey(cut, daily), k1 - 30); for (let k = k0; k <= k1; k++) keys.push(k); }
+    if (daily && M.sess && M.sess.length) keys = M.sess.map(ts => scnDayKey(ts, true)).filter(k => cu ? (k >= loK && k <= hiK) : k >= scnDayKey(cut, true));
+    else { const k1 = cu ? hiK : scnDayKey(last, daily), k0 = Math.max(cu ? loK : scnDayKey(cut, daily), k1 - 30); for (let k = k0; k <= k1; k++) keys.push(k); }
     const bk = keys.map(k => ({ k, up: 0, dn: 0, op: 0 })), by = {}; bk.forEach(b => { by[b.k] = b; });
     ent.forEach(e => { const b = by[scnDayKey(e.t.ts, daily)]; if (!b) return; if (e.t.a5 == null) b.op++; else if (e.t.a5 > 0) b.up++; else b.dn++; });
     const mx = Math.max(1, ...bk.map(b => b.up + b.dn + b.op));
@@ -4745,7 +4752,7 @@ function scnHistHtml(id, u, M, last) {
       <div class="scn-leg"><span><i style="background:var(--green)"></i>Up after 5</span><span><i style="background:var(--red)"></i>Down</span><span><i style="background:var(--border)"></i>Not yet 5 candles</span></div>`;
   }
   h += '</div>';
-  if (!ent.length) return h + `<div class="scn-empty"><b>Nothing entered in this range</b>Pick a longer range, or check Current for what is live now.</div>`;
+  if (!ent.length) return h + `<div class="scn-empty"><b>${cu ? 'No signals on these dates' : 'Nothing entered in this range'}</b>${cu ? 'Weekends and market holidays have none. Try nearby dates.' : 'Pick a longer range, or check Current for what is live now.'}</div>`;
   let lastDay = '', body = '';
   ent.slice(0, u.n).forEach(e => {
     const dk = scnDay(e.t.ts, daily);
