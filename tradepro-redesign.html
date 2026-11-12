@@ -413,12 +413,12 @@
   .sc2-list { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 10px; overflow: hidden; }
   .sc2-row { border-top: 1px solid var(--border-soft); }
   .sc2-row:first-child { border-top: none; }
-  .sc2-row > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 0; min-height: 54px; -webkit-tap-highlight-color: transparent; }
+  .sc2-row > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; padding: 0 12px 8px 0; min-height: 54px; -webkit-tap-highlight-color: transparent; }
   .sc2-row > summary::-webkit-details-marker { display: none; }
   .sc2-row > summary:hover { background: var(--surface-2); }
   .sc2-row[open] > summary { background: var(--surface-2); }
   .sc2-rbar { width: 3px; align-self: stretch; flex-shrink: 0; }
-  .sc2-main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 9px 0; }
+  .sc2-main { flex: 1 1 170px; min-width: 0; display: flex; flex-direction: column; padding: 9px 0 3px; }
   .sc2-name { font-size: 13.5px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .sc2-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sc2-row[open] .sc2-name { -webkit-line-clamp: unset; display: block; }
@@ -426,7 +426,7 @@
   .sc2-dots { display: flex; gap: 3px; flex-shrink: 0; }
   .sc2-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--text-faint); display: inline-block; box-sizing: border-box; }
   .sc2-dot.f { background: var(--green); border-color: var(--green); }
-  .sc2-st { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
+  .sc2-st { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .sc2-st.m { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
   .sc2-st.n { color: var(--text-faint); font-weight: 500; padding: 2px 0; }
   .sc2-chev { color: var(--text-faint); flex-shrink: 0; transition: transform .15s; }
@@ -557,6 +557,41 @@
   .rs-sym { border-top: 1px solid var(--border-soft); padding-top: 9px; }
   .rs-symhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
   .rs-cov { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+  /* Shared scanner result layout (Current / History) */
+  .scn-asof { font-size: 12px; color: var(--text-muted); margin: 2px 0 10px; line-height: 1.45; }
+  .scn-seg { display: flex; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 3px; margin: 0 0 10px; }
+  .scn-seg button { all: unset; cursor: pointer; flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; color: var(--text-muted); }
+  .scn-seg button.on { background: var(--surface); color: var(--accent); font-weight: 600; }
+  .scn-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .scn-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 12px; color: var(--text-muted); }
+  .scn-cap { font-size: 11.5px; color: var(--text-faint); margin: 6px 0; line-height: 1.4; }
+  .scn-lbl { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .scn-list { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 14px; overflow: hidden; }
+  .scn-r { border-top: 1px solid var(--border-soft); } .scn-r:first-child { border-top: 0; }
+  .scn-rh { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px 40px; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; min-height: 54px; cursor: pointer; }
+  .scn-nm b { display: block; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scn-nm small { display: block; font-size: 11.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scn-pc { text-align: right; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .scn-ib { all: unset; box-sizing: border-box; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--accent); color: var(--accent); border-radius: 10px; cursor: pointer; }
+  .scn-ib:focus-visible, .scn-rh:focus-visible, .scn-dd:focus-visible, .scn-opt:focus-visible, .scn-ph:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .scn-det { padding: 2px 14px 12px; background: var(--surface); }
+  .scn-g { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; padding-top: 8px; }
+  .scn-g b { display: block; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; } .scn-g span { font-size: 11.5px; color: var(--text-faint); }
+  .scn-dh { padding: 6px 14px; background: var(--surface); font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border-soft); } .scn-dh:first-child { border-top: 0; }
+  .scn-up { color: var(--green); } .scn-dn { color: var(--red); } .scn-na { color: var(--text-faint); }
+  .scn-dd { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; justify-content: space-between; width: 100%; background: var(--surface-2); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 600; }
+  .scn-menu { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 6px 0 8px; background: var(--surface-2); }
+  .scn-opt { all: unset; box-sizing: border-box; cursor: pointer; display: flex; justify-content: space-between; width: 100%; padding: 11px 12px; font-size: 14px; border-top: 1px solid var(--border-soft); } .scn-opt:first-child { border-top: 0; }
+  .scn-opt.cur { background: var(--surface); color: var(--accent); }
+  .scn-panel { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 12px; padding: 4px 12px; margin: 0 0 10px; }
+  .scn-ph { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 40px; font-size: 13px; font-weight: 600; } .scn-dim { font-weight: 400; color: var(--text-muted); }
+  .scn-pt { font-size: 12px; color: var(--text-muted); margin: 4px 0 8px; }
+  .scn-bars { display: flex; align-items: flex-end; gap: 3px; height: 64px; } .scn-bw { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; } .scn-bw i { display: block; margin-top: 1px; border-radius: 1px; }
+  .scn-leg { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); margin: 8px 0 8px; } .scn-leg i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; }
+  .scn-empty { padding: 18px 14px; text-align: center; font-size: 12.5px; color: var(--text-muted); line-height: 1.5; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 14px; } .scn-empty b { display: block; font-size: 14px; color: var(--text); margin-bottom: 2px; }
+  .scn-foot { font-size: 11.5px; color: var(--text-faint); margin: 8px 0 0; text-align: center; }
+  .scn-more { width: 100%; margin-top: 8px; }
+  .scn-sk { height: 14px; border-radius: 7px; background: var(--border-soft); margin: 12px 0; width: 100%; }
   .rs-line { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
   .rs-tbl { overflow-x: auto; margin-top: 6px; -webkit-overflow-scrolling: touch; }
   .rs-tbl table { border-collapse: collapse; min-width: 100%; font-family: var(--mono); font-size: 11.5px; }
@@ -3131,28 +3166,14 @@ function renderSScans() {
   const cards = sscans.map((sc, i) => {
     const r = sscanResults[i];
     const sideCol = sc.side === 'Sell' ? 'var(--red)' : 'var(--green)';
-    let res = '';
-    if (r) {
-      const bigScan = r.rows.length > 12, shownRows = bigScan ? r.rows.filter(x => x && x.ok).slice(0, 80) : r.rows;
-      const bigHead = bigScan ? `<div class="strat-legs" style="margin-top:6px"><b>${r.rows.filter(x => x && x.ok).length}</b> of ${r.rows.length} match${r.rows.some(x => x && x.err) ? ' · ' + r.rows.filter(x => x && x.err).length + ' could not be scanned' : ''}${r.rows.filter(x => x && x.ok).length > 80 ? ' · showing the first 80' : ''}</div>` : '';
-      res = bigHead + shownRows.map(row => {
-        if (row.err) return `<div class="strat-legs" style="margin-top:6px"><b>${row.und}</b> — could not scan: ${sscanEsc(row.err)}</div>`;
-        const chip = row.ok ? `<span style="color:var(--green); font-weight:700">MATCH</span>` : `<span style="color:var(--text-faint); font-weight:600">no match</span>`;
-        const lines = row.details.map(d => `<div style="font-size:11.5px; color:${d.ok ? 'var(--green)' : 'var(--text-muted)'}">${d.ok ? '✓' : '✗'} ${sscanEsc(d.text)}</div>`).join('');
-        const when = row.lastActSec ? `<div style="font-size:11.5px; margin-top:4px; color:var(--text-muted)">${row.ok ? 'Active since' : 'Last activated'} <b>${sscanTime(row.lastActSec)}</b> · ${row.barsSince === 0 ? 'this candle' : row.barsSince + ' candle' + (row.barsSince > 1 ? 's' : '') + ' ago'} · ${row.actCount} activation${row.actCount > 1 ? 's' : ''} in the last ~400 candles</div>` : `<div style="font-size:11.5px; margin-top:4px; color:var(--text-faint)">Not activated in the last ~400 candles</div>`;
-        const open = sc.strat === 'Guppy crossover' ? (isIndiaUnd(row.und) ? `<button class="strat-chart-btn" onclick="openIndiaChart('${row.und}',${i})">Open on chart (Bullish + Bearish) ↗</button>` : `<button class="strat-chart-btn" onclick="openGuppyChart('${row.und}',${i})">Open on live chart (Bullish + Bearish) ↗</button>`) : ((row.actCount || row.ok) ? `<button class="strat-chart-btn" onclick="openSScanChart(${i},'${row.und}')">Show ${sscanEsc(sc.side)} ${sscanEsc(sc.strat)} chart with activations ↗</button>` : '');
-        return `<div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border)">
-          <div style="display:flex; justify-content:space-between; font-size:13px"><span><b>${row.und}</b> · close ${sscanFmt(row.price)}</span>${chip}</div>
-          ${lines}${when}${open}</div>`;
-      }).join('') + `<div style="font-size:10.5px; color:var(--text-faint); margin-top:6px">scanned ${new Date(r.at).toISOString().slice(11,19)} UTC</div>`;
-    }
+    const key = 's:' + sc.name, sub = scSubOf(key);
+    const res = r && sub !== 'perf' ? scnHtml(key, scnModelS(sc, i, r), sub) : '';
     const cat = sscanDeriveCat(sc), catCol = scCatInfo(cat).col;
     const rows = r ? r.rows : [], hit = rows.filter(x => x && x.ok).map(x => x.und);
     let best = null; rows.forEach(x => { if (x && x.details && x.details.length) { const n = x.details.filter(d => d.ok).length; if (!best || n > best.n) best = { n, t: x.details.length }; } });
     metas[i] = { match: hit.length > 0, cat };
     const dots = best ? Array.from({ length: Math.min(best.t, 6) }, (_, k) => `<i class="sc2-dot${k < best.n ? ' f' : ''}"></i>`).join('') : '';
     const chip = !r ? '<span class="sc2-st n">Not scanned</span>' : hit.length ? `<span class="sc2-st m">Match · ${hit.length > 3 ? hit.slice(0, 3).join(' + ') + ' +' + (hit.length - 3) : hit.join(' + ')}</span>` : `<span class="sc2-st n">${best && best.n ? best.n + ' of ' + best.t : 'No match'}</span>`;
-    const key = 's:' + sc.name, sub = scSubOf(key);
     return `<details class="sc2-row" data-k="${sscanEsc(key)}" ${scOpen[key] ? 'open' : ''} ontoggle="scToggle(this)">
       <summary><span class="sc2-rbar" style="background:${catCol}"></span>
         <span class="sc2-main"><span class="sc2-name">${sscanEsc(sc.name)}</span>
@@ -3606,7 +3627,8 @@ function sscanEval(candles, conds, xr, slr) {
   const now = at(n), prev = n > 0 ? at(n - 1) : null;
   const acts = sscanSignals(candles, conds, xr, 0, slr).entries;   // one entry per cycle (exit must fire before the next)
   const lastIdx = acts.length ? acts[acts.length - 1] : -1;
-  return { details: now, allNow: now.every(d => d.ok), allPrev: prev ? prev.every(d => d.ok) : false, price: candles[n].c,
+  let days = 0; for (let i = n; i >= 0; i--) { if (conds.every((c, j) => { const v = lines[j][i]; return v != null && sscanCmp(c, candles[i].c, v, c.op === 'below'); })) days++; else break; }
+  return { acts, days, details: now, allNow: now.every(d => d.ok), allPrev: prev ? prev.every(d => d.ok) : false, price: candles[n].c,
            lastActSec: lastIdx >= 0 ? liveTimeToSec(candles[lastIdx].t) : null, barsSince: lastIdx >= 0 ? n - lastIdx : null, actCount: acts.length };
 }
 async function runSScan(i) {
@@ -3615,7 +3637,9 @@ async function runSScan(i) {
   sscanResults[i] = { at: Date.now(), rows: sc.und.split(',').map(u => ({ und: u, ok: false, price: null, details: [{ ok: false, text: 'scanning…' }] })) };
   renderSScans();
   const list = sc.und.split(','), rows = new Array(list.length);
+  let sess = null;
   await indiaListReady;
+  const idx = isIndiaUnd(list[0]) ? await scnIdx() : null;
   const workers = isIndiaUnd(list[0]) ? 8 : 1;   // India files are static (fast); Delta stays one-at-a-time
   let next = 0, done = 0;
   const work = async () => {
@@ -3625,13 +3649,15 @@ async function runSScan(i) {
         const candles = await sscanCandles(und, sc.tf);
         if (candles.length < 5) throw new Error('not enough candles returned');
         const ev = sscanEval(candles, sc.conds, sscanExitRule(sc), sscanSlRule(sc));
-        rows[k] = { und, price: ev.price, details: ev.details, ok: sc.fresh ? ev.allNow && !ev.allPrev : ev.allNow, lastActSec: ev.lastActSec, barsSince: ev.barsSince, actCount: ev.actCount };
+        const tsOf = j => liveTimeToSec(candles[j].t);
+        if (!sess) sess = candles.slice(-70).map((c, j, a) => tsOf(candles.length - a.length + j));
+        rows[k] = { und, price: ev.price, details: ev.details, ok: sc.fresh ? ev.allNow && !ev.allPrev : ev.allNow, allNow: ev.allNow, days: ev.days, lastActSec: ev.lastActSec, barsSince: ev.barsSince, actCount: ev.actCount, x: candles.length > 25 ? rsExtras(candles) : null, trig: ev.acts.map(j => scnTrig(candles, j, tsOf)), to: tsOf(candles.length - 1) };
       } catch (e) { rows[k] = { und, err: liveErrText(e) }; }
       done++;
     }
   };
   await Promise.all(Array.from({ length: workers }, work));
-  sscanResults[i] = { at: Date.now(), rows };
+  sscanResults[i] = { at: Date.now(), rows, sess, idx };
   renderSScans();
 }
 async function runAllSScans(auto) {
@@ -4149,8 +4175,8 @@ function scPerfStratHtml(sc, i) {
   return chips + sp2CtlHtml() + `<div style="margin-top:8px">${sp2BodyHtml(cur, d)}</div><div style="margin-top:10px"><button class="btn-ghost" onclick="scPerfRefreshOne(${i},'${cur.und}')">Refresh \u21bb</button></div>`;
 }
 function scSubSet(btn, v) { const d = btn.closest('details'); if (!d) return; scSub[d.dataset.k] = v; renderSScans(); }
-function scSubOf(k) { return (typeof scSub === 'object' && scSub && scSub[k] === 'perf' && typeof scOpen === 'object' && scOpen[k]) ? 'perf' : 'sig'; }
-function scSubBar(cur) { return `<div class="sc2-chips" style="margin:0 0 10px"><button class="sc2-chip${cur !== 'perf' ? ' on' : ''}" onclick="scSubSet(this,'sig')">Signals</button><button class="sc2-chip${cur === 'perf' ? ' on' : ''}" onclick="scSubSet(this,'perf')">Performance</button></div>`; }
+function scSubOf(k) { return (typeof scSub === 'object' && scSub && (scSub[k] === 'perf' || scSub[k] === 'his') && typeof scOpen === 'object' && scOpen[k]) ? scSub[k] : 'sig'; }
+function scSubBar(cur) { return `<div class="sc2-chips" style="margin:0 0 10px"><button class="sc2-chip${cur === 'sig' ? ' on' : ''}" onclick="scSubSet(this,'sig')">Current</button><button class="sc2-chip${cur === 'his' ? ' on' : ''}" onclick="scSubSet(this,'his')">History</button><button class="sc2-chip${cur === 'perf' ? ' on' : ''}" onclick="scSubSet(this,'perf')">Performance</button></div>`; }
 /* Custom scanners: what price did after each trigger (the scanner's own history), scored in the direction of its category. */
 function rsPerfHtml(sc, R) {
   if (!R) return `<div class="strat-legs">Scan it once to see how its past triggers played out.</div>`;
@@ -4481,7 +4507,7 @@ function rsScanCandles(sc, base, baseTf) {
     const px = base[i].c, after = {}; RS_AFTER.forEach(N => { after[N] = i + N < n ? (base[i + N].c / px - 1) * 100 : null; });
     let up = null, dn = null, avail = Math.min(10, n - 1 - i);
     if (avail > 0) { let hi = -Infinity, lo = Infinity; for (let j = i + 1; j <= i + avail; j++) { if (base[j].h > hi) hi = base[j].h; if (base[j].l < lo) lo = base[j].l; } up = (hi / px - 1) * 100; dn = (lo / px - 1) * 100; }
-    triggers.push({ ts: base[i].ts, price: px, after, up, dn, avail });
+    triggers.push(Object.assign({ ts: base[i].ts, price: px, after, up, dn, avail }, scnTrig(base, i, k => base[k].ts)));
   }
   const firstOk = ok.findIndex(x => x !== null), now = n ? ok[n - 1] : null;
   let since = null, days = 0; if (now === true) { let j = n - 1; while (j > 0 && ok[j - 1] === true) j--; since = base[j].ts; days = n - j; }
@@ -4575,16 +4601,17 @@ async function rsFetchBase(sym, tf, count) {
 async function rsRun(sc) {
   const tf = rsBaseTf(sc.rules), need = rsNeedCandles(sc.rules, tf), count = Math.min(RS_FETCH_CAP, Math.max(500, need + 1200));
   const warn = need > RS_FETCH_CAP ? `These rules need about ${need.toLocaleString()} ${RS_TF_LABEL[tf].toLowerCase()} candles of history, but only ${RS_FETCH_CAP.toLocaleString()} are read, so they cannot be evaluated. Use a longer timeframe or a shorter indicator length.` : '';
-  const syms = sc.symbols || [], results = new Array(syms.length); let nx = 0;
+  const syms = sc.symbols || [], results = new Array(syms.length); let nx = 0, sess = null;
   const work = async () => {
     while (nx < syms.length) {
       const k = nx++, sym = syms[k];
-      try { const base = await rsFetchBase(sym, tf, count); const r = rsScanCandles(sc, base, tf); r.sym = sym; results[k] = r; }
+      try { const base = await rsFetchBase(sym, tf, count); if (!sess && base.length) sess = base.slice(-70).map(c => c.ts); const r = rsScanCandles(sc, base, tf); r.sym = sym; results[k] = r; }
       catch (e) { results[k] = { sym, err: typeof liveErrText === 'function' ? liveErrText(e) : String(e && e.message || e) }; }
     }
   };
   await Promise.all(Array.from({ length: Math.min(8, syms.length) }, work));
-  return { at: Date.now(), baseTf: tf, need, count, warn, results, unit: rsUnit(sc.market) };
+  const idx = syms.length && isIndiaUnd(syms[0]) ? await scnIdx() : null;
+  return { at: Date.now(), baseTf: tf, need, count, warn, results, unit: rsUnit(sc.market), sess, idx };
 }
 async function rsRunOne(id) {
   const sc = rscans.find(x => x.id === id); if (!sc || rsRunning[id]) return;
@@ -4612,144 +4639,164 @@ function rsStats(trs, N) {
 }
 function rsSetWin(k) { rsWin = k; renderSScans(); rbPreviewRefresh(); }
 function rsUnit(m) { return (RS_MARKETS[m] || RS_MARKETS.crypto).unit || 'coin'; }
-function rsSymHtml(r, R) {
-  if (r.err) return `<div class="rs-sym"><div class="rs-symhead"><b>${sscanEsc(r.sym)}</b><span class="sc2-st n">No data</span></div><div class="rs-line">No data from the feed yet: ${sscanEsc(r.err)}</div></div>`;
-  const tf = R.baseTf, yr = r.to - r.from > 300 * 86400, F = (t) => rsFmt(t, tf, yr), trs = rsInWin(r.triggers), chip = r.now === true ? `<span class="sc2-st m">Match${r.since ? ' since ' + F(r.since) : ''}</span>` : r.now === false ? '<span class="sc2-st n">No match now</span>' : '<span class="sc2-st n">Not enough history</span>';
-  let cov = `Data ${F(r.from)} \u2192 ${F(r.to)} \u00b7 ${r.n.toLocaleString()} ${RS_TF_LABEL[tf].toLowerCase()} candles`;
-  if (r.evalFrom && r.from != null && r.evalFrom - r.from > 0.3 * (r.to - r.from)) cov += ` \u00b7 rules computable from ${F(r.evalFrom)}`;
-  let line;
-  if (trs.length) {
-    const st = rsStats(trs, 5);
-    line = `Triggered <b>${trs.length}</b> time${trs.length === 1 ? '' : 's'}` + (st ? `. After 5 candles: <span class="rs-up">up ${st.up}</span> \u00b7 <span class="rs-dn">down ${st.dn}</span> \u00b7 median ${rsPct(st.med)} (${st.n} measured)` : '. Too recent to measure yet');
-  } else if (r.triggers.length) {
-    const lastT = r.triggers[r.triggers.length - 1];
-    line = `No triggers in this window. Last triggered <b>${F(lastT.ts)}</b>, ${r.triggers.length} time${r.triggers.length === 1 ? '' : 's'} in all available data.`;
-  } else line = 'Has not triggered in the available data.';
-  let tbl = '';
-  if (trs.length) {
-    const rows = trs.slice().reverse().slice(0, 15).map(t => `<tr><td>${F(t.ts)}</td><td>${rsPx(t.price)}</td><td>${rsPct(t.after[1])}</td><td>${rsPct(t.after[3])}</td><td>${rsPct(t.after[5])}</td><td>${rsPct(t.after[10])}</td><td>${rsPct(t.up)}</td><td>${rsPct(t.dn)}</td></tr>`).join('');
-    tbl = `<div class="rs-tbl"><table><thead><tr><th>Triggered</th><th>Price</th><th>+1</th><th>+3</th><th>+5</th><th>+10</th><th>High</th><th>Low</th></tr></thead><tbody>${rows}</tbody></table></div>` +
-      (trs.length > 15 ? `<div class="rs-line">${trs.length - 15} earlier trigger${trs.length - 15 === 1 ? '' : 's'} not shown.</div>` : '') +
-      `<div class="rs-line">+N = move after N ${RS_TF_LABEL[tf].toLowerCase()} candles, measured from the trigger candle\u2019s close. High / Low = best and worst point within the next 10 candles.${RS_TF[tf] < 86400 ? ' Times in IST.' : ''}</div>`;
-  }
-  const openBtn = isIndiaUnd(r.sym) ? `<button type="button" class="inx-btn" style="width:100%;margin-top:10px" onclick="openIndiaChart('${sscanEsc(r.sym).replace(/'/g, '')}')">Open chart</button>` : '';
-  return `<div class="rs-sym"><div class="rs-symhead"><b>${sscanEsc(r.sym)}</b>${chip}</div><div class="rs-cov">${cov}</div><div class="rs-line">${line}</div>${tbl}${openBtn}</div>`;
-}
-function rsBarsHtml(R) {
-  const stamps = []; R.results.forEach(r => { if (!r.err) rsInWin(r.triggers).forEach(t => stamps.push(t.ts)); });
-  if (!stamps.length) return '';
-  const monthly = rsWin === 'all' || rsWin === '90', now = new Date(), bk = [];
-  const mkey = ts => { const d = new Date(ts * 1000); return d.getUTCFullYear() * 12 + d.getUTCMonth(); };
-  if (monthly) for (let k = 11; k >= 0; k--) { const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - k, 1)); bk.push({ key: d.getUTCFullYear() * 12 + d.getUTCMonth(), label: RS_MON[d.getUTCMonth()], n: 0 }); }
-  else for (let k = +rsWin - 1; k >= 0; k--) { const d = new Date(Date.now() - k * 86400000); bk.push({ key: Math.floor(d.getTime() / 86400000), label: String(d.getUTCDate()), n: 0 }); }
-  let older = 0; stamps.forEach(ts => { const b = bk.find(x => x.key === (monthly ? mkey(ts) : Math.floor(ts / 86400))); if (b) b.n++; else older++; });
-  const max = Math.max(1, ...bk.map(b => b.n)), every = bk.length > 12 ? 5 : 1;
-  return `<div><div class="rs-line" style="margin:0">Fired per ${monthly ? 'month, last 12 months' : 'day'}</div>
-    <div class="rs-bars">${bk.map(b => `<div class="rs-bar${b.n ? '' : ' z'}" title="${b.label}: ${b.n}">${b.n && bk.length <= 12 ? b.n : ''}<i style="height:${b.n ? Math.max(4, Math.round(b.n / max * 40)) : 1}px"></i></div>`).join('')}</div>
-    <div class="rs-bl">${bk.map((b, i) => `<span>${i % every === 0 || i === bk.length - 1 ? b.label : ''}</span>`).join('')}</div>${older ? `<div class="rs-line">${older} more before that.</div>` : ''}</div>`;
-}
-/* ---- Scanner results v2 (big lists such as Nifty 500): track record, graded setups, trade plan ---- */
-var rsView = { f: 'ab', n: 15 }, RS_RISK = 5000;
 function rsClamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
 function rsExtras(base) {
   const n = base.length; if (n < 25) return null;
   const last = base[n - 1], prev = base[n - 2];
   let vs = 0; for (let i = n - 21; i < n - 1; i++) vs += base[i].v || 0;
-  const volAvg = vs / 20; let atr = 0;
-  for (let i = n - 14; i < n; i++) atr += Math.max(base[i].h - base[i].l, Math.abs(base[i].h - base[i - 1].c), Math.abs(base[i].l - base[i - 1].c));
-  return { px: last.c, chg: (last.c / prev.c - 1) * 100, volRatio: volAvg > 0 ? (last.v || 0) / volAvg : null, atr: atr / 14, ret20: (last.c / base[n - 21].c - 1) * 100, spark: base.slice(-10).map(c => c.c) };
+  const volAvg = vs / 20;
+  return { px: last.c, chg: (last.c / prev.c - 1) * 100, volRatio: volAvg > 0 ? (last.v || 0) / volAvg : null, ret20: (last.c / base[n - 21].c - 1) * 100, spark: base.slice(-10).map(c => c.c) };
 }
-function rsIdxRet20() { const h = rsCache['IN|NIFTY']; if (!h || h.candles.length < 22) return null; const c = h.candles; return (c[c.length - 1].c / c[c.length - 21].c - 1) * 100; }
-function rsGrade(r, idx) {
-  const x = r.x; if (!x) return null;
-  const vol = x.volRatio == null ? 0 : rsClamp((x.volRatio - 0.8) / 1.2, 0, 1) * 40, rel = x.ret20 - (idx || 0), str = rsClamp(rel / 6, 0, 1) * 35;
-  const age = r.days || 1, fresh = age <= 1 ? 25 : age === 2 ? 18 : age <= 4 ? 10 : 4, score = Math.round(vol + str + fresh);
-  return { score, g: score >= 70 ? 'A' : score >= 50 ? 'B' : 'C', vol, str, fresh, rel };
+/* Nifty's own 20-day move, so a stock's move can be shown next to the index (India scans only). */
+async function scnIdx() { try { const b = await rsFetchBase('NIFTY', '1d', 0), n = b.length; return n > 21 ? (b[n - 1].c / b[n - 21].c - 1) * 100 : null; } catch (e) { return null; } }
+/* What happened to one signal since it fired: facts only (no stops, targets, grades or statuses). */
+function scnTrig(base, i, tsOf) {
+  const n = base.length, c = base[i].c, age = n - 1 - i;
+  let hi = null, lo = null;
+  if (age > 0) { let h = -Infinity, l = Infinity; for (let j = i + 1; j < n; j++) { if (base[j].h > h) h = base[j].h; if (base[j].l < l) l = base[j].l; } hi = (h / c - 1) * 100; lo = (l / c - 1) * 100; }
+  let sp = null;
+  if (age <= 70) { let arr = []; for (let j = Math.max(0, i - 4); j < n; j++) arr.push(base[j].c); if (arr.length > 12) { const st = Math.ceil(arr.length / 12); arr = arr.filter((_, k) => k % st === 0 || k === arr.length - 1); } sp = arr; }
+  return { ts: tsOf(i), price: c, now: (base[n - 1].c / c - 1) * 100, hi, lo, age, sp, a5: i + 5 < n ? (base[i + 5].c / c - 1) * 100 : null };
 }
-function rsPlan(x) {
-  const risk = 1.5 * x.atr; if (!(risk > 0)) return null;
-  return { stop: x.px - risk, tgt: x.px + 2 * risk, stopPct: -risk / x.px * 100, tgtPct: 2 * risk / x.px * 100, qty: Math.floor(RS_RISK / risk) };
-}
-function rsRecord(R) {
-  const bins = new Array(9).fill(0); let n = 0, w = 0, sum = 0, sigs = 0;
-  R.results.forEach(r => { if (r.err) return; sigs += r.triggers.length; r.triggers.forEach(t => { const v = t.after[5]; if (v == null) return; n++; if (v > 0) w++; sum += v; bins[rsClamp(Math.floor((v + 8) / (16 / 9)), 0, 8)]++; }); });
-  return { sigs, n, win: n ? w / n * 100 : null, avg: n ? sum / n : null, bins };
-}
-function rsSetView(k) { rsView.f = k; rsView.n = 15; renderSScans(); }
-function rsMore() { rsView.n += 15; renderSScans(); }
-function rsSpark(a) {
-  if (!a || a.length < 2) return '';
+
+/* ======================================================================
+   SHARED SCANNER RESULT LAYOUT
+   Every scanner (strategy scans and rule-builder scans, today and in future) is turned into the same
+   model by a small adapter and drawn by scnHtml(). A new scanner only has to supply:
+     rows: [{ sym, now, days, x:{px,chg,volRatio,ret20,spark}, trig:[{ts,price,now,hi,lo,age,sp,a5}], to, err }]
+     plus { daily, tf, unit, sess, idx, chart(sym) }.
+   The app shows facts only. It never grades stocks and never suggests a stop, target or exit.
+   ====================================================================== */
+var SCN_RANGE_KEY = 'tradepro_scn_range_v1', scnRange = 7, scnUi = {}, scnKeys = [];
+try { const v = localStorage.getItem(SCN_RANGE_KEY); if (v != null && [0, 1, 7, 14, 30, 90].indexOf(+v) >= 0) scnRange = +v; } catch (e) { /* storage unavailable */ }
+var SCN_DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+var SCN_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v3M7 16v4M17 3v5M17 15v6"/><rect x="5" y="7" width="4" height="9" rx="1"/><rect x="15" y="8" width="4" height="7" rx="1"/></svg>';
+function scnReg(key) { let i = scnKeys.indexOf(key); if (i < 0) { scnKeys.push(key); i = scnKeys.length - 1; } return i; }
+function scnU(key) { return scnUi[key] || (scnUi[key] = { f: 'new', sort: 'v', open: {}, n: 20, past: false, dd: false, sdd: false, seg: 'cur' }); }
+function scnRefresh() { renderSScans(); try { if (typeof rbAutoR !== 'undefined' && rbAutoR) rbPaintResults(); } catch (e) { /* builder closed */ } }
+function scnSet(id, k, v) { const u = scnU(scnKeys[id]); u[k] = v; if (k === 'f' || k === 'sort') u.n = 20; scnRefresh(); }
+function scnTog(id, rk) { const u = scnU(scnKeys[id]); u.open[rk] = !u.open[rk]; scnRefresh(); }
+function scnMore(id) { scnU(scnKeys[id]).n += 20; scnRefresh(); }
+function scnSetRange(id, v) { scnRange = v; try { localStorage.setItem(SCN_RANGE_KEY, String(v)); } catch (e) { /* ignore */ } scnU(scnKeys[id]).dd = false; scnRefresh(); }
+function scnDay(ts, daily) { const d = new Date((daily ? ts : ts + 19800) * 1000); return SCN_DOW[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + RS_MON[d.getUTCMonth()]; }
+function scnDayKey(ts, daily) { return Math.floor((daily ? ts : ts + 19800) / 86400); }
+function scnPct(v) { return v == null ? '<span class="scn-na">—</span>' : `<span class="${v > 0 ? 'scn-up' : v < 0 ? 'scn-dn' : ''}">${v > 0 ? '+' : ''}${v.toFixed(2)}%</span>`; }
+function scnSpark(a) {
+  if (!a || a.length < 2) return '<span></span>';
   const lo = Math.min(...a), hi = Math.max(...a), rg = hi - lo || 1;
-  return `<svg width="52" height="22" viewBox="0 0 52 22" aria-hidden="true"><polyline points="${a.map((v, i) => (i * 52 / (a.length - 1)).toFixed(1) + ',' + (20 - (v - lo) / rg * 18).toFixed(1)).join(' ')}" fill="none" stroke="${a[a.length - 1] >= a[0] ? 'var(--green)' : 'var(--red)'}" stroke-width="2"/></svg>`;
+  return `<svg width="64" height="24" viewBox="0 0 64 24" aria-hidden="true"><polyline points="${a.map((v, i) => (1 + i * 62 / (a.length - 1)).toFixed(1) + ',' + (22 - (v - lo) / rg * 20).toFixed(1)).join(' ')}" fill="none" stroke="${a[a.length - 1] >= a[0] ? 'var(--green)' : 'var(--red)'}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
-function rsBar(label, val, pct, note) { return `<div class="rs2-fb"><div><span>${label}</span><b>${val}</b></div><i><u style="width:${Math.round(rsClamp(pct, 0, 1) * 100)}%"></u></i>${note ? `<em>${note}</em>` : ''}</div>`; }
-function rsStockHtml(r, R, idx) {
-  const x = r.x, g = r.gr, pl = rsPlan(x), isNew = r.since != null && r.since === r.to, yr = true;
-  const trs = r.triggers, meas = trs.filter(t => t.after[5] != null), won = meas.filter(t => t.after[5] > 0).length, avg = meas.length ? meas.reduce((s, t) => s + t.after[5], 0) / meas.length : null;
-  const rows = trs.slice().reverse().slice(0, 5).map(t => `<tr><td>${rsFmt(t.ts, R.baseTf, yr)}</td><td>${rsPx(t.price)}</td><td>${rsPct(t.after[1])}</td><td>${rsPct(t.after[3])}</td><td>${rsPct(t.after[5])}</td><td>${rsPct(t.after[10])}</td></tr>`).join('');
-  return `<details class="rs2-s"><summary><span class="rs2-g g${g.g}">${g.g}</span>
-    <span class="rs2-nm"><b>${sscanEsc(r.sym)}</b><small>${isNew ? 'New today' : 'Day ' + (r.days || 1)} · Vol ${x.volRatio == null ? '\u2014' : x.volRatio.toFixed(1) + 'x'} · Score ${g.score}</small></span>
-    ${rsSpark(x.spark)}<span class="rs2-px"><b>${rsPx(x.px)}</b>${rsPct(x.chg)}</span></summary>
-    <div class="rs2-body">
-      <div class="rs2-lbl">Why it grades ${g.g}</div>
-      ${rsBar('Volume vs 20-day average', x.volRatio == null ? '\u2014' : x.volRatio.toFixed(1) + 'x', g.vol / 40)}
-      ${rsBar(idx == null ? '20-day move' : 'Strength vs Nifty (20D)', (g.rel >= 0 ? '+' : '') + g.rel.toFixed(1) + '%', g.str / 35)}
-      ${rsBar('Signal freshness', isNew ? 'Today' : 'Day ' + (r.days || 1), g.fresh / 25)}
-      ${pl ? `<div class="rs2-lbl" style="margin-top:12px">Trade plan <span>risk \u20b9${RS_RISK.toLocaleString()}</span></div>
-      <div class="rs2-plan"><div><small>Entry</small><b>${rsPx(x.px)}</b></div><div><small>Quantity</small><b>${pl.qty.toLocaleString()} shares</b></div>
-      <div><small>Stop (1.5\u00d7 ATR)</small><b class="rs-dn">${rsPx(pl.stop)} \u00b7 ${pl.stopPct.toFixed(1)}%</b></div><div><small>Target (2R)</small><b class="rs-up">${rsPx(pl.tgt)} \u00b7 +${pl.tgtPct.toFixed(1)}%</b></div></div>` : ''}
-      <div class="rs2-lbl" style="margin-top:12px">This stock on this scanner</div>
-      <div class="rs-line" style="margin:2px 0 6px">${meas.length ? `<b>${won} of ${meas.length}</b> past signals were up after 5 candles \u00b7 average ${rsPct(avg)}` : 'No past signals old enough to measure.'}</div>
-      ${rows ? `<div class="rs-tbl"><table><thead><tr><th>Triggered</th><th>Price</th><th>+1</th><th>+3</th><th>+5</th><th>+10</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}
-      ${isIndiaUnd(r.sym) ? `<button type="button" class="inx-btn" style="width:100%;margin-top:12px;background:var(--accent);border-color:var(--accent);color:var(--on-accent)" onclick="openIndiaChart('${sscanEsc(r.sym).replace(/'/g, '')}')">Open chart</button>` : ''}
-    </div></details>`;
+function scnRangeList(M) { return (M.daily ? [[0, 'Last close']] : [[0, 'Last candle'], [1, 'Last 24 hours']]).concat([[7, 'Last 1 week'], [14, 'Last 2 weeks'], [30, 'Last 1 month'], [90, 'Last 3 months']]); }
+function scnRowHtml(id, rk, name, sub, pct, spark, chartJs, det, isOpen) {
+  const nm = sscanEsc(name);
+  return `<div class="scn-r"><div class="scn-rh" role="button" tabindex="0" aria-expanded="${isOpen ? 'true' : 'false'}" onclick="scnTog(${id},'${sscanEsc(rk)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}">
+    <span class="scn-nm"><b>${nm}</b><small>${sub}</small></span><span class="scn-pc">${pct}</span>${spark}
+    ${chartJs ? `<button type="button" class="scn-ib" aria-label="Open ${nm} on chart" onclick="event.stopPropagation();${chartJs}">${SCN_ICON}</button>` : '<span></span>'}</div>
+    ${isOpen ? `<div class="scn-det">${det}</div>` : ''}</div>`;
 }
-function rsBigHtml(R) {
-  const U = R.unit || 'stock', idx = rsIdxRet20(), rec = rsRecord(R), ok = R.results.filter(r => !r.err), tot = ok.length;
-  const matches = ok.filter(r => r.now === true), pct = tot ? matches.length / tot * 100 : 0, isNew = r => r.since != null && r.since === r.to;
-  matches.forEach(r => { r.gr = rsGrade(r, idx); });
-  const graded = matches.filter(r => r.gr), newN = graded.filter(isNew).length, abN = graded.filter(r => r.gr.g !== 'C').length;
-  let list = graded; if (rsView.f === 'ab') list = list.filter(r => r.gr.g !== 'C'); else if (rsView.f === 'new') list = list.filter(isNew);
-  list = list.slice().sort((a, b) => b.gr.score - a.gr.score);
-  const mx = Math.max(1, ...rec.bins), hist = rec.bins.map((n, i) => `<i style="height:${Math.max(3, Math.round(n / mx * 34))}px;background:var(${i < 4 ? '--red' : '--green'});opacity:${i === 4 ? .55 : .9}"></i>`).join('');
-  const chip = (k, l) => `<button class="sc2-chip${rsView.f === k ? ' on' : ''}" onclick="rsSetView('${k}')">${l}</button>`;
-  const wchips = [['7', '7D'], ['30', '30D'], ['90', '90D'], ['all', 'All data']].map(([k, l]) => `<button class="sc2-chip${rsWin === k ? ' on' : ''}" onclick="rsSetWin('${k}')">${l}</button>`).join('');
-  return `<div class="rs-res">
-    <div class="rs2-card"><div class="rs2-big"><b>${matches.length}</b> of ${tot} ${U}s match</div>
-      <div class="rs2-meter"><u style="width:${pct.toFixed(1)}%"></u></div>
-      <div class="rs2-meta"><span><b>${newN}</b> new on last close</span><span><b>${abN}</b> graded A or B</span></div></div>
-    <div class="rs2-card"><div class="rs2-lbl">Track record \u00b7 all available data</div>
-      ${rec.win == null ? '<div class="rs-line">Not enough history to measure yet.</div>' : `<div class="rs2-stats"><div><b class="${rec.win >= 50 ? 'rs-up' : 'rs-dn'}">${rec.win.toFixed(0)}%</b><small>up after 5 candles</small></div><div><b>${rsPct(rec.avg)}</b><small>average move</small></div><div><b>${rec.sigs.toLocaleString()}</b><small>signals</small></div></div>
-      <div class="rs2-hist" role="img" aria-label="Distribution of moves after 5 candles">${hist}</div><div class="rs2-hl"><span>\u22128%</span><span>0</span><span>+8%</span></div>`}
-      ${pct > 40 ? `<div class="rs2-warn">This rule matches ${pct.toFixed(0)}% of ${U}s, so it is not narrowing much. Ranking matters more than matching: start with the A and B grades, or add a volume or trend-strength rule.</div>` : ''}</div>
-    <div class="sc2-chips" style="margin:0">${chip('ab', 'A + B grade ' + abN)}${chip('new', 'New today ' + newN)}${chip('all', 'All matches ' + graded.length)}</div>
-    <div class="rs2-list">${list.length ? list.slice(0, rsView.n).map(r => rsStockHtml(r, R, idx)).join('') : '<div class="rs-line" style="padding:14px">Nothing in this filter right now.</div>'}</div>
-    ${list.length > rsView.n ? `<button class="btn-ghost" onclick="rsMore()">Show ${Math.min(15, list.length - rsView.n)} more (${list.length - rsView.n} left)</button>` : ''}
-    <details class="rs2-act"><summary>Activity and history</summary><div class="sc2-chips" style="margin:8px 0">${wchips}</div>${rsBarsHtml(R)}</details>
-    ${R.warn ? `<div class="rs-line" style="color:var(--red)">${sscanEsc(R.warn)}</div>` : ''}
-    <div class="rs-line">Grades combine volume, strength vs Nifty and how fresh the signal is. Stops and targets are simple ATR-based examples. A guide for ranking, not advice; past results don\u2019t predict future ones.</div></div>`;
-}
-function rsResultsHtml(R) {
-  if (!R) return '';
-  if (R.results.length > 12 && R.results.some(r => !r.err && r.x)) return rsBigHtml(R);
-  const chips = [['7', '7D'], ['30', '30D'], ['90', '90D'], ['all', 'All data']].map(([k, l]) => `<button class="sc2-chip${rsWin === k ? ' on' : ''}" onclick="rsSetWin('${k}')">${l}</button>`).join('');
-  let tot = 0; R.results.forEach(r => { if (!r.err) tot += rsInWin(r.triggers).length; });
-  const U = R.unit || 'coin';
-  let shown = R.results, bigNote = '';
-  if (shown.length > 12) {
-    const lastT = r => { const t = rsInWin(r.triggers); return t.length ? t[t.length - 1].ts : 0; };
-    const act = shown.filter(r => !r.err && (r.now === true || rsInWin(r.triggers).length)).sort((a, b) => ((b.now === true) - (a.now === true)) || (lastT(b) - lastT(a)));
-    const errN = shown.filter(r => r.err).length;
-    bigNote = `<div class="rs-line"><b>${act.length}</b> of ${shown.length} ${U}s fired in this window${act.length > 60 ? ' \u00b7 showing the 60 most recent' : ''}${errN ? ' \u00b7 ' + errN + ' had no data' : ''}.</div>`;
-    shown = act.slice(0, 60);
+function scnFacts(list) { return `<div class="scn-g">${list.map(f => `<div><b>${f[1]}</b><span>${f[0]}</span></div>`).join('')}</div>`; }
+function scnChip(id, k, v, on, label) { return `<button type="button" class="sc2-chip${on ? ' on' : ''}" onclick="scnSet(${id},'${k}','${v}')">${label}</button>`; }
+
+function scnCurHtml(id, u, M, last) {
+  const idx = M.idx, lab = M.daily ? 'close' : 'candle', U = M.unit;
+  const live = M.rows.filter(r => !r.err && r.now), newL = live.filter(r => r.days <= 1), actL = live.filter(r => r.days > 1);
+  let list = u.f === 'act' ? actL : u.f === 'all' ? live : newL;
+  const rel = r => r.x ? r.x.ret20 - (idx || 0) : null;
+  const srt = { v: (a, b) => (b.x && b.x.volRatio != null ? b.x.volRatio : -1) - (a.x && a.x.volRatio != null ? a.x.volRatio : -1), r: (a, b) => (rel(b) == null ? -1e9 : rel(b)) - (rel(a) == null ? -1e9 : rel(a)), d: (a, b) => (a.days - b.days) || (a.sym < b.sym ? -1 : 1) }[u.sort] || null;
+  list = list.slice().sort(srt);
+  const sortLab = { v: 'Volume', r: idx == null ? '20-day move' : 'Move vs Nifty', d: 'Newest first' };
+  let h = `<div class="scn-chips">${scnChip(id, 'f', 'new', u.f === 'new', `New on last ${lab} <span class="sc2-n">${newL.length}</span>`)}${scnChip(id, 'f', 'act', u.f === 'act', `Still active <span class="sc2-n">${actL.length}</span>`)}${scnChip(id, 'f', 'all', u.f === 'all', `All <span class="sc2-n">${live.length}</span>`)}</div>
+    <div class="scn-bar"><span>Tap a name for the numbers</span><button type="button" class="sc2-chip" aria-expanded="${u.sdd}" onclick="scnSet(${id},'sdd',${!u.sdd})">Sort: ${sortLab[u.sort]} ▾</button></div>`;
+  if (u.sdd) h += `<div class="scn-menu">${Object.keys(sortLab).map(k => `<button type="button" class="scn-opt${k === u.sort ? ' cur' : ''}" onclick="scnU(scnKeys[${id}]).sdd=false;scnSet(${id},'sort','${k}')">${sortLab[k]}</button>`).join('')}</div>`;
+  if (!live.length) h += `<div class="scn-empty"><b>No matches on the last ${lab}</b>${M.unit === 'stock' ? 'No stock meets every rule right now.' : 'Nothing meets every rule right now.'} Check History to see what matched earlier.</div>`;
+  else if (!list.length) h += `<div class="scn-empty"><b>${u.f === 'act' ? 'Nothing is still active' : 'No new matches on the last ' + lab}</b>${u.f === 'new' && actL.length ? actL.length + ' ' + U + (actL.length === 1 ? ' is' : 's are') + ' still active. See Still active.' : 'Try another filter.'}</div>`;
+  else {
+    h += `<div class="scn-cap">% is the move on the last ${lab}. Mini chart: last 10 candles.</div><div class="scn-list">${list.slice(0, u.n).map(r => {
+      const x = r.x, rl = rel(r), isOpen = !!u.open[r.sym];
+      const sub = u.sort === 'v' ? 'Vol ' + (x && x.volRatio != null ? x.volRatio.toFixed(1) + 'x' : '—') : u.sort === 'r' ? (idx == null ? '20-day ' : 'vs Nifty ') + (rl == null ? '—' : (rl > 0 ? '+' : '') + rl.toFixed(1) + '%') : (r.days <= 1 ? 'New' : 'Day ' + r.days);
+      const det = scnFacts([['Last close', x ? rsPx(x.px) : '—'], ['Volume vs 20-day average', x && x.volRatio != null ? x.volRatio.toFixed(1) + 'x' : '—'], [idx == null ? '20-day move' : 'Move vs Nifty, 20 days', rl == null ? '—' : scnPct(rl)], ['Time in scanner', r.days <= 1 ? 'New on last ' + lab : 'Day ' + r.days]]);
+      return scnRowHtml(id, r.sym, r.sym, sub, scnPct(x ? x.chg : null), scnSpark(x && x.spark), M.chart(r.sym), det, isOpen);
+    }).join('')}</div>${list.length > u.n ? `<button type="button" class="btn-ghost scn-more" onclick="scnMore(${id})">Show ${Math.min(20, list.length - u.n)} more (${list.length - u.n} left)</button>` : ''}`;
   }
-  return `<div class="rs-res"><div class="sc2-chips" style="margin:0">${chips}</div>
-    <div class="rs-sum"><b>${tot}</b> trigger${tot === 1 ? '' : 's'} across ${R.results.length} ${U}${R.results.length === 1 ? '' : 's'} in ${rsWin === 'all' ? 'all available data' : 'the last ' + rsWin + ' days'}</div>
-    ${rsBarsHtml(R)}
-    ${R.warn ? `<div class="rs-line" style="color:var(--red)">${sscanEsc(R.warn)}</div>` : ''}
-    ${bigNote}${shown.map(r => rsSymHtml(r, R)).join('')}
-    <div class="rs-line">This only shows what price did afterwards. Past triggers don\u2019t predict future ones, and a few triggers is a small sample.</div></div>`;
+  let sg = 0, up = 0; M.rows.forEach(r => { if (r.err) return; (r.trig || []).forEach(t => { if (t.a5 == null) return; sg++; if (t.a5 > 0) up++; }); });
+  if (sg) h += `<div class="scn-foot">${sg.toLocaleString()} past signals measured · ${Math.round(up / sg * 100)}% were up after 5 candles</div>`;
+  return h;
 }
+
+function scnHistHtml(id, u, M, last) {
+  const ranges = scnRangeList(M), cur = ranges.find(r => r[0] === scnRange) || ranges.find(r => r[0] === 7) || ranges[0], days = cur[0], daily = M.daily;
+  const cut = days === 0 ? last : last - days * 86400;
+  const ent = []; M.rows.forEach(r => { if (r.err) return; (r.trig || []).forEach(t => { if (t.ts >= cut) ent.push({ sym: r.sym, t }); }); });
+  ent.sort((a, b) => (b.t.ts - a.t.ts) || (a.sym < b.sym ? -1 : 1));
+  let h = `<div class="scn-lbl">Show stocks that entered in</div><button type="button" class="scn-dd" aria-expanded="${u.dd}" onclick="scnSet(${id},'dd',${!u.dd})"><span>${cur[1]}</span><span aria-hidden="true">${u.dd ? '▴' : '▾'}</span></button>`;
+  if (u.dd) h += `<div class="scn-menu">${ranges.map(r => `<button type="button" class="scn-opt${r[0] === cur[0] ? ' cur' : ''}" onclick="scnSetRange(${id},${r[0]})"><span>${r[1]}</span>${r[0] === cur[0] ? '<span aria-hidden="true">✓</span>' : ''}</button>`).join('')}</div>`;
+  h += `<div class="scn-cap">Your choice is remembered for every scanner.</div>`;
+  let meas = 0, up = 0, dn = 0; ent.forEach(e => { if (e.t.a5 != null) { meas++; if (e.t.a5 > 0) up++; else dn++; } });
+  h += `<div class="scn-panel"><button type="button" class="scn-ph" aria-expanded="${u.past}" onclick="scnSet(${id},'past',${!u.past})"><span>Past signals in this range</span><span class="scn-dim">${ent.length} <span aria-hidden="true">${u.past ? '▴' : '▾'}</span></span></button>`;
+  if (u.past) {
+    let keys = [];
+    if (daily && M.sess && M.sess.length) keys = M.sess.filter(ts => ts >= cut).map(ts => scnDayKey(ts, true));
+    else { const k1 = scnDayKey(last, daily), k0 = Math.max(scnDayKey(cut, daily), k1 - 30); for (let k = k0; k <= k1; k++) keys.push(k); }
+    const bk = keys.map(k => ({ k, up: 0, dn: 0, op: 0 })), by = {}; bk.forEach(b => { by[b.k] = b; });
+    ent.forEach(e => { const b = by[scnDayKey(e.t.ts, daily)]; if (!b) return; if (e.t.a5 == null) b.op++; else if (e.t.a5 > 0) b.up++; else b.dn++; });
+    const mx = Math.max(1, ...bk.map(b => b.up + b.dn + b.op));
+    h += `<div class="scn-pt">${up} were up after 5 candles, ${dn} were down, ${ent.length - meas} not yet 5 candles old.</div>
+      <div class="scn-bars" role="img" aria-label="Signals per ${daily ? 'session' : 'day'}">${bk.map(b => { const f = (n, c) => n ? `<i style="height:${Math.max(2, Math.round(n / mx * 60))}px;background:${c}"></i>` : ''; return `<div class="scn-bw" title="${b.up + b.dn + b.op} signals">${f(b.op, 'var(--border)')}${f(b.dn, 'var(--red)')}${f(b.up, 'var(--green)')}</div>`; }).join('')}</div>
+      <div class="scn-leg"><span><i style="background:var(--green)"></i>Up after 5</span><span><i style="background:var(--red)"></i>Down</span><span><i style="background:var(--border)"></i>Not yet 5 candles</span></div>`;
+  }
+  h += '</div>';
+  if (!ent.length) return h + `<div class="scn-empty"><b>Nothing entered in this range</b>Pick a longer range, or check Current for what is live now.</div>`;
+  let lastDay = '', body = '';
+  ent.slice(0, u.n).forEach(e => {
+    const dk = scnDay(e.t.ts, daily);
+    if (dk !== lastDay) { body += `<div class="scn-dh">${dk}${daily ? ' · close' : ''}</div>`; lastDay = dk; }
+    const t = e.t, rk = e.sym + '@' + t.ts, isOpen = !!u.open[rk], tm = daily ? '' : rsFmt(t.ts, M.tf).split(' ').slice(2).join(' ') + ' IST · ';
+    const det = scnFacts([['Signal close', rsPx(t.price)], ['Since signal', scnPct(t.now)], ['Highest since signal', t.hi == null ? '—' : scnPct(t.hi)], ['Lowest since signal', t.lo == null ? '—' : scnPct(t.lo)]]) + `<div class="scn-cap" style="margin:8px 0 0">${t.age === 0 ? 'Signal on the latest ' + (daily ? 'close' : 'candle') : t.age + ' candle' + (t.age === 1 ? '' : 's') + ' since the signal'}</div>`;
+    body += scnRowHtml(id, rk, e.sym, daily ? 'Signal ' + rsPx(t.price) : tm.replace(/ \u00b7 $/, ''), scnPct(t.now), scnSpark(t.sp), M.chart(e.sym), det, isOpen);
+  });
+  h += `<div class="scn-cap">% is the change since the signal. Mini chart: from just before the signal to now.</div><div class="scn-list">${body}</div>${ent.length > u.n ? `<button type="button" class="btn-ghost scn-more" onclick="scnMore(${id})">Show ${Math.min(20, ent.length - u.n)} more (${ent.length - u.n} left)</button>` : ''}`;
+  return h;
+}
+
+function scnHtml(key, M, mode, inline) {
+  const id = scnReg(key), u = scnU(key), his = inline ? u.seg === 'his' : mode === 'his';
+  const last = M.rows.reduce((m, r) => r.to && r.to > m ? r.to : m, 0), errN = M.rows.filter(r => r.err).length;
+  let h = '';
+  if (M.scanning) return `<div class="scn"><div class="scn-asof">Scanning ${M.rows.length} ${M.unit}${M.rows.length === 1 ? '' : 's'}…</div><div class="scn-sk"></div><div class="scn-sk" style="width:70%"></div><div class="scn-sk" style="width:85%"></div></div>`;
+  if (last) {
+    const ist = new Date(Date.now() + 19800000), wk = ist.getUTCDay() === 0 || ist.getUTCDay() === 6;
+    h += `<div class="scn-asof">${M.daily ? 'Daily candles · as of the close on ' + scnDay(last, true) + (M.india ? ' · updates after the market closes' : '') : 'As of ' + rsFmt(last, M.tf) + ' IST'}${M.daily && M.india && wk ? ' · market closed today, showing the last session' : ''}</div>`;
+  }
+  if (inline) h += `<div class="scn-seg" role="tablist"><button type="button" role="tab" aria-selected="${!his}" class="${his ? '' : 'on'}" onclick="scnSet(${id},'seg','cur')">Current</button><button type="button" role="tab" aria-selected="${his}" class="${his ? 'on' : ''}" onclick="scnSet(${id},'seg','his')">History</button></div>`;
+  h += his ? scnHistHtml(id, u, M, last) : scnCurHtml(id, u, M, last);
+  if (errN) h += `<div class="scn-foot">${errN} ${M.unit}${errN === 1 ? '' : 's'} could not be scanned.</div>`;
+  return `<div class="scn">${h}</div>`;
+}
+async function scnOpenCoin(sym, tf) {   // a crypto scan row -> the live chart for that symbol
+  try {
+    showView('replay');
+    if (!liveMode) setDataMode('live');
+    const k = document.getElementById('live-kind');
+    if (k && k.value !== 'perp') { k.value = 'perp'; await onLiveKindChange(); }
+    const sy = document.getElementById('live-symbol'), want = /USD$/.test(sym) ? sym : sym + 'USD';
+    if (sy && Array.from(sy.options).some(o => o.value === want)) { sy.value = want; onLiveSymbolChange(); }
+    const t = document.getElementById('live-timeframe');
+    if (t && tf && Array.from(t.options).some(o => o.value === tf)) { t.value = tf; onLiveTimeframeChange(); }
+  } catch (e) { console.warn('scnOpenCoin failed', e); }
+}
+/* adapters: turn each scanner type's results into the shared model */
+function scnModelR(R) {
+  const first = (R.results.find(r => r && r.sym) || {}).sym || '';
+  return { rows: R.results.map(r => r.err ? { sym: r.sym, err: r.err } : { sym: r.sym, now: r.now === true, days: r.days || 0, x: r.x, trig: r.triggers || [], to: r.to }), sess: R.sess, idx: R.idx, daily: RS_TF[R.baseTf] >= 86400, tf: R.baseTf, india: isIndiaUnd(first), unit: R.unit || 'coin',
+    chart: s => isIndiaUnd(s) ? `openIndiaChart('${sscanEsc(s).replace(/'/g, '')}')` : `scnOpenCoin('${sscanEsc(s).replace(/'/g, '')}','${R.baseTf}')`, scanning: false };
+}
+function scnModelS(sc, i, r) {
+  const rows = r.rows.map(row => row.err ? { sym: row.und, err: row.err } : (row.details && row.details[0] && row.details[0].text === 'scanning…') ? { sym: row.und, wait: true } : { sym: row.und, now: row.allNow !== undefined ? row.allNow : !!row.ok, days: row.days != null ? row.days : (row.ok ? 1 : 0), x: row.x || null, trig: row.trig || [], to: row.to });
+  const ind = rows.length && isIndiaUnd(rows[0].sym);
+  return { rows, sess: r.sess, idx: r.idx, daily: /^1[dwM]$/.test(sc.tf), tf: sc.tf, india: ind, unit: ind ? 'stock' : 'coin',
+    chart: s => { const q = sscanEsc(s).replace(/'/g, ''); return sc.strat === 'Guppy crossover' ? (isIndiaUnd(s) ? `openIndiaChart('${q}',${i})` : `openGuppyChart('${q}',${i})`) : `openSScanChart(${i},'${q}')`; }, scanning: rows.some(x => x.wait) };
+}
+function rsResultsHtml(R) { return R ? scnHtml('pv', scnModelR(R), 'cur', true) : ''; }
 function rsSubLine(sc, R) {
   if (!R || rsRunning[sc.id]) return `${(RS_MARKETS[sc.market] || RS_MARKETS.crypto).label} \u00b7 ${sc.symbols.length} ${rsUnit(sc.market)}${sc.symbols.length === 1 ? '' : 's'} \u00b7 ${RS_TF_LABEL[rsBaseTf(sc.rules)]} \u00b7 ${sc.rules.length} rule${sc.rules.length === 1 ? '' : 's'}`;
   let n = 0, last = 0; R.results.forEach(r => { if (r.err) return; n += rsInWin(r.triggers).length; r.triggers.forEach(t => { if (t.ts > last) last = t.ts; }); });
@@ -4764,6 +4811,7 @@ function rsCardHtml(sc, meta) {
   const dots = best ? Array.from({ length: Math.min(best.t, 6) }, (_, k) => `<i class="sc2-dot${best.t <= 6 ? (k < best.n ? ' f' : '') : (k < Math.round(best.n / best.t * 6) ? ' f' : '')}"></i>`).join('') : '';
   const chip = running ? '<span class="sc2-st n">Scanning\u2026</span>' : !R ? '<span class="sc2-st n">Not scanned</span>' : hit.length ? `<span class="sc2-st m">Match \u00b7 ${hit.length > 2 ? hit.length + ' ' + rsUnit(sc.market) + 's' : hit.join(' + ')}</span>` : `<span class="sc2-st n">${best && best.n ? best.n + ' of ' + best.t : 'No match'}</span>`;
   const key = 'r:' + sc.id, sub = scSubOf(key);
+  const shared = R && sub !== 'perf' ? scnHtml(key, scnModelR(R), sub) : '';
   return `<details class="sc2-row" data-k="${sscanEsc(key)}" ${scOpen[key] ? 'open' : ''} ontoggle="scToggle(this)">
     <summary><span class="sc2-rbar" style="background:${ci.col}"></span>
       <span class="sc2-main"><span class="sc2-name">${sscanEsc(sc.name)}</span><span class="sc2-sub">${sscanEsc(rsSubLine(sc, R))}</span></span>
@@ -4772,7 +4820,7 @@ function rsCardHtml(sc, meta) {
       ${scSubBar(sub)}
       ${sub === 'perf' ? rsPerfHtml(sc, R) : `<div class="strat-legs">${sc.mode === 'any' ? 'Triggers when ANY rule is true' : 'Triggers when ALL rules are true'} \u00b7 checked on every ${RS_TF_LABEL[rsBaseTf(sc.rules)].toLowerCase()} candle close \u00b7 ${sc.vis === 'public' ? 'Public' : 'Private'}</div>
       <ul class="sc2-conds">${sc.rules.map(r => `<li>${sscanEsc(rsRuleText(r))}</li>`).join('')}</ul>
-      ${R ? rsResultsHtml(R) : '<div class="strat-legs">Not scanned yet. Tap Scan now to check it and see its history.</div>'}`}
+      ${R ? shared : '<div class="strat-legs">Not scanned yet. Tap Scan now to check it and see its history.</div>'}`}
       <div class="sc2-acts">
         <button class="btn-primary" onclick="rsRunOne('${sc.id}')">${running ? 'Scanning\u2026' : 'Scan now'}</button>
         <button class="btn-ghost" onclick="rbOpen(${rscans.indexOf(sc)})">Edit</button>
