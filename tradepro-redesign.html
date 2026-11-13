@@ -8937,12 +8937,12 @@ function initChartDrag() {
   // while a gesture is active (chartTouchLock), (2) the pinch is previewed with a CSS scale on the
   // existing SVG and the real re-render happens once, when the fingers lift, and (3) with
   // touch-action: pan-y the browser doesn't start its own horizontal scroll that would steal the pinch.
-  let panOn = false, panX = 0, panScroll = 0, panLastX = 0, panLastT = 0, panV = 0, inertiaRaf = 0, pinch = null;
+  let panOn = false, panX = 0, panScroll = 0, panLastX = 0, panLastT = 0, panV = 0, inertiaRaf = 0, pinch = null, axisDrag = null;
   const dist2 = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
   const svgEl = () => wrap.firstElementChild;
   const stopInertia = () => { if (inertiaRaf) { cancelAnimationFrame(inertiaRaf); inertiaRaf = 0; } };
   const releaseLock = () => {
-    if (pinch || panOn) return;
+    if (pinch || panOn || axisDrag) return;
     chartTouchLock = false;
     if (chartRenderDeferred) { chartRenderDeferred = false; renderChart(); }
   };
@@ -8954,9 +8954,16 @@ function initChartDrag() {
       if (e.cancelable) e.preventDefault();
       const rect = wrap.getBoundingClientRect();
       const midView = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
-      pinch = { d0: Math.max(1, dist2(e.touches)), px0: candlePx, ratio: 1, midView, midContent: wrap.scrollLeft + midView };
+      const vert = Math.abs(e.touches[0].clientY - e.touches[1].clientY) > Math.abs(e.touches[0].clientX - e.touches[1].clientX) * 1.2;   // fingers stacked vertically = zoom the price range
+      pinch = { d0: Math.max(1, dist2(e.touches)), px0: candlePx, ratio: 1, midView, midContent: wrap.scrollLeft + midView, vert, z0: priceZoom };
       const sv = svgEl();
-      if (sv) { sv.style.transformOrigin = pinch.midContent + 'px 0'; sv.style.willChange = 'transform'; }
+      if (sv) { sv.style.transformOrigin = vert ? '0 40%' : pinch.midContent + 'px 0'; sv.style.willChange = 'transform'; }
+    } else if (e.touches.length === 1 && !pinch && !touchDragHandle && !brushDrawing && chartTool !== 'brush' && e.touches[0].clientX > wrap.getBoundingClientRect().right - 64) {
+      // one finger dragging up/down on the price scale = zoom the price range (drag down = wider, drag up = tighter)
+      panOn = false; chartTouchLock = true;
+      if (e.cancelable) e.preventDefault();
+      axisDrag = { y0: e.touches[0].clientY, z0: priceZoom, z: priceZoom };
+      const sv = svgEl(); if (sv) { sv.style.transformOrigin = '0 40%'; sv.style.willChange = 'transform'; }
     } else if (e.touches.length === 1 && !pinch && !touchDragHandle && !brushDrawing && chartTool !== 'brush') {
       panOn = true;
       chartTouchLock = true;
@@ -8967,6 +8974,18 @@ function initChartDrag() {
     }
   }, { passive: false });
   wrap.addEventListener('touchmove', e => {
+    if (axisDrag && e.touches.length === 1) {
+      if (e.cancelable) e.preventDefault();
+      axisDrag.z = Math.max(PRICE_ZOOM_MIN, Math.min(PRICE_ZOOM_MAX, axisDrag.z0 * Math.exp((e.touches[0].clientY - axisDrag.y0) / 160)));
+      const sv = svgEl(); if (sv) sv.style.transform = 'scaleY(' + (axisDrag.z0 / axisDrag.z) + ')';
+      return;
+    }
+    if (pinch && pinch.vert && e.touches.length >= 2) {
+      if (e.cancelable) e.preventDefault();
+      pinch.z = Math.max(PRICE_ZOOM_MIN, Math.min(PRICE_ZOOM_MAX, pinch.z0 / (dist2(e.touches) / pinch.d0)));
+      const sv = svgEl(); if (sv) sv.style.transform = 'scaleY(' + (pinch.z0 / pinch.z) + ')';
+      return;
+    }
     if (pinch && e.touches.length >= 2) {
       if (e.cancelable) e.preventDefault();
       const target = Math.max(CANDLE_PX_MIN, Math.min(CANDLE_PX_MAX, pinch.px0 * dist2(e.touches) / pinch.d0));
@@ -8986,6 +9005,21 @@ function initChartDrag() {
     }
   }, { passive: false });
   const endTouch = e => {
+    if (axisDrag) {
+      const ad = axisDrag; axisDrag = null;
+      const sv = svgEl(); if (sv) { sv.style.transform = ''; sv.style.willChange = ''; }
+      chartTouchLock = false; chartRenderDeferred = false;
+      priceZoom = ad.z; renderChart(true); pzLabel();
+      return;
+    }
+    if (pinch && pinch.vert && e.touches.length < 2) {
+      const pc = pinch; pinch = null;
+      const sv = svgEl(); if (sv) { sv.style.transform = ''; sv.style.willChange = ''; }
+      chartTouchLock = false; chartRenderDeferred = false; panOn = false;
+      if (pc.z != null) priceZoom = pc.z;
+      renderChart(true); pzLabel();
+      return;
+    }
     if (pinch && e.touches.length < 2) {
       const pc = pinch;
       pinch = null;
