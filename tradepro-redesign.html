@@ -1063,7 +1063,7 @@
     color: var(--on-accent); white-space: nowrap;
   }
   .price-tag.entry { background: var(--accent); color: var(--on-accent); }
-  .price-tag.ctimer { border-radius: 0 0 0 4px; font-size: 10px; letter-spacing: .2px; font-variant-numeric: tabular-nums; }
+  .price-tag.ctimer { border-radius: 0 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .2px; font-variant-numeric: tabular-nums; }
   .price-tag.ctimer.warn { background: #D9A441 !important; color: #1a1408 !important; }
   .price-tag.sl { background: var(--red); color: var(--on-red); }
   .price-tag.tp { background: var(--green); color: var(--on-accent); }
@@ -1832,8 +1832,8 @@
 
       <div id="view-markets" class="view" style="display:none">
         <div class="mkt-head"><div class="mkt-title">Markets</div><div class="mkt-stamp" id="mkt-stamp"><i></i>Loading</div></div>
-        <div class="mkt-seg"><button id="mkt-b-pulse" class="on" onclick="mktSeg('pulse')">Pulse</button><button id="mkt-b-options" onclick="mktSeg('options')">Options</button><button id="mkt-b-calendar" onclick="mktSeg('calendar')">Calendar</button><button id="mkt-b-trend" onclick="mktSeg('trend')">Trend</button></div>
-        <div id="mkt-pulse">
+        <div class="mkt-seg"><button id="mkt-b-pulse" onclick="mktSeg('pulse')">Pulse</button><button id="mkt-b-options" class="on" onclick="mktSeg('options')">Options</button><button id="mkt-b-calendar" onclick="mktSeg('calendar')">Calendar</button><button id="mkt-b-trend" onclick="mktSeg('trend')">Trend</button></div>
+        <div id="mkt-pulse" style="display:none">
           <div class="mkt-chips" id="inx-mk"></div>
           <div id="mkt-crypto">
           <div class="mkt-chips" id="mkt-cols"></div>
@@ -1842,7 +1842,7 @@
           </div>
           <div id="inx-pane" style="display:none"></div>
         </div>
-        <div id="mkt-options" style="display:none"><div id="mkt-opt"></div></div>
+        <div id="mkt-options"><div id="mkt-opt"></div></div>
         <div id="mkt-calendar" style="display:none"><div id="mkt-cal"></div></div>
         <div id="mkt-alerts" style="display:none"><div class="mkt-chips"><button onclick="mktSeg('pulse')">‹ Back to Markets</button></div><div id="mkt-alr"></div></div>
         <div id="mkt-trend" style="display:none"><div id="mkt-tr"></div></div>
@@ -7547,6 +7547,7 @@ function toggleColorGrid(instId, field) {
   refreshIndicatorSettings(instId);
 }
 function pickIndicatorColorFromGrid(instId, field, color) {
+  if (String(instId).startsWith('draw:')) { const d = drawings[+instId.slice(5)]; if (d) d.color = color; colorGridOpenFor = null; refreshDrawingSettingsPopup(); renderChart(); scheduleSave(); return; }
   if (field === 'secondary') updateIndicatorSecondaryColor(instId, color);
   else if (field === 'primary') updateIndicatorColor(instId, color);
   else updateIndicatorFieldColor(instId, field, color);
@@ -7563,6 +7564,7 @@ function updateIndicatorFieldColor(instId, field, color) {
   scheduleSave();
 }
 function openCustomColorEditor(instId, field) {
+  if (String(instId).startsWith('draw:')) { const d = drawings[+instId.slice(5)]; if (!d) return; colorPickerHSV = hexToHsv(d.color || '#2962FF'); customColorEditorFor = { instId, field }; refreshDrawingSettingsPopup(); return; }
   const inst = activeIndicators.find(i => i.id === instId);
   if (!inst) return;
   const startHex = field === 'secondary' ? (inst.secondaryColor || '#D9A441') : field === 'primary' ? inst.color : (inst[field] || '#2962FF');
@@ -7578,6 +7580,7 @@ function applyCustomColor() {
   if (!customColorEditorFor) return;
   const { instId, field } = customColorEditorFor;
   const hex = hsvToHex(colorPickerHSV.h, colorPickerHSV.s, colorPickerHSV.v);
+  if (String(instId).startsWith('draw:')) { const d = drawings[+instId.slice(5)]; if (d) d.color = hex; lastCustomIndColor = hex; customColorEditorFor = null; colorGridOpenFor = null; refreshDrawingSettingsPopup(); renderChart(); scheduleSave(); return; }
   if (field === 'secondary') updateIndicatorSecondaryColor(instId, hex);
   else if (field === 'primary') updateIndicatorColor(instId, hex);
   else updateIndicatorFieldColor(instId, field, hex);
@@ -7890,6 +7893,7 @@ function openIndicatorSettings(e, id) {
   panel.style.top = top + 'px';
 }
 function refreshIndicatorSettings(id) {
+  if (String(id).startsWith('draw:')) { refreshDrawingSettingsPopup(); return; }
   renderIndicatorChips();
   const panel = document.getElementById('ind-settings');
   if (panel.classList.contains('open')) {
@@ -8456,11 +8460,22 @@ function renderChart(forceEnd) {
   const lastY = yAt(lastCandle.c);
   const upNow = revealed.length > 1 ? lastCandle.c >= revealed[revealed.length-2].c : true;
   let priceLines = `<line x1="0" y1="${lastY.toFixed(1)}" x2="${W}" y2="${lastY.toFixed(1)}" stroke="${upNow ? 'var(--green)' : 'var(--red)'}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>`;
-  let axisTags = `<div class="price-tag last" style="top:${clampY(lastY).toFixed(0)}px; background:${upNow ? 'var(--green)' : 'var(--red)'}; color:var(--on-accent); border:none;">${ccy}${fmtPrice(lastCandle.c)}</div>`;
+  let axisTags = `<div class="price-tag last" style="top:${clampY(lastY).toFixed(0)}px; background:${upNow ? 'var(--green)' : 'var(--red)'}; color:${upNow ? 'var(--on-accent)' : 'var(--on-red)'}; border:none;">${ccy}${fmtPrice(lastCandle.c)}</div>`;
 
+  {   // price tag on the axis for each horizontal line / ray, in the line's own colour, so you can read where it sits
+    const hBottom = GAP + (BASE_H - GAP - VOLH - PAD), inkOn = c => { const m = /^#([0-9a-f]{6})$/i.exec(c || ''); if (!m) return 'var(--on-accent)'; const n = parseInt(m[1], 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; return l > 0.58 ? '#0B0F14' : '#FFFFFF'; };
+    let hTags = '';
+    drawings.forEach(d => {
+      if (d.type !== 'hline' && d.type !== 'ray') return;
+      const y = yAt(d.price); if (!(y >= GAP && y <= hBottom)) return;
+      const c = ((d.color === '#EEF2F6' || d.color === '#1F2D3D') ? DRAW_INK() : d.color) || DRAW_INK();
+      hTags += `<div class="price-tag" style="top:${y.toFixed(0)}px; background:${c}; color:${inkOn(c)}; border:none; font-weight:700;">${fmtPrice(d.price)}</div>`;
+    });
+    axisTags = hTags + axisTags;
+  }
   if (ctOn) {   // candle-close countdown, stacked under the live price tag (updated every second by candleTimerTick)
     const ctBottom = GAP + (BASE_H - GAP - VOLH - PAD), ctTop = clampY(lastY) + 15 > ctBottom + 6 ? clampY(lastY) - 15 : clampY(lastY) + 15;
-    axisTags += `<div class="price-tag ctimer" id="candle-timer" style="top:${ctTop.toFixed(0)}px; background:${upNow ? 'var(--green)' : 'var(--red)'}; color:var(--on-accent); border:none;">${candleTimerText()}</div>`;
+    axisTags += `<div class="price-tag ctimer" id="candle-timer" style="top:${ctTop.toFixed(0)}px; background:var(--surface-2); color:${upNow ? 'var(--green)' : 'var(--red)'}; border:1px solid ${upNow ? 'var(--green)' : 'var(--red)'}; border-right:none;">${candleTimerText()}</div>`;
   }
 
   if (position) {
@@ -8869,7 +8884,11 @@ function initChartDrag() {
     if (e.touches.length !== 1 || chartTool !== 'cursor') return;
     const t = e.touches[0];
     const rect = wrap.getBoundingClientRect();
-    const hit = hitTestHandle(t.clientX - rect.left, t.clientY - rect.top);
+    let hit = hitTestHandle(t.clientX - rect.left, t.clientY - rect.top);
+    if (!hit && chartGeom) {   // a horizontal line can be grabbed anywhere along its length, not only by its tiny left-edge dot
+      const vy = t.clientY - rect.top;
+      for (let di = drawings.length - 1; di >= 0; di--) { const d = drawings[di]; if (d.type === 'hline' && Math.abs(vy - priceToVy(d.price)) <= 18) { hit = { di, handle: 'price' }; break; } }
+    }
     if (hit) {
       touchDragHandle = hit; draggingHandle = hit; selectedDrawingIndex = hit.di;
       closeDeleteDrawingPopup(); renderChart();
@@ -9537,15 +9556,7 @@ function showDrawingSettingsPopup(index, clientX, clientY) {
       ${coordinatesHtml}
       <div class="ind-settings-section-title">Style</div>
       ${d.type === 'emoji' ? '' : `
-      <div class="ind-settings-row ind-settings-row-wrap">
-        <label>Color</label>
-        <div class="color-options">
-          ${IND_COLORS.map(c => `
-            <button type="button" class="color-swatch ${c.toLowerCase()===d.color.toLowerCase()?'active':''}" style="background:${c}"
-              onclick="updateDrawingColor(${index},'${c}')" title="${c}"></button>
-          `).join('')}
-        </div>
-      </div>`}
+      ${colorFieldHtml({ id: 'draw:' + index, color: d.color }, 'color', 'Color')}`}
       ${d.type === 'text' || d.type === 'emoji' ? '' : `
       <div class="ind-settings-row ind-settings-row-wrap">
         <label>Width</label>
@@ -12071,7 +12082,7 @@ try { liveApplyKindUi(); } catch (e) { /* not ready */ }
 
 <script>
 /* ---------- Markets tab logic. Reuses MK (tickers), oi (OI baseline + chart highlight), LIVE (Trade) ---------- */
-const MKT = { seg: 'pulse', col: 'chg', pt: {}, ptAt: 0, ptErr: null, sym: null, und: 'BTC', exp: null, raw: null, base: null, spot: null, oat: 0, strike: null, busy: false, err: null, timer: null, day: 0, rng: 7, nokeep: false, hist: {}, seen: {}, px: null, abn: false, goto: null, view: 'oi', sort: 'desc', gr: 'delta', snapOpen: false, coarse: {}, vol: null, gk: null };
+const MKT = { seg: 'options', col: 'chg', pt: {}, ptAt: 0, ptErr: null, sym: null, und: 'BTC', exp: null, raw: null, base: null, spot: null, oat: 0, strike: null, busy: false, err: null, timer: null, day: 0, rng: 7, nokeep: false, hist: {}, seen: {}, px: null, abn: false, goto: null, view: 'oi', sort: 'desc', gr: 'delta', snapOpen: false, coarse: {}, vol: null, gk: null };
 // Sample macro list: edit or replace with a real feed. Times are UTC.
 const MKT_EVENTS = [{ at: '2026-11-06T13:30:00Z', n: 'US jobs report', imp: 'hi' }];
 // Market holidays, from the NSE 2026 circular (equity and derivatives) and the NYSE calendar. Confirm against the exchange before trading around a date.
@@ -12408,7 +12419,6 @@ function mktOptRender() {
   const mpg = mp != null && spot ? (spot - mp) / mp * 100 : null;
   let rd = '';
   if (pcr != null) rd += ri('pcr', OX_SVG.pcr, rdc, 'PCR ' + pcr.toFixed(2), lbl === 'Call-heavy' ? 'More calls than puts' : lbl === 'Put-heavy' ? 'More puts than calls' : 'Calls and puts are close', (lbl === 'Put-heavy' ? 'Often read as hedging, or put writers defending support, which leans supportive. Very high readings can also mean fear.' : lbl === 'Call-heavy' ? 'Can mean call writers capping the upside, or a crowd leaning long. Very low readings can signal over-optimism.' : 'Positioning shows no clear lean.') + (pcrExt ? ' Readings this extreme are rare and often show fear or over-optimism, which can come before a reversal, so treat the lean with extra caution.' : ''), '', pcrExt ? '<span class="mkt-tag ex">Extreme</span>' : '', pcrExt);
-  if (addC + addP > 0) rd += ri('base', OX_SVG.clock, 'var(--text-muted)', 'Since the 17:30 IST baseline', addP > addC * 1.2 ? 'Puts are being added faster' : addC > addP * 1.2 ? 'Calls are being added faster' : 'Puts and calls are added at a similar pace', '', `<div class="mkt-nb"><span>Calls</span><i style="width:${(addC / mxn * 55).toFixed(0)}%;background:${OI_SH.r.base}"></i>+${mktFmt(addC)}</div><div class="mkt-nb"><span>Puts</span><i style="width:${(addP / mxn * 55).toFixed(0)}%;background:${OI_SH.g.base}"></i>+${mktFmt(addP)}</div>`, '', false);
   if (cw || pw) rd += ri('walls', OX_SVG.walls, 'var(--text-muted)', 'Walls', (cw ? 'Resistance ' + mktFmt(cw.k) : '') + (cw && pw ? ' · ' : '') + (pw ? 'Support ' + mktFmt(pw.k) : ''), `${cw ? 'Largest call OI above spot marks a possible resistance zone. ' : ''}${pw ? 'Largest put OI below spot marks a possible support zone.' : ''}`, '', '', false);
   if (!ALL && mp != null && spot) rd += ri('mp', OX_SVG.target, 'var(--text-muted)', 'Max pain ' + mktFmt(mp), Math.abs(mpg) < 0.05 ? 'Spot is at max pain' : `Spot is ${Math.abs(mpg).toFixed(1)}% ${mpg > 0 ? 'above' : 'below'} it`, 'Price sometimes drifts toward max pain near expiry, but the effect is weak.', '', '<span class="mkt-tag">Weak pull</span>', false);
   const rdN = (rd.match(/class="mk-acc"/g) || []).length;
@@ -12460,7 +12470,7 @@ function mktOptRender() {
   if (!ALL) vl += expEnd(MKT.exp) > nowT ? ' ' + left(MKT.exp) + ' to expiry.' : ' Expiry is settling.';
   const rangeTxt = (cw && pw ? `Range ${mktFmt(pw.k)} to ${mktFmt(cw.k)}` : '') + (s0 && sT.d(s0.t) === 'direction unclear' ? (cw && pw ? ' · ' : '') + 'direction not confirmed' : '');
   const oth = !ALL && SPK.und === MKT.und ? (SPK.live || []).find(c => c.exp !== MKT.exp && c.sev > (s0 ? s0.sev : 0)) : null;
-  const hero = `<div class="mkt-card mk-hero" style="margin-top:0"><div class="mk-vd"><p class="eb">Market read</p><h3>${vl}</h3>${rangeTxt ? `<p>${rangeTxt}</p>` : ''}</div>${spot && (cw || pw) ? mktRangeBar({ spot, cw, pw, mp, s0, sT }) : ''}${sBan ? `<div style="margin-top:10px">${sBan}</div>` : ''}${oth ? `<button class="mk-oth" onclick="spkView('${oth.id}')"><span>Stronger flag on ${liveExpLabel(oth.exp).slice(0, 6)}: <b>${mktEsc(spkText(oth))}</b></span><span>›</span></button>` : ''}</div>`;
+  const hero = `<div class="mkt-card mk-hero" style="margin-top:0"><div class="mk-vd"><p class="eb">Market read</p><h3>${vl}</h3>${rangeTxt ? `<p>${rangeTxt}</p>` : ''}</div>${spot && (cw || pw) ? mktRangeBar({ spot, cw, pw, mp, s0, sT }) : ''}${addC + addP > 0 ? `<div class="mk-adds"><p class="mkt-note" style="margin:10px 0 0">Added since the 17:30 IST baseline · ${addP > addC * 1.2 ? 'puts are being added faster' : addC > addP * 1.2 ? 'calls are being added faster' : 'similar pace'}</p><div class="mkt-nb"><span>Calls</span><i style="width:${(addC / mxn * 55).toFixed(0)}%;background:${OI_SH.r.base}"></i>+${mktFmt(addC)}</div><div class="mkt-nb"><span>Puts</span><i style="width:${(addP / mxn * 55).toFixed(0)}%;background:${OI_SH.g.base}"></i>+${mktFmt(addP)}</div></div>` : ''}${sBan ? `<div style="margin-top:10px">${sBan}</div>` : ''}${oth ? `<button class="mk-oth" onclick="spkView('${oth.id}')"><span>Stronger flag on ${liveExpLabel(oth.exp).slice(0, 6)}: <b>${mktEsc(spkText(oth))}</b></span><span>›</span></button>` : ''}</div>`;
   /* who is behind the new OI */
   const wt = { SB: 0, LB: 0, CL: 0, UN: 0 }; sl.forEach(c => { wt[c.ty === 'SB' ? 'SB' : c.ty === 'LB' ? 'LB' : c.ty === 'SC' || c.ty === 'LU' ? 'CL' : 'UN'] += Math.abs(c.d); });
   const wsum = wt.SB + wt.LB + wt.CL + wt.UN, WL = { SB: ['Writing', MKT_SIGT.SB.c], LB: ['Buying', MKT_SIGT.LB.c], CL: ['Closing', MKT_SIGT.SC.c], UN: ['Unclear', MKT_SIGT.BU.c] }, wk = Object.keys(wt).filter(k => wt[k] > 0);
