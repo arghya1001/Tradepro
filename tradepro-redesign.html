@@ -1063,6 +1063,8 @@
     color: var(--on-accent); white-space: nowrap;
   }
   .price-tag.entry { background: var(--accent); color: var(--on-accent); }
+  .price-tag.ctimer { border-radius: 0 0 0 4px; font-size: 10px; letter-spacing: .2px; font-variant-numeric: tabular-nums; }
+  .price-tag.ctimer.warn { background: #D9A441 !important; color: #1a1408 !important; }
   .price-tag.sl { background: var(--red); color: var(--on-red); }
   .price-tag.tp { background: var(--green); color: var(--on-accent); }
   .price-tag.order { background: #D9A441; color: #1a1408; }
@@ -7919,6 +7921,22 @@ document.addEventListener('click', (e) => {
    Chart rendering — candles, indicator overlays/oscillator pane,
    current-price + position lines, fixed right-edge price axis
    ============================================================ */
+/* ---- candle-close countdown (live Delta charts only) ----
+   Candles open on clock boundaries (epoch-aligned, UTC), so time left = next boundary - now. Follows the selected timeframe. */
+function candleTimerOn() { return !!(liveMode && LIVE.kind !== 'india' && LIVE_RES[LIVE.res] && LIVE_RES[LIVE.res] <= 86400); }
+function candleTimerLeft() { const r = LIVE_RES[LIVE.res]; if (!r) return 0; const now = Date.now() / 1000; return Math.max(0, Math.ceil((Math.floor(now / r) + 1) * r - now)); }
+function candleTimerText() {
+  const t = candleTimerLeft(), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60, p = n => String(n).padStart(2, '0');
+  return h > 0 ? h + ':' + p(m) + ':' + p(s) : p(m) + ':' + p(s);
+}
+function candleTimerTick() {
+  const el = document.getElementById('candle-timer'); if (!el) return;
+  if (!candleTimerOn()) { el.remove(); return; }
+  el.textContent = candleTimerText();
+  el.classList.toggle('warn', candleTimerLeft() <= 10);
+}
+setInterval(() => { if (!document.hidden) candleTimerTick(); }, 1000);
+
 function renderChart(forceEnd) {
   if (chartTouchLock) { chartRenderDeferred = true; return; }
   const scrollEl = document.getElementById('chart-scroll');
@@ -8404,10 +8422,11 @@ function renderChart(forceEnd) {
   // apps show the full vertical price scale on the right, not just the current price.
   const lastPxY = yAtPrice => GAP + (BASE_H - GAP - VOLH - PAD) * (1 - (yAtPrice - yMin) / (yMax - yMin));
   const lastPriceY = lastPxY(lastCandle.c);
+  const ctOn = candleTimerOn();
   const priceScaleLabels = PRICE_SCALE_FRACTIONS.map(f => {
     const y = GAP + (BASE_H - GAP - VOLH - PAD) * f;
     const val = yMax - (yMax - yMin) * f;
-    if (Math.abs(y - lastPriceY) < 13) return ''; // the live price tag sits here — don't print a grid label underneath it
+    if (Math.abs(y - lastPriceY) < 13 || (ctOn && y > lastPriceY && y - lastPriceY < 32)) return ''; // the live price tag (and candle timer below it) sit here — don't print a grid label underneath
     return `<div class="price-scale-label" style="top:${y.toFixed(0)}px;">${fmtAxisPrice(val)}</div>`;
   }).join('');
 
@@ -8438,6 +8457,11 @@ function renderChart(forceEnd) {
   const upNow = revealed.length > 1 ? lastCandle.c >= revealed[revealed.length-2].c : true;
   let priceLines = `<line x1="0" y1="${lastY.toFixed(1)}" x2="${W}" y2="${lastY.toFixed(1)}" stroke="${upNow ? 'var(--green)' : 'var(--red)'}" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>`;
   let axisTags = `<div class="price-tag last" style="top:${clampY(lastY).toFixed(0)}px; background:${upNow ? 'var(--green)' : 'var(--red)'}; color:var(--on-accent); border:none;">${ccy}${fmtPrice(lastCandle.c)}</div>`;
+
+  if (ctOn) {   // candle-close countdown, stacked under the live price tag (updated every second by candleTimerTick)
+    const ctBottom = GAP + (BASE_H - GAP - VOLH - PAD), ctTop = clampY(lastY) + 15 > ctBottom + 6 ? clampY(lastY) - 15 : clampY(lastY) + 15;
+    axisTags += `<div class="price-tag ctimer" id="candle-timer" style="top:${ctTop.toFixed(0)}px; background:${upNow ? 'var(--green)' : 'var(--red)'}; color:var(--on-accent); border:none;">${candleTimerText()}</div>`;
+  }
 
   if (position) {
     // Each marker's line AND tag now share the same clamped Y — when a price (most
