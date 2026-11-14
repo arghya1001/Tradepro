@@ -3123,7 +3123,7 @@ try {
     const old = ['Bearish Guppy crossover + below Supertrend (10,2)', 'EMA squeeze breakdown + below Supertrend (10,2)'];   // earlier separate seeds, replaced by the combined scan
     sscans = sscans.filter(x => !(x && old.indexOf(x.name) !== -1));
     const sc = { name:'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)', strat:'Straddle', side:'Sell', und:'BTC,ETH', tf:'5m', fresh:true, minPrem:600, sl:{ on:true, n:4, buf:2, mode:'fixed' },
-      conds:[{ op:'below', k:'gsq', a:1.0, n:10, m:3 }, { op:'below', k:'gmma', s:[10,12,15], l:[30,35,40], mode:'avg' }, { op:'below', k:'st', p:10, m:2 }] };
+      conds:[{ op:'below', k:'gsq', a:2.5, n:8, m:3, w:15 }, { op:'below', k:'gmma', s:[10,12,15], l:[30,35,40], mode:'avg' }, { op:'below', k:'st', p:10, m:2 }] };
     if (!sscans.some(x => x && x.name === sc.name)) sscans.push(sc);
     localStorage.setItem('tradepro_seed_guppy_v2', '1');
   }
@@ -3132,7 +3132,7 @@ try {
     const bearName = 'Bearish: EMA squeeze breakdown + Guppy crossover + below Supertrend (10,2)';
     sscans.forEach(x => { if (x && x.name === bearName && x.und === 'BTC') x.und = 'BTC,ETH'; });
     const bull = { name:'Bullish: EMA squeeze breakout + Guppy crossover + above Supertrend (10,2)', strat:'Straddle', side:'Buy', und:'BTC,ETH', tf:'5m', fresh:true, minPrem:600, sl:{ on:true, n:4, buf:2, mode:'fixed' },
-      conds:[{ op:'above', k:'gsq', a:1.0, n:10, m:3 }, { op:'above', k:'gmma', s:[10,12,15], l:[30,35,40], mode:'avg' }, { op:'above', k:'st', p:10, m:2 }] };
+      conds:[{ op:'above', k:'gsq', a:2.5, n:8, m:3, w:15 }, { op:'above', k:'gmma', s:[10,12,15], l:[30,35,40], mode:'avg' }, { op:'above', k:'st', p:10, m:2 }] };
     if (!sscans.some(x => x && x.name === bull.name)) sscans.push(bull);
     localStorage.setItem('tradepro_seed_guppy_v3', '1');
   }
@@ -3141,6 +3141,14 @@ try {
   if (!localStorage.getItem('tradepro_split_guppy_v1')) {
     sscans.forEach(sc => { if (sc && /guppy/i.test(sc.name) && Array.isArray(sc.conds) && sc.conds.some(c => c.k === 'gmma') && sc.strat === 'Straddle') { sc.strat = 'Guppy crossover'; sc.minPrem = 0; } });
     localStorage.setItem('tradepro_split_guppy_v1', '1');
+  }
+} catch (e) { /* storage unavailable */ }
+// One-time: saved squeeze + Guppy + Supertrend scans move to the new sequence rule's defaults (squeeze <= 2.5 x ATR, look back 8 bars, 15-bar trigger window).
+try {
+  if (!localStorage.getItem('tradepro_squeeze_seq_v1')) {
+    sscans.forEach(sc => { if (sc && Array.isArray(sc.conds) && ['gsq', 'gmma', 'st'].every(k => sc.conds.some(c => c && c.k === k))) sc.conds.forEach(c => { if (c.k === 'gsq') { if (!(c.a > 1.0)) c.a = 2.5; if (c.n === 10) c.n = 8; c.w = c.w || 15; } }); });
+    persistSScans();
+    localStorage.setItem('tradepro_squeeze_seq_v1', '1');
   }
 } catch (e) { /* storage unavailable */ }
 // One-time: Guppy scans exit only on the EMA 15 close rule, so the 4-candle stop-loss is switched off (can be re-enabled in the scan editor).
@@ -3159,7 +3167,7 @@ const sscanTime = sec => (typeof liveMode !== 'undefined' && liveMode && LIVE.ki
 let scanOverlay = null, scanOverlayTimer = null;   // activation markers drawn on the combined-strategy chart
 const sscanFmt = v => v == null ? '–' : v.toLocaleString('en-US', { maximumFractionDigits: v >= 100 ? 1 : 4 });
 function sscanRefLabel(c) { if (c.k === 'gsq') return 'EMA squeeze → ' + (c.op === 'below' ? 'breakdown' : 'breakout'); if (c.k === 'gmma') return `Guppy ${(c.s || SSCAN_GMMA.s).join(',')} vs ${(c.l || SSCAN_GMMA.l).join(',')}`; return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
-function sscanSummary(sc) { return sc.conds.map(c => c.k === 'gsq' ? `EMA squeeze (ribbon ≤ ${c.a || SSCAN_SQ.a}×ATR in ≥ ${c.m || SSCAN_SQ.m} of last ${c.n || SSCAN_SQ.n} bars) then close ${c.op === 'below' ? 'below the ribbon' : 'above the ribbon'}` : c.k === 'gmma' ? `Guppy short EMAs (${(c.s || SSCAN_GMMA.s).join(',')}) ${c.op === 'below' ? 'below' : 'above'} long EMAs (${(c.l || SSCAN_GMMA.l).join(',')})${c.mode === 'all' ? ' — all lines' : ''}` : 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · ') + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); }
+function sscanSummary(sc) { if (sscanIsSeq(sc.conds)) { const q = sc.conds.find(c => c.k === 'gsq'), dn = q.op === 'below'; return `EMA squeeze (ribbon ≤ ${q.a || SSCAN_SQ.a}×ATR in ≥ ${q.m || SSCAN_SQ.m} of last ${q.n || SSCAN_SQ.n} bars) → Guppy ${dn ? 'bearish' : 'bullish'} crossover + Supertrend ${dn ? 'down' : 'up'} flip within ${q.w || SSCAN_SQ.w} bars → close ${dn ? 'below' : 'above'} the ribbon · one entry per squeeze · exit when Supertrend flips back` + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); } return sc.conds.map(c => c.k === 'gsq' ? `EMA squeeze (ribbon ≤ ${c.a || SSCAN_SQ.a}×ATR in ≥ ${c.m || SSCAN_SQ.m} of last ${c.n || SSCAN_SQ.n} bars) then close ${c.op === 'below' ? 'below the ribbon' : 'above the ribbon'}` : c.k === 'gmma' ? `Guppy short EMAs (${(c.s || SSCAN_GMMA.s).join(',')}) ${c.op === 'below' ? 'below' : 'above'} long EMAs (${(c.l || SSCAN_GMMA.l).join(',')})${c.mode === 'all' ? ' — all lines' : ''}` : 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · ') + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); }
 
 function renderSScans() {
   const el = document.getElementById('sscan-list');
@@ -3540,7 +3548,7 @@ function sscanGmmaLine(candles, c) {
    Squeeze bar: ribbon width (highest EMA - lowest EMA) <= a x ATR(14).  Context: at least m of the previous n bars were squeezed.
    Breakdown (op 'below'): context AND the close is below the lowest EMA of the ribbon.  Breakout (op 'above'): close above the highest EMA.
    Exit (all-flipped rule): close back above (breakdown) / below (breakout) the average of the long EMAs. */
-const SSCAN_SQ = { a: 1.0, n: 10, m: 3 };
+const SSCAN_SQ = { a: 2.5, n: 8, m: 3, w: 15 };
 function sscanSqueezeLine(candles, c) {
   const closes = candles.map(x => x.c), N = candles.length;
   const a = c.a > 0 ? c.a : SSCAN_SQ.a, n = c.n >= 1 ? c.n : SSCAN_SQ.n, m = c.m >= 1 ? c.m : SSCAN_SQ.m;
@@ -3581,9 +3589,52 @@ function sscanRefLine(candles, c) {
 /* Optional stop-loss (slr = {n, buf, mode, side}): a SELL position is stopped out when a candle's HIGH reaches the highest high of the
    previous N candles (+ buf %); a BUY when the LOW reaches the lowest low (- buf %). 'fixed' = level set at entry; 'trail' = re-set every
    candle but only ever tightened. A gap through the level fills at the open. stops[k] describes how exit k was triggered. */
+/* Squeeze -> crossover + Supertrend flip -> breakout (the "sequence" rule).
+   Used whenever a scan holds a squeeze (gsq), a Guppy (gmma) and a Supertrend (st) condition. All thresholds are in bars or ATR multiples, so it behaves the same on every timeframe.
+   1) ARM: at least m of the last n bars were squeezed (ribbon <= a x ATR).  The setup expires if no squeezed bar is seen for w bars.
+   2) TRIGGER: after arming, the short/long Guppy crossover AND the Supertrend flip must both happen (either order, within w bars of each other);
+      the entry fires on the bar the second one completes, and only if the close is beyond the whole ribbon (below for Sell, above for Buy).
+   3) ONE entry per squeeze. EXIT: Supertrend flips back (or the optional stop-loss). A new squeeze is needed before the next entry. */
+function sscanIsSeq(conds) { return Array.isArray(conds) && ['gsq', 'gmma', 'st'].every(k => conds.some(c => c && c.k === k)); }
+function sscanSeqSignals(candles, conds, minPrem, slr) {
+  const n = candles.length, entries = [], exits = [], stops = {};
+  const gq = conds.find(c => c.k === 'gsq'), gm = conds.find(c => c.k === 'gmma'), sp = conds.find(c => c.k === 'st');
+  const bear = gq.op === 'below', sellSide = bear;
+  const a = gq.a > 0 ? gq.a : SSCAN_SQ.a, nWin = gq.n >= 1 ? gq.n : SSCAN_SQ.n, mMin = gq.m >= 1 ? gq.m : SSCAN_SQ.m, W = gq.w >= 1 ? gq.w : SSCAN_SQ.w;
+  const Q = sscanSqueezeLine(candles, { k: 'gsq', a, n: nWin, m: mMin, s: gm.s, l: gm.l }), G = sscanGmmaLine(candles, gm), T = supertrendSeries(candles, sp.p, sp.m);
+  const isSq = i => !!(Q[i] && Q[i].w <= a);
+  const lvlOf = (x, y) => { let v = sellSide ? -Infinity : Infinity; for (let k = Math.max(0, x); k <= y; k++) v = sellSide ? Math.max(v, candles[k].h) : Math.min(v, candles[k].l); return sellSide ? v * (1 + slr.buf / 100) : v * (1 - slr.buf / 100); };
+  let armed = false, reset = 0, armI = -1, lastSq = -99, cx = -99, tf = -99, pos = false, lvl = null;
+  for (let i = 1; i < n; i++) {
+    if (!(Q[i] && Q[i - 1] && G[i] && G[i - 1] && T.line[i] != null && T.trendUp[i - 1] != null)) continue;
+    const up = T.trendUp[i], up0 = T.trendUp[i - 1];
+    if (pos) {
+      let hit = false;
+      if (slr) {
+        if (slr.mode === 'trail') { const t = lvlOf(i - slr.n, i - 1); lvl = sellSide ? Math.min(lvl, t) : Math.max(lvl, t); }
+        hit = sellSide ? candles[i].h >= lvl : candles[i].l <= lvl;
+      }
+      if (hit) { stops[exits.length] = { level: lvl, fill: sellSide ? Math.max(lvl, candles[i].o) : Math.min(lvl, candles[i].o) }; exits.push(i); pos = false; reset = i; }
+      else if (bear ? (up && !up0) : (!up && up0)) { exits.push(i); pos = false; reset = i; }
+      continue;
+    }
+    if (isSq(i)) lastSq = i;
+    if (!armed) { let c = 0; for (let k = Math.max(reset + 1, i - nWin); k <= i; k++) if (isSq(k)) c++; if (c >= mMin) { armed = true; armI = i; cx = tf = -99; } }
+    if (!armed) continue;
+    if (i - lastSq > W) { armed = false; continue; }
+    const g = G[i], g0 = G[i - 1];
+    if (bear ? (g0.sa >= g0.la && g.sa < g.la) : (g0.sa <= g0.la && g.sa > g.la)) cx = i;
+    if (bear ? (up0 && !up) : (!up0 && up)) tf = i;
+    const both = cx > armI && tf > armI && i - Math.min(cx, tf) <= W && (cx === i || tf === i);
+    const state = bear ? (g.sa < g.la && !up && candles[i].c < Q[i].lo) : (g.sa > g.la && up && candles[i].c > Q[i].hi);
+    if (both && state && !(minPrem > 0 && candles[i].c < minPrem)) { entries.push(i); pos = true; armed = false; if (slr) lvl = lvlOf(i - slr.n + 1, i); }
+  }
+  return { entries, exits, stops, inPos: pos };
+}
 function sscanSignals(candles, conds, xr, minPrem, slr) {
   const n = candles.length, entries = [], exits = [], stops = {};
   if (!n || !conds || !conds.length) return { entries, exits, stops, inPos: false };
+  if (sscanIsSeq(conds)) return sscanSeqSignals(candles, conds, minPrem, slr);   // squeeze -> crossover + Supertrend flip -> breakout; ignores the old EMA 15 exit
   const lines = conds.map(c => sscanRefLine(candles, c));
   const xl = xr ? sscanRefLine(candles, { k: 'ema', p: xr.p }) : null; // optional custom exit: close vs EMA
   const valid = new Array(n).fill(false), ent = new Array(n).fill(false), ext = new Array(n).fill(false);
@@ -3638,7 +3689,8 @@ function sscanEval(candles, conds, xr, slr) {
   const acts = sscanSignals(candles, conds, xr, 0, slr).entries;   // one entry per cycle (exit must fire before the next)
   const lastIdx = acts.length ? acts[acts.length - 1] : -1;
   let days = 0; for (let i = n; i >= 0; i--) { if (conds.every((c, j) => { const v = lines[j][i]; return v != null && sscanCmp(c, candles[i].c, v, c.op === 'below'); })) days++; else break; }
-  return { acts, days, details: now, allNow: now.every(d => d.ok), allPrev: prev ? prev.every(d => d.ok) : false, price: candles[n].c,
+  const seq = sscanIsSeq(conds);   // sequence scans fire on the bar the entry completes (states alone cannot show the order)
+  return { acts, days, details: now, allNow: seq ? lastIdx === n : now.every(d => d.ok), allPrev: seq ? false : (prev ? prev.every(d => d.ok) : false), price: candles[n].c,
            lastActSec: lastIdx >= 0 ? liveTimeToSec(candles[lastIdx].t) : null, barsSince: lastIdx >= 0 ? n - lastIdx : null, actCount: acts.length };
 }
 async function runSScan(i) {
@@ -3744,7 +3796,7 @@ function sscanFillApply() {
   const onStrat = liveMode && LIVE.kind === 'strategy';
   const pr = onStrat ? null : sscanGuppyPair(), hide = pr ? [pr.bull.name, pr.bear.name] : [];
   sel.innerHTML = '<option value="">Off</option>' +
-    (pr ? `<option value="__pair" ${sscanApplied === '__pair' ? 'selected' : ''}>Guppy crossover: Bullish + Bearish · Buy + Sell</option>` : '') +
+    (pr ? `<option value="__pair" ${sscanApplied === '__pair' ? 'selected' : ''}>Guppy squeeze signals: Bullish + Bearish · Buy + Sell</option>` : '') +
     sscans.filter(sc => hide.indexOf(sc.name) < 0 && !(onStrat && sc.strat === 'Guppy crossover')).map(sc => `<option value="${sscanEsc(sc.name)}" ${sc.name === sscanApplied ? 'selected' : ''}>${sscanEsc(sc.name)} · ${sc.side}</option>`).join('') +
     '<option value="__new">+ New scan for this chart…</option>';
   if (!sscanApplied) sel.value = '';
@@ -12800,7 +12852,7 @@ function phCfg(name) { if (!PH.sc[name]) PH.sc[name] = { on: false, tf: '15m', v
 function phScans() {
   return phScanList().filter(({ sc }) => PH.sc[sc.name] && PH.sc[sc.name].on && phSupported(sc)).map(({ sc }) => {
     const cf = PH.sc[sc.name];
-    return { id: phHash(sc.name), name: sc.name, side: sc.side, und: String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u)), tf: cf.tf, ver: cf.ver, conds: sc.conds, pause: cf.pause };
+    return { id: phHash(sc.name), name: sc.name, side: sc.side, und: String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u)), tf: cf.tf, ver: cf.ver, conds: sc.conds, seq: sscanIsSeq(sc.conds), pause: cf.pause };
   });
 }
 function stOn(i, v) { const sc = sscans[i]; if (!sc) return; const c = phCfg(sc.name); c.on = !!v; if (v) c.ver = Date.now(); phSave(); phSyncSoon(); alrRender(); }
@@ -12830,7 +12882,7 @@ function stratCard() {
       <label style="${lab}">Until<select onchange="stPause(${i},'ed',this.value)">${dayOpts(pz.ed)}</select></label><label style="${lab}">at<input type="time" value="${phEsc(pz.et)}" onchange="stPause(${i},'et',this.value)"></label></div><div class="mkt-note">Times are IST. Signals during the pause are skipped, not delayed.</div>` : ''}
       <div class="mkt-note">${last ? 'Last alert: ' + phEsc(last) : 'No alert sent yet.'}</div>` : ''}</div>`;
   }).join('');
-  return `<div class="mkt-card"><div style="font:600 14px var(--sans);margin-bottom:4px">Strategy alerts (Guppy)</div><div class="mkt-note" style="margin:0 0 8px">Checked by your Worker each time a candle closes, so it works with the app closed. Alerts fire once, when a fresh signal forms.</div>${rows}<div class="mkt-acts"><button class="mkt-btn" onclick="stCheck()">Check now (sends result to Telegram)</button></div></div>`;
+  return `<div class="mkt-card"><div style="font:600 14px var(--sans);margin-bottom:4px">Strategy alerts (Guppy)</div><div class="mkt-note" style="margin:0 0 8px">Checked by your Worker each time a candle closes, so it works with the app closed. Alerts fire once, when a fresh signal forms. Squeeze scans are sent with a sequence flag; your Worker must run the same sequence rule, otherwise phone alerts keep using the older rule and can differ from the chart.</div>${rows}<div class="mkt-acts"><button class="mkt-btn" onclick="stCheck()">Check now (sends result to Telegram)</button></div></div>`;
 }
 function phCard() {
   const q = PH.quiet, body = !phReady()
