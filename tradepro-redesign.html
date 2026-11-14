@@ -1285,6 +1285,9 @@
     #view-replay #rc-month-wrap { order: 3; }
     #view-replay #rc-live-tf-wrap, #view-replay #rc-timeframe-wrap { order: 4; }
     #view-replay #rc-charttype-wrap { order: 5; }
+    #view-replay #rc-brick-wrap { order: 5; gap: 6px; }
+    #view-replay #rc-brick-wrap input.field-input { width: 84px; height: 30px; padding: 0 10px; border-radius: 999px; font-size: 12px; margin: 0; }
+    #view-replay #rc-brick-wrap input.field-input:disabled { opacity: .7; }
     #view-replay .rc-indicators { order: 6; }
     #view-replay #rc-live-scan-wrap { order: 7; }
     #view-replay .ind-add-btn { padding: 0 11px; height: 30px; font-size: 12px; border-radius: 999px; white-space: nowrap; display: flex; align-items: center; }
@@ -2095,8 +2098,12 @@
               </select>
             </div>
             <div class="rc-field" id="rc-brick-wrap" style="display:none">
-              <label class="field-label">Brick size</label>
-              <input type="number" class="field-input" id="renko-brick-size" min="0.0001" step="any" oninput="onBrickSizeChange()">
+              <label class="field-label">Renko box</label>
+              <select class="field-input" id="renko-mode" onchange="onRenkoModeChange()" title="Traditional = fixed box size you type. ATR = box size taken from the Average True Range of the chart's own candles.">
+                <option value="fixed" selected>Traditional</option>
+                <option value="atr">ATR 14</option>
+              </select>
+              <input type="number" class="field-input" id="renko-brick-size" min="0.0001" step="any" oninput="onBrickSizeChange()" title="Renko box size (price units)" placeholder="box size">
             </div>
             <div class="rc-field" id="rc-contract-wrap" style="display:none">
               <label class="field-label">Contract</label>
@@ -3760,7 +3767,8 @@ function sscanChartSignals(ov) {
   const secs = liveMode && LIVE.kind !== 'india' ? LIVE_RES[LIVE.res] : 0;   // replay data is all historical: no still-forming candle to skip
   let n = Math.min(replayIndex, replayCandles.length);
   if (n > 0 && secs) { const ts = liveTimeToSec(replayCandles[n - 1].t); if (ts != null && ts + secs > Date.now() / 1000) n--; }
-  const cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
+  let cs = n === replayCandles.length ? replayCandles : replayCandles.slice(0, n);
+  if (chartAltSeries) cs = chartType === 'renko' ? chartAltSeries : chartAltSeries.slice(0, n);   // Renko bricks / Heikin-Ashi candles: signals follow what is drawn
   const sig = indCalc('scansig', { calc: (c, p) => sscanSignals(c, p.conds, p.xr, p.minPrem, p.slr) }, cs, { conds: ov.conds, xr: sscanExitRule(ov), minPrem: ov.perp || ov.opt ? 0 : ov.minPrem || 0, slr: sscanSlRule(ov) });
   return { sig, cs };
 }
@@ -5568,7 +5576,9 @@ function priceShiftChart(dir) { priceShift += dir * 0.3 * Math.min(priceZoom, 3)
 function priceFit() { priceZoom = 1; priceShift = 0; renderChart(true); pzLabel(); }
 function pzLabel() { const b = document.getElementById('pz-fit'); if (b) b.textContent = priceZoom === 1 && !priceShift ? 'Fit' : (priceZoom >= 10 ? Math.round(priceZoom) : priceZoom.toFixed(1)) + '×'; }
 let chartType = 'candles'; // 'candles' | 'heikinashi' | 'renko' — which style renderChart draws
+let renkoMode = 'fixed'; // 'fixed' = traditional box size | 'atr' = box size from ATR(14) of the chart's candles
 let renkoBrickSize = null; // null = auto-sized from recent volatility; set once the user edits it
+let chartAltSeries = null; // Renko bricks or Heikin-Ashi candles while one of those styles is shown, else null — indicators and signals read from it
 let chartDisplayCandles = []; // whatever renderChart actually drew (real candles, HA candles, or Renko bricks) — what the crosshair/readout read against
 let chartTouchLock = false, chartRenderDeferred = false; // while a finger gesture is active, live ticks must not rebuild the SVG under it
 let chartGeom = null; // cached mapping constants from the last render, used by the crosshair
@@ -5731,6 +5741,29 @@ function onChartTypeChange() {
 function onBrickSizeChange() {
   const v = parseFloat(document.getElementById('renko-brick-size').value);
   if (v > 0) { renkoBrickSize = v; renderChart(); }
+}
+function syncRenkoControls(size) {
+  const inp = document.getElementById('renko-brick-size'), sel = document.getElementById('renko-mode');
+  if (sel && sel.value !== renkoMode) sel.value = renkoMode;
+  if (inp) {
+    inp.disabled = renkoMode === 'atr';
+    if (size != null && document.activeElement !== inp) inp.value = size;
+  }
+}
+function onRenkoModeChange() {
+  renkoMode = document.getElementById('renko-mode').value === 'atr' ? 'atr' : 'fixed';
+  if (renkoMode === 'fixed') renkoBrickSize = autoRenkoBrickSize();
+  renderChart();
+}
+function atrRenkoBrickSize() {
+  // ATR-based boxes: Wilder ATR(14) over the chart's own candles up to the revealed point, rounded to 2 significant
+  // digits so the boxes don't re-flow on every tick. Falls back to the traditional auto size if there is too little data.
+  const upTo = replayIndex || replayCandles.length;
+  if (upTo < 3) return autoRenkoBrickSize();
+  const a = atrSeriesGeneric(replayCandles.slice(0, upTo), Math.min(14, upTo - 1)), v = a[a.length - 1];
+  if (!(v > 0)) return autoRenkoBrickSize();
+  const mag = Math.pow(10, Math.floor(Math.log10(v)) - 1);
+  return Math.max(1e-4, Math.round(v / mag) * mag);
 }
 function computeHeikinAshi(candles) {
   // Standard Heikin-Ashi recurrence: each bar's open is the midpoint of the PREVIOUS
@@ -8041,8 +8074,13 @@ function renderChart(forceEnd) {
   // series entirely as fixed-size, non-time-based bricks, so indicators that assume one
   // value per time step don't apply there — disabled rather than drawn wrong.
   const haCandles = chartType === 'heikinashi' ? computeHeikinAshi(replayCandles) : null;
+  if (chartType === 'renko' && renkoMode === 'atr') renkoBrickSize = atrRenkoBrickSize();
   const renkoBricks = chartType === 'renko' ? computeRenkoBricks(replayCandles, replayIndex, renkoBrickSize || (renkoBrickSize = autoRenkoBrickSize())) : null;
-  const indicatorsSupported = chartType !== 'renko';
+  if (chartType === 'renko') syncRenkoControls(renkoBrickSize);
+  const dispCS = chartType === 'renko' ? renkoBricks : (chartType === 'heikinashi' ? haCandles : replayCandles);   // the series actually drawn: indicators, signals and the price scale all follow it
+  const dispN = chartType === 'renko' ? renkoBricks.length : replayIndex;
+  chartAltSeries = chartType === 'candles' ? null : dispCS;
+  const indicatorsSupported = true;
 
   const oscInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'oscillator' && !i.hidden) : [];
   const overlayInstances = indicatorsSupported ? activeIndicators.filter(i => INDICATOR_DEFS[i.key].type === 'overlay' && !i.hidden) : [];
@@ -8074,10 +8112,10 @@ function renderChart(forceEnd) {
   const prevSL = scrollEl.scrollLeft, prevSW = scrollEl.scrollWidth, prevCW = scrollEl.clientWidth || 340;
   const atRightEdge = forceEnd || !prevSW || (prevSW - prevCW - prevSL) < 30;
   let yStart, yEnd;
-  if (atRightEdge) { yEnd = replayIndex; yStart = Math.max(0, yEnd - visCount); }
-  else { yStart = Math.max(0, Math.floor((prevSL - 10) / candlePx)); yEnd = Math.min(replayIndex, yStart + visCount); }
-  if (yEnd - yStart < 1) { yEnd = replayIndex; yStart = Math.max(0, yEnd - visCount); }
-  const yCandles = replayCandles.slice(yStart, yEnd);
+  if (atRightEdge) { yEnd = dispN; yStart = Math.max(0, yEnd - visCount); }
+  else { yStart = Math.max(0, Math.floor((prevSL - 10) / candlePx)); yEnd = Math.min(dispN, yStart + visCount); }
+  if (yEnd - yStart < 1) { yEnd = dispN; yStart = Math.max(0, yEnd - visCount); }
+  const yCandles = dispCS.slice(yStart, yEnd);
   let winHigh = Math.max(...yCandles.map(c => c.h));
   let winLow = Math.min(...yCandles.map(c => c.l));
   // Deliberately NOT stretching this to fit entry/SL/TP/liquidation: a leveraged position's
@@ -8122,7 +8160,7 @@ function renderChart(forceEnd) {
   // overlay lines/band/markers instead of recalculating it a second time.
   let confluenceCalc = null;
   const confluenceInstForChart = overlayInstances.find(i => i.key === 'confluence');
-  if (confluenceInstForChart) confluenceCalc = indCalc('confluence', INDICATOR_DEFS.confluence, replayCandles, confluenceInstForChart.params);
+  if (confluenceInstForChart) confluenceCalc = indCalc('confluence', INDICATOR_DEFS.confluence, dispCS, confluenceInstForChart.params);
 
   let bars = '', volBars = '';
   if (chartType === 'renko') {
@@ -8164,10 +8202,10 @@ function renderChart(forceEnd) {
   }
 
   function seriesPath(values, mapY, color, dash, width, opacityPct, count) {
-    // `count` lets a caller draw past replayIndex (Ichimoku's forward-projected cloud) —
+    // `count` lets a caller draw past dispN (Ichimoku's forward-projected cloud) —
     // every other caller omits it and gets the usual "up to what's revealed" behavior.
     let pts = [];
-    const n = count != null ? count : replayIndex;
+    const n = count != null ? count : dispN;
     for (let i = Math.max(0, drawLo - 1); i < Math.min(n, drawHi + 2); i++) {
       if (values[i] == null) continue;
       pts.push(`${xAt(i).toFixed(2)},${mapY(values[i]).toFixed(2)}`);
@@ -8178,7 +8216,7 @@ function renderChart(forceEnd) {
   }
   function segmentedPath(values, flags, mapY, colorA, colorB, width) {
     let out = '';
-    for (let i = Math.max(1, drawLo); i < Math.min(replayIndex, drawHi + 2); i++) {
+    for (let i = Math.max(1, drawLo); i < Math.min(dispN, drawHi + 2); i++) {
       if (values[i] == null || values[i-1] == null) continue;
       const c = flags[i] ? colorA : colorB;
       out += `<line x1="${xAt(i-1).toFixed(2)}" y1="${mapY(values[i-1]).toFixed(2)}" x2="${xAt(i).toFixed(2)}" y2="${mapY(values[i]).toFixed(2)}" stroke="${c}" stroke-width="${width || 1.8}"/>`;
@@ -8189,12 +8227,12 @@ function renderChart(forceEnd) {
   let overlays = '', oscSvg = '', oscTagsHtml = '', signalMarkers = '';
   overlayInstances.forEach(inst => {
     const def = INDICATOR_DEFS[inst.key];
-    const result = inst.key === 'confluence' ? confluenceCalc : indCalc(inst.key, def, replayCandles, inst.params);
+    const result = inst.key === 'confluence' ? confluenceCalc : indCalc(inst.key, def, dispCS, inst.params);
     if (inst.key === 'bb') {
       let band = '';
       const pts = [];
-      for (let i = 0; i < replayIndex; i++) if (result.upper[i] != null) pts.push([xAt(i), yAt(result.upper[i])]);
-      for (let i = replayIndex - 1; i >= 0; i--) if (result.lower[i] != null) pts.push([xAt(i), yAt(result.lower[i])]);
+      for (let i = 0; i < dispN; i++) if (result.upper[i] != null) pts.push([xAt(i), yAt(result.upper[i])]);
+      for (let i = dispN - 1; i >= 0; i--) if (result.lower[i] != null) pts.push([xAt(i), yAt(result.lower[i])]);
       if (pts.length > 3) band = `<polygon points="${pts.map(p=>p[0].toFixed(2)+','+p[1].toFixed(2)).join(' ')}" fill="${inst.color}" opacity="0.08"/>`;
       overlays += band;
       overlays += seriesPath(result.upper, yAt, inst.color, '3,3', inst.width, inst.opacity);
@@ -8208,8 +8246,8 @@ function renderChart(forceEnd) {
       // fill, so the cloud actually reads against the dark chart background instead of
       // disappearing into it.
       let segStart = 0;
-      for (let i = 1; i <= replayIndex; i++) {
-        const atEnd = i === replayIndex;
+      for (let i = 1; i <= dispN; i++) {
+        const atEnd = i === dispN;
         const stateChanged = !atEnd && (result.sslStateUp[i] !== result.sslStateUp[segStart] || result.sslHigh[i] == null || result.sslHigh[segStart] == null);
         if (atEnd || stateChanged) {
           const segEnd = i;
@@ -8228,8 +8266,8 @@ function renderChart(forceEnd) {
       overlays += segmentedPath(result.sslLine, result.sslStateUp, yAt, CONFLUENCE_BULL_COLOR, CONFLUENCE_BEAR_COLOR, inst.width);
       // Adaptive Ehlers Filtered Percentile trend line, dashed, so it reads as the second confirming layer
       overlays += segmentedPath(result.aefpTrend, result.aefpRegimeUp, yAt, CONFLUENCE_BULL_COLOR, CONFLUENCE_BEAR_COLOR, Math.max(1, (inst.width||1.5) - 0.5));
-      for (let i = 0; i < replayIndex; i++) {
-        const c = replayCandles[i];
+      for (let i = 0; i < dispN; i++) {
+        const c = dispCS[i];
         const x = xAt(i);
         if (result.buyMarkers[i]) {
           const y = clampY(yAt(c.l) + 14);
@@ -8258,17 +8296,17 @@ function renderChart(forceEnd) {
       ];
       PIVOT_LEVELS.forEach(lv => {
         let runStart = null;
-        for (let i = 0; i <= replayIndex; i++) {
-          const sameAsRun = runStart != null && i < replayIndex && lv.arr[i] === lv.arr[runStart];
+        for (let i = 0; i <= dispN; i++) {
+          const sameAsRun = runStart != null && i < dispN && lv.arr[i] === lv.arr[runStart];
           if (!sameAsRun) {
             if (runStart != null && lv.arr[runStart] != null) {
               const y = yAt(lv.arr[runStart]);
               overlays += `<line x1="${xAt(runStart).toFixed(2)}" y1="${y.toFixed(2)}" x2="${xAt(i-1).toFixed(2)}" y2="${y.toFixed(2)}" stroke="${lv.color}" stroke-width="1" stroke-dasharray="3,2" opacity="0.7"/>`;
             }
-            runStart = i < replayIndex ? i : null;
+            runStart = i < dispN ? i : null;
           }
         }
-        const lastVal = lv.arr[replayIndex - 1];
+        const lastVal = lv.arr[dispN - 1];
         if (lastVal != null) {
           oscTagsHtml += `<div class="price-tag" style="top:${clampY(yAt(lastVal)).toFixed(0)}px; background:${lv.color}; color:var(--on-accent); border:none; font-size:9px; padding:2px 5px;">${lv.label}</div>`;
         }
@@ -8276,8 +8314,8 @@ function renderChart(forceEnd) {
     } else if (inst.key === 'ma_cross') {
       overlays += seriesPath(result.fast, yAt, '#2EBD85', null, inst.width, inst.opacity);
       overlays += seriesPath(result.slow, yAt, '#F6465D', null, inst.width, inst.opacity);
-      for (let i = 0; i < replayIndex; i++) {
-        const c = replayCandles[i];
+      for (let i = 0; i < dispN; i++) {
+        const c = dispCS[i];
         const x = xAt(i);
         if (result.bullCross[i]) {
           const y = clampY(yAt(c.l) + 14);
@@ -8306,9 +8344,9 @@ function renderChart(forceEnd) {
       // Senkou A/B projected `disp` bars forward — the values themselves only depend on
       // already-revealed highs/lows, so this is re-plotting known data further right,
       // not previewing anything not yet revealed.
-      const projLen = replayIndex + disp;
+      const projLen = dispN + disp;
       const senkouA = new Array(projLen).fill(null), senkouB = new Array(projLen).fill(null);
-      for (let i = 0; i < replayIndex; i++) {
+      for (let i = 0; i < dispN; i++) {
         if (result.senkouARaw[i] != null) senkouA[i + disp] = result.senkouARaw[i];
         if (result.senkouBRaw[i] != null) senkouB[i + disp] = result.senkouBRaw[i];
       }
@@ -8332,9 +8370,9 @@ function renderChart(forceEnd) {
       overlays += seriesPath(senkouA, yAt, 'var(--green)', null, 1, 60, projLen);
       overlays += seriesPath(senkouB, yAt, 'var(--red)', null, 1, 60, projLen);
       // Chikou: today's close re-plotted `disp` bars back — only ever re-displays closes
-      // that are already revealed (close[k+disp] is only used once k+disp < replayIndex).
-      const chikou = new Array(replayIndex).fill(null);
-      for (let k = 0; k + disp < replayIndex; k++) chikou[k] = result.closeRaw[k + disp];
+      // that are already revealed (close[k+disp] is only used once k+disp < dispN).
+      const chikou = new Array(dispN).fill(null);
+      for (let k = 0; k + disp < dispN; k++) chikou[k] = result.closeRaw[k + disp];
       overlays += seriesPath(chikou, yAt, '#8E44AD', '2,2', inst.width, inst.opacity);
     } else {
       overlays += seriesPath(result.line, yAt, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
@@ -8343,11 +8381,11 @@ function renderChart(forceEnd) {
 
   signalInstances.forEach(inst => {
     const def = INDICATOR_DEFS[inst.key];
-    const result = indCalc(inst.key, def, replayCandles, inst.params);
+    const result = indCalc(inst.key, def, dispCS, inst.params);
     const buyColor = inst.buyColor || inst.color || '#00C853';
     const sellColor = inst.sellColor || '#FF5252';
-    for (let i = 0; i < replayIndex; i++) {
-      const c = replayCandles[i];
+    for (let i = 0; i < dispN; i++) {
+      const c = dispCS[i];
       const x = xAt(i);
       if (result.buyMarkers && result.buyMarkers[i]) {
         const y = clampY(yAt(c.l) + 14);
@@ -8370,7 +8408,7 @@ function renderChart(forceEnd) {
     const entTag = isSell ? 'SELL' : 'BUY', exTag = ov.strat === 'Guppy crossover' ? (isSell ? 'SELL EXIT' : 'BUY EXIT') : (isSell ? 'BUY EXIT' : 'SELL EXIT');   // Guppy: the exit is named after the trade it closes
     const BUY_COL = '#2F9BFF', SELL_COL = '#FFD60A';
     const { sig, cs } = sscanChartSignals(ov);
-    if (!ov.perp && !ov.opt) try { sperfLogFromChart(ov, sig, cs); } catch (e) { /* logging must never break the chart */ }
+    if (!ov.perp && !ov.opt && !chartAltSeries) try { sperfLogFromChart(ov, sig, cs); } catch (e) { /* logging must never break the chart */ }
     const arrow = (i, tag) => {
       const isBuy = tag.indexOf('BUY') === 0, col = isBuy ? BUY_COL : SELL_COL, x = xAt(i), exit = /EXIT/.test(tag);
       const top = GAP, bot = GAP + (BASE_H - GAP - VOLH - PAD);
@@ -8409,7 +8447,7 @@ function renderChart(forceEnd) {
   oscInstances.forEach((inst, pi) => {
     if (paneIsCollapsed(inst)) return;
     const def = INDICATOR_DEFS[inst.key];
-    const result = indCalc(inst.key, def, replayCandles, inst.params);
+    const result = indCalc(inst.key, def, dispCS, inst.params);
     const top = BASE_H - PAD + OSC_GAP + oscInstances.slice(0, pi).reduce((t, i) => t + oscHOf(i) + OSC_GAP, 0);
     const bottom = top + oscHOf(inst);
     const tagStart = oscTagsHtml.length, vzr = inst.vr && inst.vr.hi > inst.vr.lo ? inst.vr : null;
@@ -8421,12 +8459,12 @@ function renderChart(forceEnd) {
 
     if (def.renderKind === 'macd') {
       const vals = [];
-      for (let i = 0; i < replayIndex; i++) { if (result.macd[i]!=null) vals.push(result.macd[i]); if (result.signal[i]!=null) vals.push(result.signal[i]); if (result.hist[i]!=null) vals.push(result.hist[i]); }
+      for (let i = 0; i < dispN; i++) { if (result.macd[i]!=null) vals.push(result.macd[i]); if (result.signal[i]!=null) vals.push(result.signal[i]); if (result.hist[i]!=null) vals.push(result.hist[i]); }
       const mx = vals.length ? Math.max(...vals.map(Math.abs)) * 1.15 || 1 : 1;
       const oY = mkY(-mx, mx);
       const zeroY = oY(0);
       oscSvg += `<line x1="0" y1="${zeroY.toFixed(1)}" x2="${W}" y2="${zeroY.toFixed(1)}" stroke="var(--text-faint)" stroke-width="1"/>`;
-      for (let i = 0; i < replayIndex; i++) {
+      for (let i = 0; i < dispN; i++) {
         if (result.hist[i] == null) continue;
         const x = xAt(i), hy = oY(result.hist[i]);
         const up = result.hist[i] >= 0;
@@ -8434,7 +8472,7 @@ function renderChart(forceEnd) {
       }
       oscSvg += seriesPath(result.macd, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
       oscSvg += seriesPath(result.signal, oY, inst.secondaryColor || '#D9A441', null, inst.width, inst.opacity);
-      const lastM = result.macd[replayIndex-1];
+      const lastM = result.macd[dispN-1];
       if (lastM != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastM).toFixed(0)}px; background:${inst.color}; color:var(--on-accent); border:none;">${lastM.toFixed(1)}</div>`;
     } else if (def.renderKind === 'stoch') {
       const oY = mkY(0, 100);
@@ -8444,17 +8482,17 @@ function renderChart(forceEnd) {
       });
       oscSvg += seriesPath(result.k, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
       oscSvg += seriesPath(result.d, oY, inst.secondaryColor || '#D9A441', '3,2', inst.width, inst.opacity);
-      const lastK = result.k[replayIndex-1];
+      const lastK = result.k[dispN-1];
       if (lastK != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastK).toFixed(0)}px; background:${inst.color}; color:var(--on-accent); border:none;">${lastK.toFixed(1)}</div>`;
     } else if (def.renderKind === 'atr') {
       // Unbounded positive value, so it gets its own auto-scaled 0..max pane rather than
       // the fixed 0-100 scale RSI/Stoch use.
       const vals = [];
-      for (let i = 0; i < replayIndex; i++) if (result.line[i] != null) vals.push(result.line[i]);
+      for (let i = 0; i < dispN; i++) if (result.line[i] != null) vals.push(result.line[i]);
       const mx = (vals.length ? Math.max(...vals) : 1) * 1.15 || 1;
       const oY = mkY(0, mx);
       oscSvg += seriesPath(result.line, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
-      const lastVal = result.line[replayIndex - 1];
+      const lastVal = result.line[dispN - 1];
       if (lastVal != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastVal).toFixed(0)}px; background:${inst.color}; color:var(--on-accent); border:none;">${lastVal.toFixed(2)}${def.unit || ''}</div>`;
     } else { // rsi: plot + smoothed MA + limit lines (configurable)
       const cf = rsiEnsure(inst);
@@ -8470,7 +8508,7 @@ function renderChart(forceEnd) {
         if (cf.plot) oscSvg += seriesPath(result.line, oY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
         if (cf.smooth && result.smooth && inst.params.smoothType !== 'None') oscSvg += seriesPath(result.smooth, oY, inst.secondaryColor, null, inst.width, inst.opacity);
         if (cf.plot && cf.smooth && result.smooth && inst.params.smoothType !== 'None') {   // hollow dot where RSI crosses its smoothing line (green = up through it, red = down through it)
-          for (let i = Math.max(1, replayIndex - 700); i < replayIndex; i++) {
+          for (let i = Math.max(1, dispN - 700); i < dispN; i++) {
             const a0 = result.line[i - 1], b0 = result.smooth[i - 1], a1 = result.line[i], b1 = result.smooth[i];
             if (a0 == null || b0 == null || a1 == null || b1 == null || !((a0 - b0) * (a1 - b1) < 0)) continue;
             const t = (a0 - b0) / ((a0 - b0) - (a1 - b1));
@@ -8478,9 +8516,9 @@ function renderChart(forceEnd) {
           }
         }
         if (cf.labels !== false) {
-          const lastVal = result.line[replayIndex - 1];
+          const lastVal = result.line[dispN - 1];
           if (cf.plot && lastVal != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastVal).toFixed(0)}px; background:${inst.color}; color:var(--on-accent); border:none;">${lastVal.toFixed(1)}</div>`;
-          const lastSm = result.smooth ? result.smooth[replayIndex - 1] : null;
+          const lastSm = result.smooth ? result.smooth[dispN - 1] : null;
           if (cf.smooth && lastSm != null && inst.params.smoothType !== 'None') oscTagsHtml += `<div class="price-tag" style="top:${oY(lastSm).toFixed(0)}px; background:${inst.secondaryColor}; color:var(--on-accent); border:none;">${lastSm.toFixed(1)}</div>`;
         }
       }
@@ -8516,9 +8554,6 @@ function renderChart(forceEnd) {
     for (let i = Math.floor(drawLo / stride) * stride; i < renkoBricks.length && i <= drawHi; i += stride) {
       xAxis += `<text x="${xAt(i).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#FFD43B" font-family="var(--mono)">${fmtAxisLabelSmart(renkoBricks[i].t, prevLblT)}</text>`;
       prevLblT = renkoBricks[i].t;
-    }
-    if (activeIndicators.length) {
-      xAxis += `<text x="6" y="12" font-size="9.5" fill="var(--text-faint)" font-family="var(--mono)">Indicators are unavailable on Renko charts</text>`;
     }
   } else {
     let prevLblT = null;
@@ -9328,13 +9363,13 @@ function updateOhlcReadout(candle, index) {
 }
 /* RSI / MACD / Stoch / ATR values at the candle under the crosshair (latest candle when idle), on their own line under the OHLC readout. */
 function oscReadoutHtml(idx) {
-  if (chartType === 'renko' || idx == null || idx < 0) return '';
+  if (idx == null || idx < 0) return '';
   const items = [];
   try {
     activeIndicators.forEach(inst => {
       const def = INDICATOR_DEFS[inst.key];
-      if (!def || def.type !== 'oscillator' || inst.hidden || paneIsCollapsed(inst) || idx >= replayIndex) return;
-      const r = indCalc(inst.key, def, replayCandles, inst.params), sec = inst.secondaryColor || '#D9A441';
+      if (!def || def.type !== 'oscillator' || inst.hidden || paneIsCollapsed(inst) || idx >= (chartType === 'renko' ? chartDisplayCandles.length : replayIndex)) return;
+      const r = indCalc(inst.key, def, chartDisplayCandles, inst.params), sec = inst.secondaryColor || '#D9A441';
       const f = v => v == null || !isFinite(v) ? '\u2013' : (Math.abs(v) < 1 ? v.toFixed(3) : v.toFixed(1)), c = (col, v) => `<b style="color:${col}">${f(v)}</b>`;
       let vals;
       if (def.renderKind === 'macd') vals = c(inst.color, r.macd[idx]) + ' ' + c(sec, r.signal[idx]) + ' ' + f(r.hist[idx]);
@@ -11939,7 +11974,7 @@ function selectContract(sym) {
     var regs = [];
     function reg(el, dest) { if (el) regs.push({ el: el, home: el.parentNode, next: el.nextSibling, dest: dest }); }
     ['rc-live-kind-wrap', 'rc-live-strat-wrap', 'rc-live-und-wrap', 'rc-live-exp-wrap', 'rc-live-ot-wrap', 'rc-live-strike-wrap',
-     'rc-live-center-wrap', 'rc-live-sw-wrap', 'rc-live-status-wrap', 'rc-brick-wrap', 'rc-contract-wrap', 'rc-jumpdate-wrap'].forEach(function (id) {
+     'rc-live-center-wrap', 'rc-live-sw-wrap', 'rc-live-status-wrap', 'rc-contract-wrap', 'rc-jumpdate-wrap'].forEach(function (id) {
       reg($(id), function () { return [$('m-sh-body'), null]; });
     });
     Array.prototype.forEach.call(view.querySelectorAll('.zoom-cluster'), function (z) { reg(z, function () { return [$('m-sh-zoom'), null]; }); });
@@ -12814,7 +12849,7 @@ function alrRender() {
     <input id="alr-val" inputmode="decimal" placeholder="Level" value="${mktEsc(d.val)}" onchange="alrSync()">`}</div>
     ${['price', 'funding', 'pcr'].includes(d.type) ? `<label style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-muted);margin:8px 0 0"><input type="checkbox" id="alr-always" style="width:auto" onchange="alrSync()"${d.always ? ' checked' : ''}> Always notify, even during quiet hours</label>` : ''}<div class="mkt-acts"><button class="mkt-btn pri" onclick="alrAdd()">Add alert</button>${canNote ? '<button class="mkt-btn" onclick="Notification.requestPermission().then(alrRender)">Enable notifications</button>' : ''}</div></div>
   ${rows || '<div class="mkt-empty">No alerts yet. Add one above, or tap a tile in Pulse and choose Set alert.</div>'}
-  ${phCard()}<div class="mkt-note">In-app alerts are checked every 30 seconds while TradePro is open. Phone alerts (Telegram) cover price, funding, PCR and Guppy alerts, with the app open or closed. Wall and trend alerts work only while the app is open. Never rely on alerts for time-critical exits. Use stop-losses for that.</div><div style="margin-top:8px"><button class="mkt-chipbtn" onclick="tpDiag()">App diagnostics</button></div>`;
+  ${hgCard()}${phCard()}<div class="mkt-note">In-app alerts are checked every 30 seconds while TradePro is open. Phone alerts (Telegram) cover price, funding, PCR and Guppy alerts, with the app open or closed. Wall and trend alerts work only while the app is open. Never rely on alerts for time-critical exits. Use stop-losses for that.</div><div style="margin-top:8px"><button class="mkt-chipbtn" onclick="tpDiag()">App diagnostics</button></div>`;
 }
 /* ---------- Phone alerts (Telegram via your own Cloudflare Worker) + quiet hours ---------- */
 const PH_KEY = 'tradepro_phone_v1', PH_TYPES = ['price', 'funding', 'pcr'];
@@ -12919,6 +12954,124 @@ function phCard() {
 setInterval(phPoll, 60000); setTimeout(() => phSync(false), 6000);
 
 setInterval(alrCheck, 30000); setTimeout(alrCheck, 4000);
+
+/* ---------- Heikin-Ashi Guppy alerts (in-app) ----------
+   Reuses your saved "Guppy crossover" scans (their conditions, exit rule and stop-loss) but evaluates them on HEIKIN-ASHI candles of the
+   perpetual, exactly like the chart does when Chart type = Heikin-Ashi. Checked every 20 s while the app is open; a scan is evaluated once per
+   closed candle. Only a signal on one of the last two closed candles fires, and each signal fires once. */
+const HG_KEY = 'tradepro_hg_v1', HG_OPEN = {};
+const HG = { on: {}, seen: {}, log: [], last: {}, busy: false, test: {}, msg: '' };
+try { const v = JSON.parse(localStorage.getItem(HG_KEY) || 'null'); if (v) { HG.on = v.on || {}; HG.seen = v.seen || {}; HG.log = v.log || []; } } catch (e) { /* storage unavailable */ }
+function hgSave() {
+  const keys = Object.keys(HG.seen); if (keys.length > 500) keys.slice(0, keys.length - 500).forEach(k => delete HG.seen[k]);
+  try { localStorage.setItem(HG_KEY, JSON.stringify({ on: HG.on, seen: HG.seen, log: HG.log.slice(0, 30) })); } catch (e) { /* storage unavailable */ }
+}
+const hgScans = () => sscans.map((sc, i) => ({ sc, i })).filter(x => x.sc && x.sc.strat === 'Guppy crossover' && Array.isArray(x.sc.conds) && x.sc.conds.length);
+const hgUnds = sc => String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u));
+function hgCfg(sc) { if (!HG.on[sc.name]) HG.on[sc.name] = { on: false, tf: sc.tf || '15m', exits: true, strong: false }; return HG.on[sc.name]; }
+function hgStrong(c, side) {   // classic strong-trend Heikin-Ashi candle: body in the trend direction and no wick on the opposite side
+  const r = c.h - c.l; if (!(r > 0)) return false;
+  return side === 'Sell' ? (c.c < c.o && c.h - c.o <= 0.05 * r) : (c.c > c.o && c.o - c.l <= 0.05 * r);
+}
+async function hgEval(sc, cfg, und) {
+  const secs = LIVE_RES[cfg.tf]; if (!secs) throw new Error('bad timeframe');
+  const now = Math.floor(Date.now() / 1000), sym = und + 'USD';
+  const cs = liveParseRestCandles(await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(sym)}&resolution=${cfg.tf}&start=${now - 340 * secs}&end=${now}`), cfg.tf);
+  if (cs.length && liveTimeToSec(cs[cs.length - 1].t) + secs > Date.now() / 1000) cs.pop();   // a signal needs a CLOSED candle
+  if (cs.length < 80) throw new Error('too few ' + cfg.tf + ' candles');
+  const ha = computeHeikinAshi(cs), sig = sscanSignals(ha, sc.conds, sscanExitRule(sc), 0, sscanSlRule(sc));
+  const entries = sig.entries.filter(i => !cfg.strong || hgStrong(ha[i], sc.side));
+  return { cs, ha, sig, entries, secs };
+}
+function hgTag(sc, type) { const sell = sc.side === 'Sell'; return (sell ? 'SELL' : 'BUY') + (type === 'exit' ? ' EXIT' : ' ENTRY'); }
+function hgBeep() { try { const A = window.AudioContext || window.webkitAudioContext; if (!A) return; const c = new A(), o = c.createOscillator(), g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = 880; g.gain.value = 0.08; o.start(); o.stop(c.currentTime + 0.25); setTimeout(() => c.close(), 600); } catch (e) { /* audio blocked */ } }
+function hgToast(msg, und, i) {
+  const t = document.createElement('div'); t.setAttribute('role', 'alert');
+  t.style.cssText = 'position:fixed;left:12px;right:12px;top:12px;z-index:10000;background:var(--surface-2);color:var(--text);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;font:14px var(--sans);box-shadow:0 8px 24px rgba(0,0,0,.45);display:flex;gap:10px;align-items:center';
+  const tx = document.createElement('div'); tx.style.flex = '1'; tx.textContent = msg; t.appendChild(tx);
+  if (und && i >= 0) { const v = document.createElement('button'); v.className = 'mkt-chipbtn'; v.textContent = 'View'; v.onclick = () => { t.remove(); hgOpen(und, i); }; t.appendChild(v); }
+  const x = document.createElement('button'); x.className = 'mkt-chipbtn'; x.textContent = 'Dismiss'; x.onclick = () => t.remove(); t.appendChild(x);
+  document.body.appendChild(t); setTimeout(() => t.remove(), 60000);
+}
+function hgFire(sc, und, tf, type, price, tIso, test) {
+  const msg = `${und} ${tf} · Heikin-Ashi Guppy ${hgTag(sc, type)} · ${sc.name}${price != null ? ' · close ' + fmtPrice(price) : ''}${test ? ' (test)' : ''}`;
+  HG.log.unshift({ at: Date.now(), msg, und, name: sc.name, test: !!test }); HG.log = HG.log.slice(0, 30);
+  hgToast(msg, und, sscans.indexOf(sc));
+  try { if ('Notification' in window && Notification.permission === 'granted') new Notification('TradePro · Heikin-Ashi Guppy', { body: msg, tag: 'hg|' + sc.name + '|' + und + '|' + type + '|' + (tIso || '') }); } catch (e) { /* not supported */ }
+  try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) { /* not supported */ }
+  hgBeep(); hgSave();
+  if (typeof MKT !== 'undefined' && MKT.seg === 'alerts') alrRender();
+}
+async function hgRun(manual) {
+  if (HG.busy) return; const todo = hgScans().filter(({ sc }) => hgCfg(sc).on && hgUnds(sc).length); if (!todo.length) return;
+  HG.busy = true; let changed = false;
+  try {
+    for (const { sc } of todo) {
+      const cfg = hgCfg(sc), secs = LIVE_RES[cfg.tf]; if (!secs) continue;
+      for (const und of hgUnds(sc)) {
+        const key = sc.name + '|' + und + '|' + cfg.tf + '|' + (cfg.strong ? 's' : 'p'), boundary = Math.floor((Date.now() / 1000 - 6) / secs);
+        if (!manual && HG.last[key] === boundary) continue;   // this candle is already checked
+        try {
+          const r = await hgEval(sc, cfg, und), n = r.ha.length;
+          HG.last[key] = boundary;
+          const evs = r.entries.filter(i => i >= n - 2).map(i => ({ type: 'entry', i }));
+          if (cfg.exits) r.sig.exits.filter(i => i >= n - 2).forEach(i => evs.push({ type: 'exit', i }));
+          evs.sort((a, b) => a.i - b.i).forEach(ev => {
+            const ek = key + '|' + ev.type + '|' + r.cs[ev.i].t;
+            if (HG.seen[ek]) return; HG.seen[ek] = 1; changed = true;
+            hgFire(sc, und, cfg.tf, ev.type, r.cs[ev.i].c, r.cs[ev.i].t);
+          });
+          HG.fail = 0;
+        } catch (e) { HG.fail = (HG.fail || 0) + 1; if (HG.fail >= 4) tpWarn('Heikin-Ashi alerts', 'Could not read candles for the Heikin-Ashi Guppy alerts, so they may be late.', { cool: 600000 }); }
+      }
+    }
+  } finally { HG.busy = false; if (changed) hgSave(); }
+}
+async function hgCheckNow(i) {   // shows the latest Heikin-Ashi Guppy signal per market without firing an alert
+  const sc = sscans[i]; if (!sc) return; const cfg = hgCfg(sc), lines = [];
+  HG.test[sc.name] = 'Checking…'; alrRender();
+  for (const und of hgUnds(sc)) {
+    try {
+      const r = await hgEval(sc, cfg, und), n = r.ha.length, e = r.entries.length ? r.entries[r.entries.length - 1] : -1, x = r.sig.exits.length ? r.sig.exits[r.sig.exits.length - 1] : -1;
+      const tx = k => sscanTime(liveTimeToSec(r.cs[k].t)) + ' (' + (n - 1 - k) + ' bars ago)';
+      lines.push(und + ': ' + (e < 0 ? 'no ' + hgTag(sc, 'entry') + ' in the last ' + n + ' candles' : 'last ' + hgTag(sc, 'entry') + ' ' + tx(e) + (x > e ? ' · exited ' + tx(x) : ' · ' + (r.sig.inPos ? 'still IN' : 'flat'))));
+    } catch (err) { lines.push(und + ': could not read candles (' + liveErrText(err) + ')'); }
+  }
+  HG.test[sc.name] = lines.join('\n'); alrRender();
+}
+function hgOn(i, v) { const sc = sscans[i]; if (!sc) return; const c = hgCfg(sc); c.on = !!v; if (v) { HG.last = {}; try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().then(alrRender); } catch (e) { /* not supported */ } } hgSave(); alrRender(); if (v) setTimeout(() => hgRun(true), 300); }
+function hgSet(i, k, v) { const sc = sscans[i]; if (!sc) return; const c = hgCfg(sc); c[k] = (k === 'exits' || k === 'strong') ? !!v : v; HG.last = {}; hgSave(); alrRender(); }
+function hgTest(i) { const sc = sscans[i]; if (sc) hgFire(sc, hgUnds(sc)[0] || 'BTC', hgCfg(sc).tf, 'entry', null, '', true); }
+async function hgOpen(und, i) {
+  try { await openGuppyChart(und, i); const s = document.getElementById('replay-charttype'); if (s) { s.value = 'heikinashi'; onChartTypeChange(); } } catch (e) { console.warn('hgOpen failed', e); }
+}
+function hgOpenSet(id, v) { HG_OPEN[id] = !!v; }
+function hgCard() {
+  const list = hgScans(), head = '<div style="font:600 14px var(--sans);margin-bottom:4px">Heikin-Ashi Guppy alerts</div>';
+  if (!list.length) return `<div class="mkt-card">${head}<div class="mkt-note" style="margin:0">No Guppy crossover strategy yet. Add one in Scanner (the Bullish or Bearish Guppy preset works), then switch its Heikin-Ashi alert on here.</div></div>`;
+  const tfOpts = sel => ['5m', '15m', '30m', '1h', '4h'].map(t => `<option${t === sel ? ' selected' : ''}>${t}</option>`).join('');
+  const onCount = list.filter(({ sc }) => hgCfg(sc).on && hgUnds(sc).length).length;
+  const rows = list.map(({ sc, i }) => {
+    const cf = hgCfg(sc), id = phHash(sc.name), unds = hgUnds(sc), can = unds.length > 0, on = cf.on && can;
+    const tag = on ? `<span class="mkt-tag">On · ${phEsc(cf.tf)}</span>` : '<span class="mkt-tag hol">Off</span>';
+    const tst = HG.test[sc.name];
+    return `<details style="border-top:1px solid var(--border);padding:10px 0"${HG_OPEN[id] ? ' open' : ''} ontoggle="hgOpenSet(${id},this.open)">
+      <summary style="cursor:pointer;display:flex;gap:10px;align-items:center;justify-content:space-between;list-style:none"><span style="min-width:0"><span style="font:600 13px var(--sans);display:block">${phEsc(sc.name)}</span><span class="mkt-note" style="margin:2px 0 0;display:block">${phEsc(unds.join(', ') || 'No supported markets')} · ${phEsc(sc.side)} signal · Heikin-Ashi candles</span></span><span style="display:flex;gap:8px;align-items:center;flex:none">${tag}<span aria-hidden="true" style="color:var(--text-muted)">▾</span></span></summary>
+      <div style="padding-top:10px">
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" onchange="hgOn(${i},this.checked)"${cf.on ? ' checked' : ''}${can ? '' : ' disabled'}> Heikin-Ashi alert</label>
+      ${cf.on ? `<div class="alr-f" style="margin-top:8px"><label style="grid-column:1/-1;font-size:12px;color:var(--text-muted)">Candle timeframe<select onchange="hgSet(${i},'tf',this.value)">${tfOpts(cf.tf)}</select></label></div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" onchange="hgSet(${i},'exits',this.checked)"${cf.exits ? ' checked' : ''}> Also alert on exits</label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" onchange="hgSet(${i},'strong',this.checked)"${cf.strong ? ' checked' : ''}> Entry only on a strong Heikin-Ashi candle (no wick on the opposite side)</label>
+      <div class="mkt-acts"><button class="mkt-btn" onclick="hgCheckNow(${i})">Check now</button><button class="mkt-btn" onclick="hgTest(${i})">Test alert</button><button class="mkt-btn" onclick="hgOpen('${phEsc(unds[0] || 'BTC')}',${i})">Open HA chart</button></div>
+      ${tst ? `<div class="mkt-note" style="white-space:pre-line">${phEsc(tst)}</div>` : ''}` : ''}
+      </div></details>`;
+  }).join('');
+  const log = HG.log.slice(0, 6).map(l => `<div class="mkt-note" style="margin:4px 0">${phEsc(new Date(l.at).toLocaleString())} · ${phEsc(l.msg)}</div>`).join('');
+  return `<div class="mkt-card">${head}<div class="mkt-note" style="margin:0 0 8px">${onCount} of ${list.length} Guppy strategies are on. Each strategy's own conditions, exit rule and stop-loss are evaluated on Heikin-Ashi candles every time a candle closes, the same signals the chart shows when Chart type is Heikin-Ashi. Checked every 20 seconds while TradePro is open, and a signal alerts once. These do not reach you with the app closed.</div>${rows}${log ? '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><div class="mkt-note" style="margin:0 0 2px"><b>Recent</b></div>' + log + '</div>' : ''}</div>`;
+}
+setInterval(() => { hgRun(false); }, 20000); setTimeout(() => { hgRun(false); }, 7000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) hgRun(false); });
+
 document.addEventListener('visibilitychange', () => { if (!document.hidden) alrCheck(); });
 
 </script>
