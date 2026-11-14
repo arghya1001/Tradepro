@@ -1930,6 +1930,7 @@
             <button class="sc2-tab" id="sc2-tab-live" role="tab" onclick="scTab('live')">Live<span class="sc2-badge" id="sc2-live-n"></span></button>
             <button class="sc2-tab" id="sc2-tab-perf" role="tab" onclick="scTab('perf')">Performance</button>
             <button class="sc2-tab" id="sc2-tab-lib" role="tab" onclick="scTab('lib')">Library</button>
+            <button class="sc2-tab" id="sc2-tab-stand" role="tab" onclick="scTab('stand')">Standing</button>
           </div>
           <button class="sc2-icon" aria-label="Scan all now" title="Scan all now" onclick="runAllSScans()">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
@@ -1980,6 +1981,18 @@
           <div class="sc2-chips" id="sc2-lib-cats"></div>
           <div id="sc2-lib-list"></div>
           <div class="sc2-privacy" id="sc2-privacy"></div>
+        </div>
+
+        <div id="sc2-stand" class="sc2-pane" style="display:none">
+          <div class="panel">
+            <div class="panel-head"><div class="panel-title">Standing candle · short straddle</div></div>
+            <div class="panel-body" style="padding:12px 14px 16px">
+              <div style="font-size:13px; color:var(--text-muted); line-height:1.5; margin-bottom:10px">A separate strategy. It does not use the other scans. Sells the straddle on the mark-price chart when a red candle that pierced below EMA and the short Guppy is followed by a lower open and a close below both, with the low touching the lower Bollinger band and RSI under the limit. Exit on the first close above the EMA.</div>
+              <div id="stand-form" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px"></div>
+              <button type="button" class="btn-primary" onclick="standRun()">Scan now</button>
+              <div id="stand-out" style="margin-top:12px"></div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -4441,7 +4454,7 @@ var scTabNow = 'live', scLiveFilter = 'all', scLibScope = 'all', scLibCat = 'all
 var SC_CHEV = '<svg class="sc2-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 var SC_LOCK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 try { scTabNow = localStorage.getItem('tradepro_sc_tab') || 'live'; } catch (e) { /* storage unavailable */ }
-if (['live', 'perf', 'lib'].indexOf(scTabNow) < 0) scTabNow = 'live';
+if (['live', 'perf', 'lib', 'stand'].indexOf(scTabNow) < 0) scTabNow = 'live';
 
 function scCatInfo(c) { return c === 'bearish' ? { col: 'var(--red)', label: 'Bearish', cls: 'bear' } : c === 'neutral' ? { col: 'var(--text-muted)', label: 'Neutral', cls: 'neu' } : { col: 'var(--green)', label: 'Bullish', cls: 'bull' }; }
 /* RULE ENGINE START — pure functions (no DOM, no network). One evaluator serves the live scan, the history view and, later, server-side alerts. */
@@ -5140,16 +5153,129 @@ function scSyncCatSeg() { document.querySelectorAll('#sscan-cat .seg-btn').forEa
 function setSScanCat(cat) { sscanDraft.cat = cat; sscanDraft.catManual = true; scSyncCatSeg(); }
 function scToggle(d) { const k = d.dataset.k; if (d.open) scOpen[k] = 1; else delete scOpen[k]; }
 
+
+/* ---------- Standing candle short straddle (its own strategy; shares nothing with the saved scans) ----------
+   Runs on the straddle's mark-price candles (MARK:MV-...). P = previous candle, C = current (just closed) candle.
+   SELL entry when ALL are true:
+     P opened above EMA(p) and above the short Guppy; P's low went below both; P is red.
+     C opened below P's open; C closed below EMA(p) and below the short Guppy; C closed below P's close;
+     C's low touched the lower Bollinger band; RSI < limit.
+   Exit: first candle that closes ABOVE EMA(p). One position at a time. "Short Guppy" = average of the short Guppy EMAs. */
+var STAND_KEY = 'tradepro_standing_v2', standCfg = { und: 'BTC', tf: '5m', p: 20, g: '10,12,15', bn: 20, bk: 2, rn: 14, rm: 60, sym: '' }, standRes = null, standBusy = false;
+try { const sv = JSON.parse(localStorage.getItem(STAND_KEY) || 'null'); if (sv) standCfg = Object.assign(standCfg, sv); } catch (e) { /* storage unavailable */ }
+function standSave() { try { localStorage.setItem(STAND_KEY, JSON.stringify(standCfg)); } catch (e) { /* ignore */ } }
+function standGuppy() { const a = String(standCfg.g).split(/[ ,]+/).map(x => parseInt(x, 10)).filter(x => x >= 1 && x <= 500); return a.length ? a : [10, 12, 15]; }
+function standSet(k, v) {
+  if (k === 'und' || k === 'tf' || k === 'sym' || k === 'g') standCfg[k] = String(v).trim();
+  else { const x = parseFloat(v); if (x > 0) standCfg[k] = x; }
+  if (k === 'und') standCfg.sym = '';
+  standSave();
+}
+function standRender() {
+  const f = document.getElementById('stand-form'); if (!f) return;
+  const inp = (k, w, t) => `<input class="field-input" style="width:${w}px" type="number" min="0.1" step="any" value="${standCfg[k]}" title="${t}" onchange="standSet('${k}',this.value)">`;
+  const lab = t => `<span style="font-size:13px; color:var(--text-muted)">${t}</span>`;
+  f.innerHTML = `${lab('Underlying')}<select class="field-input" style="width:84px" onchange="standSet('und',this.value);standRender()"><option ${standCfg.und==='BTC'?'selected':''}>BTC</option><option ${standCfg.und==='ETH'?'selected':''}>ETH</option></select>
+    ${lab('Timeframe')}<select class="field-input" style="width:76px" onchange="standSet('tf',this.value)">${['1m','3m','5m','15m','30m','1h','2h','4h'].map(t => `<option ${standCfg.tf===t?'selected':''}>${t}</option>`).join('')}</select>
+    ${lab('EMA')}${inp('p', 54, 'EMA period used for entry and exit')}
+    ${lab('Short Guppy')}<input class="field-input" style="width:96px" value="${sscanEsc(standCfg.g)}" title="Short Guppy EMA periods, comma separated (their average is used)" onchange="standSet('g',this.value)">
+    ${lab('Bollinger')}${inp('bn', 50, 'Bollinger period')}${inp('bk', 50, 'Bollinger std deviations')}
+    ${lab('RSI')}${inp('rn', 50, 'RSI period')}${lab('below')}${inp('rm', 54, 'RSI must be below this')}
+    <input class="field-input" style="flex:1; min-width:180px" type="text" placeholder="Straddle symbol (blank = nearest daily, e.g. MV-BTC-69200-141126)" value="${sscanEsc(standCfg.sym || '')}" onchange="standSet('sym',this.value)">`;
+  standShow();
+}
+function standNum(v) { return v == null || !isFinite(v) ? '–' : (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)); }
+function standTime(sec) { try { return new Date(sec * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }); } catch (e) { return ''; } }
+function standInd(cs, cfg) {   // indicator series, one value per candle (null while warming up)
+  const closes = cs.map(x => x.c), ema = emaSeries(closes, Math.round(cfg.p)), gl = String(cfg.g).split(/[ ,]+/).map(x => parseInt(x, 10)).filter(x => x >= 1 && x <= 500);
+  const gs = (gl.length ? gl : [10, 12, 15]).map(q => emaSeries(closes, q));
+  const guppy = cs.map((_, i) => { const v = gs.map(a => a[i]); return v.some(x => x == null || !isFinite(x)) ? null : v.reduce((x, y) => x + y, 0) / v.length; });
+  const bn = Math.max(2, Math.round(cfg.bn)), lower = cs.map((_, i) => {
+    if (i < bn - 1) return null; let m = 0; for (let k = i - bn + 1; k <= i; k++) m += closes[k]; m /= bn;
+    let sd = 0; for (let k = i - bn + 1; k <= i; k++) sd += (closes[k] - m) * (closes[k] - m); return m - cfg.bk * Math.sqrt(sd / bn);
+  });
+  const rn = Math.max(2, Math.round(cfg.rn)), rsi = cs.map(() => null); let ag = 0, al = 0;
+  for (let i = 1; i < cs.length; i++) {
+    const d = closes[i] - closes[i - 1], g = d > 0 ? d : 0, l = d < 0 ? -d : 0;
+    if (i <= rn) { ag += g / rn; al += l / rn; } else { ag = (ag * (rn - 1) + g) / rn; al = (al * (rn - 1) + l) / rn; }
+    if (i >= rn) rsi[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  }
+  return { ema, guppy, lower, rsi };
+}
+function standChecks(cs, ind, i, cfg) {   // the nine entry conditions for candle i (null if not enough history)
+  const P = cs[i - 1], C = cs[i], e0 = ind.ema[i - 1], e1 = ind.ema[i], g0 = ind.guppy[i - 1], g1 = ind.guppy[i], bl = ind.lower[i], r = ind.rsi[i];
+  if (i < 1 || [e0, e1, g0, g1, bl, r].some(x => x == null || !isFinite(x))) return null;
+  return [
+    ['Prev opened above EMA ' + cfg.p + ' and short Guppy', P.o > e0 && P.o > g0],
+    ['Prev low went below EMA ' + cfg.p + ' and short Guppy', P.l < e0 && P.l < g0],
+    ['Prev candle is red', P.c < P.o],
+    ['Open lower than prev open', C.o < P.o],
+    ['Close below EMA ' + cfg.p + ' and short Guppy', C.c < e1 && C.c < g1],
+    ['Close below prev close', C.c < P.c],
+    ['Low touched lower Bollinger band', C.l <= bl],
+    ['RSI below ' + cfg.rm, r < cfg.rm]
+  ];
+}
+function standCalc(cs, cfg) {   // pure: candles in, trades out
+  const ind = standInd(cs, cfg), trades = []; let pos = null;
+  for (let i = 1; i < cs.length; i++) {
+    const e = ind.ema[i]; if (e == null || !isFinite(e)) continue;
+    if (!pos) { const ch = standChecks(cs, ind, i, cfg); if (ch && ch.every(x => x[1])) pos = { i, px: cs[i].c }; }
+    else if (cs[i].c > e) { trades.push({ i: pos.i, j: i, entry: pos.px, exit: cs[i].c, pnl: pos.px - cs[i].c }); pos = null; }
+  }
+  const n = cs.length - 1;
+  return { trades, open: pos, ema: ind.ema[n], last: cs[n], checks: standChecks(cs, ind, n, cfg) };
+}
+async function standSymbol() {
+  if (standCfg.sym) return standCfg.sym.replace(/^MARK:/i, '');
+  const json = await liveFetchJson('/v2/tickers?contract_types=move_options&underlying_asset_symbols=' + encodeURIComponent(standCfg.und));
+  const rows = (json && json.result || []).filter(r => r && /^MV-/.test(r.symbol || ''));
+  if (!rows.length) throw new Error('no straddle (MV-) contract found for ' + standCfg.und + '. Type the symbol in the box.');
+  rows.sort((a, b) => String(a.expiry_date || a.settlement_time || '').localeCompare(String(b.expiry_date || b.settlement_time || '')));
+  return rows[0].symbol;
+}
+async function standRun() {
+  if (standBusy) return; standBusy = true;
+  standRes = { loading: true }; standShow();
+  try {
+    const sym = await standSymbol(), res = standCfg.tf, secs = LIVE_RES[res], end = Math.floor(Date.now() / 1000);
+    const json = await liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent('MARK:' + sym)}&resolution=${res}&start=${end - secs * 400}&end=${end}`);
+    let cs = liveParseRestCandles(json, res);
+    const l = cs[cs.length - 1]; if (l) { const ts = liveTimeToSec(l.t); if (ts != null && ts + secs > end) cs = cs.slice(0, -1); }   // drop the forming candle
+    if (cs.length < 60) throw new Error('not enough candles returned for ' + sym + ' on ' + res + ' (a new daily straddle has little history early in the day; try a smaller timeframe)');
+    const r = standCalc(cs, standCfg); r.sym = sym; r.at = Date.now(); r.tsOf = j => liveTimeToSec(cs[j].t);
+    standRes = r;
+  } catch (e) { standRes = { err: liveErrText(e) }; }
+  standBusy = false; standShow();
+}
+function standShow() {
+  const o = document.getElementById('stand-out'); if (!o) return;
+  const r = standRes;
+  if (!r) { o.innerHTML = '<div style="font-size:13px; color:var(--text-faint)">Tap Scan now to check the latest candles.</div>'; return; }
+  if (r.loading) { o.innerHTML = '<div style="font-size:13px; color:var(--text-muted)">Scanning…</div>'; return; }
+  if (r.err) { o.innerHTML = `<div style="font-size:13px; color:var(--down,#ef5350)">${sscanEsc(r.err)}</div>`; return; }
+  const tot = r.trades.reduce((a, t) => a + t.pnl, 0), wins = r.trades.filter(t => t.pnl > 0).length;
+  const state = r.open
+    ? `<b style="color:var(--down,#ef5350)">IN SHORT</b> since ${standTime(r.tsOf(r.open.i))} · entry ${standNum(r.open.px)} · now ${standNum(r.last.c)} · open P&amp;L ${standNum(r.open.px - r.last.c)} pts · exit when a candle closes above EMA ${standCfg.p} (now ${standNum(r.ema)})`
+    : `<b>FLAT</b> · last close ${standNum(r.last.c)}, EMA ${standCfg.p} ${standNum(r.ema)}`;
+  const chk = !r.open && r.checks ? `<div style="margin:8px 0 2px; font-size:12.5px; color:var(--text-muted)">Latest candle vs the entry rules:</div>` + r.checks.map(c => `<div style="font-size:12.5px; padding:2px 0; color:${c[1] ? 'var(--up,#26a69a)' : 'var(--text-faint)'}">${c[1] ? '✓' : '✗'} ${sscanEsc(c[0])}</div>`).join('') : '';
+  const rows = r.trades.slice(-12).reverse().map(t => `<div style="display:flex; justify-content:space-between; gap:8px; font-size:12.5px; padding:6px 0; border-top:1px solid var(--border-soft)"><span>${standTime(r.tsOf(t.i))} → ${standTime(r.tsOf(t.j))}</span><span>${standNum(t.entry)} → ${standNum(t.exit)}</span><span style="color:${t.pnl >= 0 ? 'var(--up,#26a69a)' : 'var(--down,#ef5350)'}">${t.pnl >= 0 ? '+' : ''}${standNum(t.pnl)}</span></div>`).join('');
+  o.innerHTML = `<div style="font-size:12px; color:var(--text-faint); margin-bottom:6px">${sscanEsc(r.sym)} · mark price · ${standCfg.tf}</div>
+    <div style="font-size:13.5px; line-height:1.5">${state}</div>${chk}
+    <div style="font-size:12.5px; color:var(--text-muted); margin:10px 0 2px">Last ~400 candles: ${r.trades.length} closed trade${r.trades.length === 1 ? '' : 's'}${r.trades.length ? ` · ${wins} win${wins === 1 ? '' : 's'} · total ${tot >= 0 ? '+' : ''}${standNum(tot)} pts (premium points, before fees)` : ''}</div>${rows}`;
+}
+
 function scTab(t) {
   scTabNow = t;
   try { localStorage.setItem('tradepro_sc_tab', t); } catch (e) { /* ignore */ }
-  ['live', 'perf', 'lib'].forEach(k => {
+  ['live', 'perf', 'lib', 'stand'].forEach(k => {
     const pane = document.getElementById('sc2-' + k), tab = document.getElementById('sc2-tab-' + k);
     if (pane) pane.style.display = k === t ? '' : 'none';
     if (tab) { tab.classList.toggle('active', k === t); tab.setAttribute('aria-selected', k === t ? 'true' : 'false'); }
   });
   if (t === 'perf') { try { renderSPerf(); } catch (e) { /* not ready */ } }
   if (t === 'lib') renderScLib();
+  if (t === 'stand') standRender();
 }
 function scNewMenu(ev) { ev.stopPropagation(); const m = document.getElementById('sc2-newmenu'); if (m) m.hidden = !m.hidden; }
 document.addEventListener('click', () => { const m = document.getElementById('sc2-newmenu'); if (m) m.hidden = true; });
