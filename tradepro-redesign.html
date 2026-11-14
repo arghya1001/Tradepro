@@ -12900,7 +12900,7 @@ function phScans() {
   return phScanList().filter(({ sc }) => PH.sc[sc.name] && PH.sc[sc.name].on && phSupported(sc)).map(({ sc }) => {
     const cf = PH.sc[sc.name];
     return { id: phHash(sc.name), name: sc.name, side: sc.side, und: String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u)), tf: cf.tf, ver: cf.ver, conds: sc.conds, seq: sscanIsSeq(sc.conds), kind: phKind(sc), minPrem: sc.minPrem || 0, pause: cf.pause };
-  });
+  }).concat(typeof hgPhScans === 'function' ? hgPhScans() : []);
 }
 function stOn(i, v) { const sc = sscans[i]; if (!sc) return; const c = phCfg(sc.name); c.on = !!v; if (v) c.ver = Date.now(); phSave(); phSyncSoon(); alrRender(); }
 function stTf(i, v) { const sc = sscans[i]; if (!sc) return; const c = phCfg(sc.name); c.tf = v; c.ver = Date.now(); phSave(); phSyncSoon(); alrRender(); }
@@ -12968,7 +12968,15 @@ function hgSave() {
 }
 const hgScans = () => sscans.map((sc, i) => ({ sc, i })).filter(x => x.sc && x.sc.strat === 'Guppy crossover' && Array.isArray(x.sc.conds) && x.sc.conds.length);
 const hgUnds = sc => String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u));
-function hgCfg(sc) { if (!HG.on[sc.name]) HG.on[sc.name] = { on: false, tf: sc.tf || '15m', exits: true, strong: false }; return HG.on[sc.name]; }
+function hgCfg(sc) { if (!HG.on[sc.name]) HG.on[sc.name] = { on: false, tf: sc.tf || '15m', exits: true, strong: false, ver: 0 }; return HG.on[sc.name]; }
+/* Heikin-Ashi Guppy scans for the Telegram Worker (needs the updated worker.js): same conditions, evaluated on Heikin-Ashi candles when each candle closes. Entries only. */
+function hgPhScans() {
+  return hgScans().filter(({ sc }) => { const c = hgCfg(sc); return c.on && hgUnds(sc).length && phSupported(sc); }).map(({ sc }) => {
+    const c = hgCfg(sc);
+    return { id: phHash('HA|' + sc.name), name: sc.name + ' (Heikin-Ashi)', side: sc.side, und: hgUnds(sc), tf: c.tf, ver: c.ver || 1, conds: sc.conds, seq: sscanIsSeq(sc.conds), kind: 'perp', minPrem: 0, ha: true, strong: !!c.strong, pause: { on: false, sd: 5, st: '19:00', ed: 0, et: '19:00', tz: 'Asia/Kolkata' } };
+  });
+}
+const hgTg = () => { try { return phReady() && PH.linked; } catch (e) { return false; } };
 function hgStrong(c, side) {   // classic strong-trend Heikin-Ashi candle: body in the trend direction and no wick on the opposite side
   const r = c.h - c.l; if (!(r > 0)) return false;
   return side === 'Sell' ? (c.c < c.o && c.h - c.o <= 0.05 * r) : (c.c > c.o && c.o - c.l <= 0.05 * r);
@@ -13039,8 +13047,8 @@ async function hgCheckNow(i) {   // shows the latest Heikin-Ashi Guppy signal pe
   }
   HG.test[sc.name] = lines.join('\n'); alrRender();
 }
-function hgOn(i, v) { const sc = sscans[i]; if (!sc) return; const c = hgCfg(sc); c.on = !!v; if (v) { HG.last = {}; try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().then(alrRender); } catch (e) { /* not supported */ } } hgSave(); alrRender(); if (v) setTimeout(() => hgRun(true), 300); }
-function hgSet(i, k, v) { const sc = sscans[i]; if (!sc) return; const c = hgCfg(sc); c[k] = (k === 'exits' || k === 'strong') ? !!v : v; HG.last = {}; hgSave(); alrRender(); }
+function hgOn(i, v) { const sc = sscans[i]; if (!sc) return; const c = hgCfg(sc); c.on = !!v; if (v) c.ver = Date.now(); try { phSyncSoon(); } catch (e) { /* phone alerts not set up */ } if (v) { HG.last = {}; try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().then(alrRender); } catch (e) { /* not supported */ } } hgSave(); alrRender(); if (v) setTimeout(() => hgRun(true), 300); }
+function hgSet(i, k, v) { const sc = sscans[i]; if (!sc) return; const c = hgCfg(sc); c[k] = (k === 'exits' || k === 'strong') ? !!v : v; if (k === 'tf' || k === 'strong') c.ver = Date.now(); HG.last = {}; hgSave(); alrRender(); try { phSyncSoon(); } catch (e) { /* phone alerts not set up */ } }
 function hgTest(i) { const sc = sscans[i]; if (sc) hgFire(sc, hgUnds(sc)[0] || 'BTC', hgCfg(sc).tf, 'entry', null, '', true); }
 async function hgOpen(und, i) {
   try { await openGuppyChart(und, i); const s = document.getElementById('replay-charttype'); if (s) { s.value = 'heikinashi'; onChartTypeChange(); } } catch (e) { console.warn('hgOpen failed', e); }
@@ -13067,7 +13075,7 @@ function hgCard() {
       </div></details>`;
   }).join('');
   const log = HG.log.slice(0, 6).map(l => `<div class="mkt-note" style="margin:4px 0">${phEsc(new Date(l.at).toLocaleString())} · ${phEsc(l.msg)}</div>`).join('');
-  return `<div class="mkt-card">${head}<div class="mkt-note" style="margin:0 0 8px">${onCount} of ${list.length} Guppy strategies are on. Each strategy's own conditions, exit rule and stop-loss are evaluated on Heikin-Ashi candles every time a candle closes, the same signals the chart shows when Chart type is Heikin-Ashi. Checked every 20 seconds while TradePro is open, and a signal alerts once. These do not reach you with the app closed.</div>${rows}${log ? '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><div class="mkt-note" style="margin:0 0 2px"><b>Recent</b></div>' + log + '</div>' : ''}</div>`;
+  return `<div class="mkt-card">${head}<div class="mkt-note" style="margin:0 0 8px">${onCount} of ${list.length} Guppy strategies are on. Each strategy's own conditions, exit rule and stop-loss are evaluated on Heikin-Ashi candles every time a candle closes, the same signals the chart shows when Chart type is Heikin-Ashi. In the app they are checked every 20 seconds while TradePro is open. ${hgTg() ? 'Telegram: entry alerts are also sent by your Worker when each candle closes, with the app open or closed (exit alerts are in-app only).' : 'Link Telegram in the phone alerts card below to get entry alerts when the app is closed.'}</div>${rows}${log ? '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><div class="mkt-note" style="margin:0 0 2px"><b>Recent</b></div>' + log + '</div>' : ''}</div>`;
 }
 setInterval(() => { hgRun(false); }, 20000); setTimeout(() => { hgRun(false); }, 7000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) hgRun(false); });

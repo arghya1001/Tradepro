@@ -4,7 +4,7 @@
 
 const BASES = ['https://api.india.delta.exchange', 'https://cdn.india.deltaex.org'];
 const TOKEN_RE = /^[a-f0-9]{32}$/;
-const MAX_RULES = 50, MAX_DEVICES = 20, MAX_BODY = 30000, MAX_HELD = 60, MAX_SCANS = 10;
+const MAX_RULES = 50, MAX_DEVICES = 20, MAX_BODY = 30000, MAX_HELD = 60, MAX_SCANS = 20;
 const TFS = { '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400 };
 
 export default {
@@ -81,7 +81,7 @@ function cleanScans(list) {
     if (!conds.length || conds.some(c => !c)) return null;
     const p = s.pause || {};
     const pause = { on: !!p.on, sd: Math.min(6, Math.max(0, (num(p.sd) || 0) | 0)), st: T.test(p.st) ? p.st : '19:00', ed: Math.min(6, Math.max(0, (num(p.ed) || 0) | 0)), et: T.test(p.et) ? p.et : '19:00', tz: typeof p.tz === 'string' && validTz(p.tz) ? p.tz : 'Asia/Kolkata' };
-    return { id, name: String(s.name || 'Guppy alert').slice(0, 80), side: s.side === 'Sell' ? 'Sell' : 'Buy', und, tf: s.tf, kind: s.kind === 'straddle' ? 'straddle' : 'perp', minPrem: Math.min(1e7, Math.max(0, num(s.minPrem) || 0)), conds, ver: num(s.ver) || id, pause };
+    return { id, name: String(s.name || 'Guppy alert').slice(0, 80), side: s.side === 'Sell' ? 'Sell' : 'Buy', und, tf: s.tf, kind: s.kind === 'straddle' ? 'straddle' : 'perp', ha: s.ha === true && s.kind !== 'straddle', strong: s.strong === true, minPrem: Math.min(1e7, Math.max(0, num(s.minPrem) || 0)), conds, ver: num(s.ver) || id, pause };
   }).filter(Boolean);
 }
 
@@ -276,6 +276,16 @@ async function fetchCandles(sym, tf, nowSec, cache, log) {
   const last = c[c.length - 1]; if (last && last.t + secs > nowSec) c = c.slice(0, -1);
   cache.set(k, c); return c;
 }
+/* Heikin-Ashi version of a candle list (same recurrence the TradePro chart uses): scans flagged ha:true are evaluated on these. */
+function toHA(cs) {
+  const out = []; let po = null, pc = null;
+  for (let i = 0; i < cs.length; i++) {
+    const c = cs[i], hc = (c.o + c.h + c.l + c.c) / 4, ho = i === 0 ? (c.o + c.c) / 2 : (po + pc) / 2;
+    out.push({ t: c.t, o: ho, h: Math.max(c.h, ho, hc), l: Math.min(c.l, ho, hc), c: hc }); po = ho; pc = hc;
+  }
+  return out;
+}
+const strongHA = (c, side) => { const r = c.h - c.l; if (!(r > 0)) return false; return side === 'Sell' ? (c.c < c.o && c.h - c.o <= 0.05 * r) : (c.c > c.o && c.o - c.l <= 0.05 * r); };   // body in the trend direction, no wick on the opposite side
 const candlesFor = (u, tf, nowSec, cache, log) => fetchCandles(u + 'USD', tf, nowSec, cache, log);
 /* ATM straddle premium candles (kind 'straddle'): nearest expiry after today (UTC), strike nearest to spot, call + put added together
    the same way the TradePro combined-premium chart does it (a leg with no trade in a bar is carried forward flat). */
@@ -325,17 +335,18 @@ async function scanRows(d, now, cache, log, all) {
     if (!all && secs > 360 && (nowSec % secs) > 400) continue;   // bigger timeframes: look only just after a candle closes
     const candles = sc.kind === 'straddle' ? await straddleCandles(u, sc.tf, nowSec, cache, log) : await candlesFor(u, sc.tf, nowSec, cache, log);
     if (!candles || candles.length < 60) { if (all) rows.push({ sc, u, err: sc.kind === 'straddle' && !candles ? 'could not build the ATM straddle candles' : 'not enough candles' }); continue; }
-    rows.push({ sc, u, meta: candles.meta || '', ev: evalConds(candles, sc.conds, sc.minPrem), price: candles[candles.length - 1].c, closeT: (candles[candles.length - 1].t + secs) * 1000, key: sc.id + '|' + u + '|' + sc.tf });
+    const ec = sc.ha ? toHA(candles) : candles;
+    rows.push({ sc, u, meta: candles.meta || '', strongOk: !sc.strong || strongHA(ec[ec.length - 1], sc.side), ev: evalConds(ec, sc.conds, sc.minPrem), price: candles[candles.length - 1].c, closeT: (candles[candles.length - 1].t + secs) * 1000, key: sc.id + '|' + u + '|' + sc.tf });
   }
   return rows;
 }
-const sigMsg = (sc, r, tz) => (sc.side === 'Buy' ? '📈 BUY' : '📉 SELL') + ' signal: ' + r.u + (sc.kind === 'straddle' ? ' ATM straddle' + (r.meta ? ' (' + r.meta + ')' : '') : '') + ' ' + sc.tf + ' at ' + money(r.price) + ' (candle closed ' + clock(tz, r.closeT) + '). ' + sc.name
+const sigMsg = (sc, r, tz) => (sc.side === 'Buy' ? '📈 BUY' : '📉 SELL') + ' signal: ' + r.u + (sc.kind === 'straddle' ? ' ATM straddle' + (r.meta ? ' (' + r.meta + ')' : '') : '') + ' ' + sc.tf + (sc.ha ? ' Heikin-Ashi' : '') + ' at ' + money(r.price) + ' (candle closed ' + clock(tz, r.closeT) + '). ' + sc.name
 async function check(req, env) {
   const b = await body(req), d = TOKEN_RE.test(b.token || '') ? await getDev(env, b.token) : null;
   if (!d || !d.chat) return json(env, { ok: false, error: 'not linked' }, 400);
   if (!(d.scans || []).length) { await tgSend(env, d.chat, '🔎 No Guppy alerts are switched on in TradePro yet.'); return json(env, { ok: true, text: 'none' }); }
   const rows = await scanRows(d, Date.now(), new Map(), [], true);
-  const lines = rows.map(r => r.err ? r.u + ' ' + r.sc.tf + ': ' + r.err : r.u + ' ' + r.sc.tf + ' at ' + money(r.price) + ': ' + (r.ev.seq ? (r.ev.allNow ? 'NEW entry (squeeze, crossover + Supertrend, breakout)' : 'no new entry') : (r.ev.allNow ? 'ALL conditions met now' : 'not met')) + ' (' + r.ev.details.map(x => x.label + (x.ok ? ' ✓' : ' ✗')).join(', ') + ')');
+  const lines = rows.map(r => r.err ? r.u + ' ' + r.sc.tf + ': ' + r.err : r.u + ' ' + r.sc.tf + (r.sc.ha ? ' HA' : '') + ' at ' + money(r.price) + ': ' + (r.ev.seq ? (r.ev.allNow ? 'NEW entry (squeeze, crossover + Supertrend, breakout)' : 'no new entry') : (r.ev.allNow ? 'ALL conditions met now' : 'not met')) + ' (' + r.ev.details.map(x => x.label + (x.ok ? ' ✓' : ' ✗')).join(', ') + ')');
   const text = '🔎 Guppy check now:\n' + lines.join('\n') + '\nAlerts fire only when a NEW signal forms on a closed candle' + (d.scans.some(x => paused(x.pause, Date.now())) ? ' (a pause window is active right now).' : '.');
   const r = await tgSend(env, d.chat, text); return json(env, { ok: r.ok, text });
 }
@@ -397,6 +408,7 @@ async function watch(env) {
       for (const r of rows) {
         const sc = r.sc;
         if (!(r.ev.allNow && !r.ev.allPrev)) continue;
+        if (sc.strong && !r.strongOk) continue;   // optional: entry only on a strong Heikin-Ashi candle
         if (r.closeT < sc.ver || now - r.closeT > 900000 || r.closeT <= (d.bars[r.key] || 0)) continue;
         if (paused(sc.pause, now)) continue;
         const msg = sigMsg(sc, r, d.quiet.tz);
