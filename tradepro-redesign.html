@@ -1990,6 +1990,7 @@
               <div style="font-size:13px; color:var(--text-muted); line-height:1.5; margin-bottom:10px">A separate strategy. It does not use the other scans. Sells the straddle on the mark-price chart when a red candle that pierced below EMA and the short Guppy is followed by a lower open and a close below both, with the low touching the lower Bollinger band and RSI under the limit. Exit on the first close above the EMA.</div>
               <div id="stand-form" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px"></div>
               <button type="button" class="btn-primary" onclick="standRun()">Scan now</button>
+              <button type="button" class="btn-ghost" onclick="standOpenChart()">Show on chart</button>
               <div id="stand-out" style="margin-top:12px"></div>
             </div>
           </div>
@@ -3665,6 +3666,7 @@ function sscanSeqSignals(candles, conds, minPrem, slr) {
 function sscanSignals(candles, conds, xr, minPrem, slr) {
   const n = candles.length, entries = [], exits = [], stops = {};
   if (!n || !conds || !conds.length) return { entries, exits, stops, inPos: false };
+  if (conds[0] && conds[0].k === 'stand') { const r = standCalc(candles, standCfg); return { entries: r.entries, exits: r.exits, stops: {}, inPos: !!r.open }; }   // separate Standing candle strategy (Scanner > Standing)
   if (sscanIsSeq(conds)) return sscanSeqSignals(candles, conds, minPrem, slr);   // squeeze -> crossover + Supertrend flip -> breakout; ignores the old EMA 15 exit
   const lines = conds.map(c => sscanRefLine(candles, c));
   const xl = xr ? sscanRefLine(candles, { k: 'ema', p: xr.p }) : null; // optional custom exit: close vs EMA
@@ -3821,13 +3823,16 @@ async function openGuppyChart(und, i) {   // Scanner tab -> live perpetual chart
 const SSCAN_OFF_KEY = 'tradepro_signal_off_v1'; let sscanDefTried = false;
 function sscanUserOff() { try { return localStorage.getItem(SSCAN_OFF_KEY) === '1'; } catch (e) { return false; } }
 function sscanSetOff(v) { try { if (v) localStorage.setItem(SSCAN_OFF_KEY, '1'); else localStorage.removeItem(SSCAN_OFF_KEY); } catch (e) { /* storage unavailable */ } }
+var STAND_NAME = 'Standing candle short straddle';
+function standScanObj() { return { name: STAND_NAME, strat: 'Straddle', side: 'Sell', und: standCfg.und, tf: standCfg.tf, fresh: true, minPrem: 0, sl: { on: false, n: 4, buf: 0, mode: 'fixed' }, conds: [{ k: 'stand', op: 'below' }] }; }
+function standIsApplied() { return sscanApplied === '__stand' || sscanApplied === STAND_NAME; }
 function sscanFillApply() {
   const sel = document.getElementById('live-scan-apply');
   if (!sel) return;
   if (!sscanDefTried) { sscanDefTried = true; if (!sscanApplied && !sscanUserOff() && sscanGuppyPair()) { sscanApplied = '__pair'; setTimeout(() => { try { sscanApplyRefresh(); } catch (e) { /* chart not ready */ } }, 0); } }
   const onStrat = liveMode && LIVE.kind === 'strategy';
   const pr = onStrat ? null : sscanGuppyPair(), hide = pr ? [pr.bull.name, pr.bear.name] : [];
-  sel.innerHTML = '<option value="">Off</option>' +
+  sel.innerHTML = '<option value="">Off</option>' + `<option value="__stand" ${standIsApplied() ? 'selected' : ''}>★ ${STAND_NAME} (own strategy) · Sell</option>` +
     (pr ? `<option value="__pair" ${sscanApplied === '__pair' ? 'selected' : ''}>Guppy squeeze signals: Bullish + Bearish · Buy + Sell</option>` : '') +
     sscans.filter(sc => hide.indexOf(sc.name) < 0 && !(onStrat && sc.strat === 'Guppy crossover')).map(sc => `<option value="${sscanEsc(sc.name)}" ${sc.name === sscanApplied ? 'selected' : ''}>${sscanEsc(sc.name)} · ${sc.side}</option>`).join('') +
     '<option value="__new">+ New scan for this chart…</option>';
@@ -3853,7 +3858,7 @@ async function sscanApplyRefresh() {
   const onReplay = !liveMode;
   if (!onReplay && !onPerp && !onOpt && (LIVE.kind !== 'strategy' || !LIVE.stratSymbol)) return;
   const pair = sscanApplied === '__pair' ? sscanGuppyPair() : null;
-  const sc = pair ? pair.bull : sscans.find(x => x.name === sscanApplied);
+  const sc = pair ? pair.bull : standIsApplied() ? standScanObj() : sscans.find(x => x.name === sscanApplied);
   if (!sc) { sscanApplied = null; scanOverlay = null; sscanFillApply(); if (info) info.textContent = ''; draw(); return; }
   const und = onReplay ? '' : onPerp ? String(LIVE.symbol || '').replace(/USD.*$/, '') : onOpt ? String(LIVE.symbol).split('-')[1] : LIVE.strat.und, symbol = onReplay ? 'replay' : onPerp || onOpt ? LIVE.symbol : LIVE.stratSymbol;
   // perp and single-option charts: the combined-premium floor doesn't apply (it is sized for a two-leg straddle premium)
@@ -5217,14 +5222,14 @@ function standChecks(cs, ind, i, cfg) {   // the nine entry conditions for candl
   ];
 }
 function standCalc(cs, cfg) {   // pure: candles in, trades out
-  const ind = standInd(cs, cfg), trades = []; let pos = null;
+  const ind = standInd(cs, cfg), trades = [], entries = [], exits = []; let pos = null;
   for (let i = 1; i < cs.length; i++) {
     const e = ind.ema[i]; if (e == null || !isFinite(e)) continue;
-    if (!pos) { const ch = standChecks(cs, ind, i, cfg); if (ch && ch.every(x => x[1])) pos = { i, px: cs[i].c }; }
-    else if (cs[i].c > e) { trades.push({ i: pos.i, j: i, entry: pos.px, exit: cs[i].c, pnl: pos.px - cs[i].c }); pos = null; }
+    if (!pos) { const ch = standChecks(cs, ind, i, cfg); if (ch && ch.every(x => x[1])) { pos = { i, px: cs[i].c }; entries.push(i); } }
+    else if (cs[i].c > e) { trades.push({ i: pos.i, j: i, entry: pos.px, exit: cs[i].c, pnl: pos.px - cs[i].c }); exits.push(i); pos = null; }
   }
   const n = cs.length - 1;
-  return { trades, open: pos, ema: ind.ema[n], last: cs[n], checks: standChecks(cs, ind, n, cfg) };
+  return { trades, entries, exits, open: pos, ema: ind.ema[n], last: cs[n], checks: standChecks(cs, ind, n, cfg) };
 }
 async function standSymbol() {
   if (standCfg.sym) return standCfg.sym.replace(/^MARK:/i, '');
@@ -5247,6 +5252,12 @@ async function standRun() {
     standRes = r;
   } catch (e) { standRes = { err: liveErrText(e) }; }
   standBusy = false; standShow();
+}
+async function standOpenChart() {   // straddle chart for the chosen underlying with this strategy's SELL / EXIT arrows on
+  try {
+    const t = TEMPLATES.find(x => x.name === 'Straddle'); if (!t) return;
+    await openStrategyFromSpecs('Short straddle', standCfg.und, { specs: t.defLegs }, 'Sell', { tf: standCfg.tf, overlay: sscanOverlayMeta(standScanObj(), standCfg.und) });
+  } catch (e) { standRes = { err: liveErrText(e) }; standShow(); }
 }
 function standShow() {
   const o = document.getElementById('stand-out'); if (!o) return;
