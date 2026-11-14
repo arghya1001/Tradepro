@@ -3151,6 +3151,17 @@ try {
     localStorage.setItem('tradepro_squeeze_seq_v1', '1');
   }
 } catch (e) { /* storage unavailable */ }
+// One-time: ATM straddle versions of the squeeze sequence scan (Sell = premium breaks down, Buy = premium breaks out). Names avoid the word "Guppy" so the chart's Guppy pair never picks them up.
+try {
+  if (!localStorage.getItem('tradepro_seed_straddle_seq_v1')) {
+    const cq = op => [{ op, k:'gsq', a:2.5, n:8, m:3, w:15 }, { op, k:'gmma', s:[10,12,15], l:[30,35,40], mode:'avg' }, { op, k:'st', p:10, m:2 }];
+    [{ name:'ATM straddle: Bearish squeeze breakdown + crossover + below Supertrend (10,2)', side:'Sell', op:'below' }, { name:'ATM straddle: Bullish squeeze breakout + crossover + above Supertrend (10,2)', side:'Buy', op:'above' }].forEach(x => {
+      if (!sscans.some(s => s && s.name === x.name)) sscans.push({ name:x.name, strat:'Straddle', side:x.side, und:'BTC,ETH', tf:'15m', fresh:true, minPrem:0, sl:{ on:false, n:4, buf:2, mode:'fixed' }, conds:cq(x.op) });
+    });
+    persistSScans();
+    localStorage.setItem('tradepro_seed_straddle_seq_v1', '1');
+  }
+} catch (e) { /* storage unavailable */ }
 // One-time: Guppy scans exit only on the EMA 15 close rule, so the 4-candle stop-loss is switched off (can be re-enabled in the scan editor).
 try {
   if (!localStorage.getItem('tradepro_guppy_exit15_v1')) {
@@ -3766,7 +3777,7 @@ async function openSScanChart(i, und) {
 let sscanApplied = null, sscanApplyToken = 0, sscanFromChart = false;
 const SSCAN_TYPE_NAMES = { straddle: 'Straddle', strangle: 'Strangle', ironfly: 'Iron butterfly', condor: 'Iron condor', bullcall: 'Bull call spread', bearput: 'Bear put spread' };
 function sscanGuppyPair() {   // chart-only merge: the Guppy-based Buy scan + the Guppy-based Sell scan, shown as one Signal option
-  const g = sscans.filter(sc => sc && /guppy/i.test(sc.name) && Array.isArray(sc.conds) && sc.conds.some(c => c.k === 'gmma'));
+  const g = sscans.filter(sc => sc && sc.strat !== 'Straddle' && /guppy/i.test(sc.name) && Array.isArray(sc.conds) && sc.conds.some(c => c.k === 'gmma'));
   const bull = g.find(sc => sc.side === 'Buy'), bear = g.find(sc => sc.side === 'Sell');
   return bull && bear ? { bull, bear } : null;
 }
@@ -12846,13 +12857,14 @@ function phAlways(id) { const a = ALR.list.find(x => x.id === id); if (!a) retur
 /* ---------- Guppy / strategy alerts to the phone: pick timeframe + a weekly pause window per scan ---------- */
 const PH_SC_OK = ['gmma', 'gsq', 'st', 'ema', 'sma'], PH_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const phHash = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h || 1; };
-const phScanList = () => sscans.map((sc, i) => ({ sc, i })).filter(x => x.sc && x.sc.strat === 'Guppy crossover');
-const phSupported = sc => Array.isArray(sc.conds) && sc.conds.length > 0 && sc.conds.every(c => PH_SC_OK.includes(c.k));
-function phCfg(name) { if (!PH.sc[name]) PH.sc[name] = { on: false, tf: '15m', ver: 0, pause: { on: true, sd: 5, st: '19:00', ed: 0, et: '19:00', tz: 'Asia/Kolkata' } }; return PH.sc[name]; }
+const phKind = sc => sc.strat === 'Guppy crossover' ? 'perp' : sc.strat === 'Straddle' ? 'straddle' : null;   // what the Worker can check: perpetual price, or ATM straddle premium
+const phScanList = () => sscans.map((sc, i) => ({ sc, i })).filter(x => x.sc && Array.isArray(x.sc.conds));
+const phSupported = sc => !!phKind(sc) && Array.isArray(sc.conds) && sc.conds.length > 0 && sc.conds.every(c => PH_SC_OK.includes(c.k));
+function phCfg(name) { if (!PH.sc[name]) PH.sc[name] = { on: false, tf: '15m', ver: 0, pause: { on: false, sd: 5, st: '19:00', ed: 0, et: '19:00', tz: 'Asia/Kolkata' } }; return PH.sc[name]; }
 function phScans() {
   return phScanList().filter(({ sc }) => PH.sc[sc.name] && PH.sc[sc.name].on && phSupported(sc)).map(({ sc }) => {
     const cf = PH.sc[sc.name];
-    return { id: phHash(sc.name), name: sc.name, side: sc.side, und: String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u)), tf: cf.tf, ver: cf.ver, conds: sc.conds, seq: sscanIsSeq(sc.conds), pause: cf.pause };
+    return { id: phHash(sc.name), name: sc.name, side: sc.side, und: String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u)), tf: cf.tf, ver: cf.ver, conds: sc.conds, seq: sscanIsSeq(sc.conds), kind: phKind(sc), minPrem: sc.minPrem || 0, pause: cf.pause };
   });
 }
 function stOn(i, v) { const sc = sscans[i]; if (!sc) return; const c = phCfg(sc.name); c.on = !!v; if (v) c.ver = Date.now(); phSave(); phSyncSoon(); alrRender(); }
@@ -12864,25 +12876,32 @@ async function stCheck() {
   catch (e) { PH.msg = 'Link Telegram and switch on a Guppy alert first.'; }
   alrRender();
 }
+const ST_OPEN = {};   // which strategy rows are expanded (kept while the card re-renders)
+function stOpen(id, v) { ST_OPEN[id] = !!v; }
 function stratCard() {
   const list = phScanList(); if (!list.length) return '';
   const dayOpts = sel => PH_DAYS.map((d, k) => `<option value="${k}"${k === sel ? ' selected' : ''}>${d}</option>`).join('');
   const tfOpts = sel => ['5m', '15m', '30m', '1h', '4h'].map(t => `<option${t === sel ? ' selected' : ''}>${t}</option>`).join('');
   const lab = 'font-size:12px;color:var(--text-muted)';
+  const unOf = sc => String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u)).join(', ');
+  const onCount = list.filter(({ sc }) => phCfg(sc.name).on && phSupported(sc) && unOf(sc)).length;
   const rows = list.map(({ sc, i }) => {
-    const cf = phCfg(sc.name), ok = phSupported(sc), id = phHash(sc.name), pz = cf.pause;
-    const unds = String(sc.und || '').split(',').map(u => u.trim()).filter(u => u && !isIndiaUnd(u)).join(', ');
+    const cf = phCfg(sc.name), ok = phSupported(sc), id = phHash(sc.name), pz = cf.pause, kind = phKind(sc), unds = unOf(sc), can = ok && !!unds, on = cf.on && can;
     const bars = Object.keys(PH.bars || {}).filter(k => k.split('|')[0] === String(id)).map(k => PH.bars[k]), last = bars.length ? new Date(Math.max(...bars)).toLocaleString() : '';
-    return `<div style="border-top:1px solid var(--border);padding:12px 0"><div style="font:600 13px var(--sans)">${phEsc(sc.name)}</div>
-      <div class="mkt-note" style="margin:2px 0 8px">${phEsc(unds || 'No supported markets')} · ${phEsc(sc.side)} signal${ok ? '' : ' · uses indicators phone alerts cannot check yet'}</div>
-      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" onchange="stOn(${i},this.checked)"${cf.on ? ' checked' : ''}${ok && unds ? '' : ' disabled'}> Phone alert</label>
+    const sub = (kind === 'straddle' ? 'ATM straddle premium · ' : kind === 'perp' ? 'Perpetual price · ' : '') + (unds || 'No supported markets') + ' · ' + sc.side + ' signal' + (ok ? '' : kind ? ' · uses indicators phone alerts cannot check yet' : ' · phone alerts not available for this strategy type yet');
+    const tag = on ? `<span class="mkt-tag">On · ${phEsc(cf.tf)}</span>` : `<span class="mkt-tag hol">Off</span>`;
+    return `<details style="border-top:1px solid var(--border);padding:10px 0"${ST_OPEN[id] ? ' open' : ''} ontoggle="stOpen(${id},this.open)">
+      <summary style="cursor:pointer;display:flex;gap:10px;align-items:center;justify-content:space-between;list-style:none"><span style="min-width:0"><span style="font:600 13px var(--sans);display:block">${phEsc(sc.name)}</span><span class="mkt-note" style="margin:2px 0 0;display:block">${phEsc(sub)}</span></span><span style="display:flex;gap:8px;align-items:center;flex:none">${tag}<span aria-hidden="true" style="color:var(--text-muted)">▾</span></span></summary>
+      <div style="padding-top:10px">
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" onchange="stOn(${i},this.checked)"${cf.on ? ' checked' : ''}${can ? '' : ' disabled'}> Phone alert</label>
       ${cf.on ? `<div class="alr-f" style="margin-top:8px"><label style="grid-column:1/-1;${lab}">Candle timeframe<select onchange="stTf(${i},this.value)">${tfOpts(cf.tf)}</select></label></div>
       <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:10px"><input type="checkbox" onchange="stPause(${i},'on',this.checked)"${pz.on ? ' checked' : ''}> Pause alerts during a weekly window</label>
       ${pz.on ? `<div class="alr-f" style="margin-top:8px"><label style="${lab}">From<select onchange="stPause(${i},'sd',this.value)">${dayOpts(pz.sd)}</select></label><label style="${lab}">at<input type="time" value="${phEsc(pz.st)}" onchange="stPause(${i},'st',this.value)"></label>
       <label style="${lab}">Until<select onchange="stPause(${i},'ed',this.value)">${dayOpts(pz.ed)}</select></label><label style="${lab}">at<input type="time" value="${phEsc(pz.et)}" onchange="stPause(${i},'et',this.value)"></label></div><div class="mkt-note">Times are IST. Signals during the pause are skipped, not delayed.</div>` : ''}
-      <div class="mkt-note">${last ? 'Last alert: ' + phEsc(last) : 'No alert sent yet.'}</div>` : ''}</div>`;
+      <div class="mkt-note">${last ? 'Last alert: ' + phEsc(last) : 'No alert sent yet.'}</div>` : ''}
+      </div></details>`;
   }).join('');
-  return `<div class="mkt-card"><div style="font:600 14px var(--sans);margin-bottom:4px">Strategy alerts (Guppy)</div><div class="mkt-note" style="margin:0 0 8px">Checked by your Worker each time a candle closes, so it works with the app closed. Alerts fire once, when a fresh signal forms. Squeeze scans are sent with a sequence flag; your Worker must run the same sequence rule, otherwise phone alerts keep using the older rule and can differ from the chart.</div>${rows}<div class="mkt-acts"><button class="mkt-btn" onclick="stCheck()">Check now (sends result to Telegram)</button></div></div>`;
+  return `<div class="mkt-card"><div style="font:600 14px var(--sans);margin-bottom:4px">Strategy alerts</div><div class="mkt-note" style="margin:0 0 8px">${onCount} of ${list.length} strategies have a phone alert on. Tap a strategy to open it and switch its alert on. Checked by your Worker each time a candle closes, so it works with the app closed. Alerts fire once, when a fresh signal forms. ATM straddle alerts and the squeeze sequence rule need the latest worker.js.</div>${rows}<div class="mkt-acts"><button class="mkt-btn" onclick="stCheck()">Check now (sends result to Telegram)</button></div></div>`;
 }
 function phCard() {
   const q = PH.quiet, body = !phReady()
