@@ -3733,9 +3733,14 @@ async function openGuppyChart(und, i) {   // Scanner tab -> live perpetual chart
     sscanFillApply(); sscanApplyRefresh();
   } catch (e) { console.warn('openGuppyChart failed', e); }
 }
+/* Guppy crossover (Buy + Sell) is the chart's default Signal. It is applied once per page load, unless the user has picked Off. */
+const SSCAN_OFF_KEY = 'tradepro_signal_off_v1'; let sscanDefTried = false;
+function sscanUserOff() { try { return localStorage.getItem(SSCAN_OFF_KEY) === '1'; } catch (e) { return false; } }
+function sscanSetOff(v) { try { if (v) localStorage.setItem(SSCAN_OFF_KEY, '1'); else localStorage.removeItem(SSCAN_OFF_KEY); } catch (e) { /* storage unavailable */ } }
 function sscanFillApply() {
   const sel = document.getElementById('live-scan-apply');
   if (!sel) return;
+  if (!sscanDefTried) { sscanDefTried = true; if (!sscanApplied && !sscanUserOff() && sscanGuppyPair()) { sscanApplied = '__pair'; setTimeout(() => { try { sscanApplyRefresh(); } catch (e) { /* chart not ready */ } }, 0); } }
   const onStrat = liveMode && LIVE.kind === 'strategy';
   const pr = onStrat ? null : sscanGuppyPair(), hide = pr ? [pr.bull.name, pr.bear.name] : [];
   sel.innerHTML = '<option value="">Off</option>' +
@@ -3752,6 +3757,7 @@ function sscanApplyChange(v) {
     return;
   }
   sscanApplied = v || null;
+  sscanSetOff(!v);
   sscanApplyRefresh();
 }
 async function sscanApplyRefresh() {
