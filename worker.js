@@ -73,7 +73,7 @@ function cleanScans(list) {
         if (c.s != null) { o.s = arr(c.s, 1, 500); if (!o.s) return null; }
         if (c.l != null) { o.l = arr(c.l, 1, 500); if (!o.l) return null; }
         if (c.k === 'gmma') o.mode = c.mode === 'all' ? 'all' : 'avg';
-        else { o.a = num(c.a); o.n = num(c.n); o.m = num(c.m); if ([o.a, o.n, o.m].some(x => x != null && (x <= 0 || x > 100))) return null; }
+        else { o.a = num(c.a); o.n = num(c.n); o.m = num(c.m); o.w = num(c.w); if ([o.a, o.n, o.m, o.w].some(x => x != null && (x <= 0 || x > 100))) return null; }
       } else if (c.k === 'st') { o.p = num(c.p); o.m = num(c.m); if (!(o.p >= 2 && o.p <= 100 && o.m > 0 && o.m <= 20)) return null; }
       else { o.p = num(c.p); if (!(o.p >= 1 && o.p <= 500)) return null; }
       return o;
@@ -81,7 +81,7 @@ function cleanScans(list) {
     if (!conds.length || conds.some(c => !c)) return null;
     const p = s.pause || {};
     const pause = { on: !!p.on, sd: Math.min(6, Math.max(0, (num(p.sd) || 0) | 0)), st: T.test(p.st) ? p.st : '19:00', ed: Math.min(6, Math.max(0, (num(p.ed) || 0) | 0)), et: T.test(p.et) ? p.et : '19:00', tz: typeof p.tz === 'string' && validTz(p.tz) ? p.tz : 'Asia/Kolkata' };
-    return { id, name: String(s.name || 'Guppy alert').slice(0, 80), side: s.side === 'Sell' ? 'Sell' : 'Buy', und, tf: s.tf, conds, ver: num(s.ver) || id, pause };
+    return { id, name: String(s.name || 'Guppy alert').slice(0, 80), side: s.side === 'Sell' ? 'Sell' : 'Buy', und, tf: s.tf, kind: s.kind === 'straddle' ? 'straddle' : 'perp', minPrem: Math.min(1e7, Math.max(0, num(s.minPrem) || 0)), conds, ver: num(s.ver) || id, pause };
   }).filter(Boolean);
 }
 
@@ -141,7 +141,7 @@ async function getJson(path, log) {
   }
   return null;
 }
-function parseOpt(sym) { const m = /^([CP])-([A-Z0-9]+)-(\d+(?:\.\d+)?)-(\d{2})(\d{2})(\d{2})$/.exec(sym || ''); return m ? { type: m[1], und: m[2], exp: '20' + m[6] + '-' + m[5] + '-' + m[4] } : null; }
+function parseOpt(sym) { const m = /^([CP])-([A-Z0-9]+)-(\d+(?:\.\d+)?)-(\d{2})(\d{2})(\d{2})$/.exec(sym || ''); return m ? { type: m[1], und: m[2], exp: '20' + m[6] + '-' + m[5] + '-' + m[4], strike: +m[3] } : null; }
 function mins(s) { const [h, m] = s.split(':'); return +h * 60 + +m; }
 function inQuiet(q, now) {
   if (!q || !q.on) return false;
@@ -166,7 +166,7 @@ function emaS(values, period) {
   return out;
 }
 const smaS = (v, p) => v.map((_, i) => i < p - 1 ? null : v.slice(i - p + 1, i + 1).reduce((a, b) => a + b, 0) / p);
-function supertrendS(candles, period, mult) {
+function supertrendFull(candles, period, mult) {
   const n = candles.length, tr = new Array(n).fill(0), atr = new Array(n).fill(null);
   for (let i = 0; i < n; i++) { const c = candles[i]; tr[i] = i === 0 ? c.h - c.l : Math.max(c.h - c.l, Math.abs(c.h - candles[i - 1].c), Math.abs(c.l - candles[i - 1].c)); }
   for (let i = period - 1; i < n; i++) {
@@ -186,9 +186,10 @@ function supertrendS(candles, period, mult) {
     else tu[i] = tu[i - 1];
     line[i] = tu[i] ? lo[i] : up[i];
   }
-  return line;
+  return { line, tu };
 }
-const G = { s: [10, 12, 15], l: [30, 35, 40] }, SQ = { a: 1.0, n: 10, m: 3 };
+const supertrendS = (candles, period, mult) => supertrendFull(candles, period, mult).line;
+const G = { s: [10, 12, 15], l: [30, 35, 40] }, SQ = { a: 2.5, n: 8, m: 3, w: 15 };
 function gmmaLine(candles, c) {
   const closes = candles.map(x => x.c), avg = a => a.reduce((x, y) => x + y, 0) / a.length;
   const S = (c.s || G.s).map(p => emaS(closes, p)), L = (c.l || G.l).map(p => emaS(closes, p));
@@ -214,7 +215,7 @@ function squeezeLine(candles, c) {
     if (lo[i] == null) return null;
     let cnt = 0; for (let k = Math.max(0, i - n); k < i; k++) if (sq[k]) cnt++;
     const ctx = cnt >= m;
-    return { ctx, dn: ctx && cd.c < lo[i], up: ctx && cd.c > hi[i] };
+    return { ctx, dn: ctx && cd.c < lo[i], up: ctx && cd.c > hi[i], sqz: sq[i], lo: lo[i], hi: hi[i] };
   });
 }
 function refLine(candles, c) {
@@ -232,19 +233,82 @@ function condOk(c, px, v) {
   return below ? px < v : px > v;
 }
 const condLabel = c => c.k === 'gsq' ? 'Squeeze ' + (c.op === 'below' ? 'breakdown' : 'breakout') : c.k === 'gmma' ? 'Guppy' : c.k === 'st' ? 'Supertrend' : c.k.toUpperCase() + c.p;
-function evalConds(candles, conds) {
+/* Squeeze -> crossover + Supertrend flip -> breakout (same rule as the TradePro chart; used when a scan has gsq + gmma + st).
+   ARM: >= m of the last n bars squeezed (ribbon <= a x ATR); expires if no squeezed bar for w bars.
+   TRIGGER: after arming, Guppy crossover AND Supertrend flip (either order, within w bars); entry on the bar the second one completes, only if the close is beyond the whole ribbon.
+   One entry per squeeze; the position ends when the Supertrend flips back, and a new squeeze is needed for the next entry. Returns the entry bar indexes. */
+const isSeq = conds => ['gsq', 'gmma', 'st'].every(k => conds.some(c => c.k === k));
+function seqEntries(candles, conds, minPrem) {
+  const gq = conds.find(c => c.k === 'gsq'), gm = conds.find(c => c.k === 'gmma'), sp = conds.find(c => c.k === 'st'), n = candles.length, entries = [];
+  const bear = gq.op === 'below', a = gq.a > 0 ? gq.a : SQ.a, nWin = gq.n >= 1 ? gq.n : SQ.n, mMin = gq.m >= 1 ? gq.m : SQ.m, W = gq.w >= 1 ? gq.w : SQ.w;
+  const Q = squeezeLine(candles, { k: 'gsq', a, n: nWin, m: mMin, s: gm.s, l: gm.l }), Gm = gmmaLine(candles, gm), T = supertrendFull(candles, sp.p, sp.m);
+  let armed = false, reset = 0, armI = -1, lastSq = -99, cx = -99, tf = -99, pos = false;
+  for (let i = 1; i < n; i++) {
+    if (!(Q[i] && Q[i - 1] && Gm[i] && Gm[i - 1] && T.line[i] != null && T.tu[i - 1] != null)) continue;
+    const up = T.tu[i], up0 = T.tu[i - 1];
+    if (pos) { if (bear ? (up && !up0) : (!up && up0)) { pos = false; reset = i; } continue; }
+    if (Q[i].sqz) lastSq = i;
+    if (!armed) { let c = 0; for (let k = Math.max(reset + 1, i - nWin); k <= i; k++) if (Q[k] && Q[k].sqz) c++; if (c >= mMin) { armed = true; armI = i; cx = tf = -99; } }
+    if (!armed) continue;
+    if (i - lastSq > W) { armed = false; continue; }
+    const g = Gm[i], g0 = Gm[i - 1];
+    if (bear ? (g0.sa >= g0.la && g.sa < g.la) : (g0.sa <= g0.la && g.sa > g.la)) cx = i;
+    if (bear ? (up0 && !up) : (!up0 && up)) tf = i;
+    const both = cx > armI && tf > armI && i - Math.min(cx, tf) <= W && (cx === i || tf === i);
+    const state = bear ? (g.sa < g.la && !up && candles[i].c < Q[i].lo) : (g.sa > g.la && up && candles[i].c > Q[i].hi);
+    if (both && state && !(minPrem > 0 && candles[i].c < minPrem)) { entries.push(i); pos = true; armed = false; }
+  }
+  return entries;
+}
+function evalConds(candles, conds, minPrem) {
   const lines = conds.map(c => refLine(candles, c)), n = candles.length - 1;
   const at = i => conds.map((c, j) => { const v = lines[j][i]; return v != null && condOk(c, candles[i].c, v); });
   const now = at(n), prev = n > 0 ? at(n - 1) : [false];
-  return { allNow: now.every(Boolean), allPrev: prev.every(Boolean), details: conds.map((c, j) => ({ label: condLabel(c), ok: now[j] })) };
+  if (isSeq(conds)) { const e = seqEntries(candles, conds, minPrem); return { seq: true, allNow: e.length > 0 && e[e.length - 1] === n, allPrev: false, details: conds.map((c, j) => ({ label: condLabel(c), ok: now[j] })) }; }   // fires only on the bar the sequence completes
+  const floor = (i) => !(minPrem > 0 && candles[i] && candles[i].c < minPrem);   // optional premium floor (straddle scans)
+  return { allNow: now.every(Boolean) && floor(n), allPrev: prev.every(Boolean) && floor(n - 1), details: conds.map((c, j) => ({ label: condLabel(c), ok: now[j] })) };
 }
-async function candlesFor(u, tf, nowSec, cache, log) {
-  const k = u + '|' + tf; if (cache.has(k)) return cache.get(k);
-  const secs = TFS[tf], j = await getJson('/v2/history/candles?symbol=' + encodeURIComponent(u + 'USD') + '&resolution=' + tf + '&start=' + (nowSec - secs * 400) + '&end=' + nowSec, log);
+async function fetchCandles(sym, tf, nowSec, cache, log) {
+  const k = sym + '|' + tf; if (cache.has(k)) return cache.get(k);
+  const secs = TFS[tf], j = await getJson('/v2/history/candles?symbol=' + encodeURIComponent(sym) + '&resolution=' + tf + '&start=' + (nowSec - secs * 400) + '&end=' + nowSec, log);
   let c = ((j && j.result) || []).map(r => { let t = num(r.time); if (t == null) return null; if (t > 1e12) t = Math.floor(t / 1000); return { t, o: num(r.open), h: num(r.high), l: num(r.low), c: num(r.close) }; })
     .filter(x => x && x.o != null && x.h != null && x.l != null && x.c != null).sort((a, b) => a.t - b.t).filter((x, i, a) => !i || x.t !== a[i - 1].t);
   const last = c[c.length - 1]; if (last && last.t + secs > nowSec) c = c.slice(0, -1);
   cache.set(k, c); return c;
+}
+const candlesFor = (u, tf, nowSec, cache, log) => fetchCandles(u + 'USD', tf, nowSec, cache, log);
+/* ATM straddle premium candles (kind 'straddle'): nearest expiry after today (UTC), strike nearest to spot, call + put added together
+   the same way the TradePro combined-premium chart does it (a leg with no trade in a bar is carried forward flat). */
+async function straddleLegs(u, now, cache, log) {
+  const k = 'legs|' + u; if (cache.has(k)) return cache.get(k);
+  const today = new Date(now).toISOString().slice(0, 10), M = {}, exps = new Set(); let spot = null;
+  const j = await getJson('/v2/tickers?contract_types=call_options,put_options&underlying_asset_symbols=' + encodeURIComponent(u), log);
+  ((j && j.result) || []).forEach(t => {
+    const o = parseOpt(t && t.symbol); if (!o || o.und !== u) return;
+    exps.add(o.exp); const key = o.exp + '|' + o.strike; (M[key] = M[key] || {})[o.type] = t.symbol;
+    if (spot == null) spot = num(t.spot_price);
+  });
+  if (spot == null) { const pj = await getJson('/v2/tickers/' + encodeURIComponent(u + 'USD'), log); spot = pj && pj.result ? num(pj.result.mark_price) : null; }
+  const list = [...exps].sort(), exp = list.find(e => e > today) || list[0];
+  let best = null;
+  if (exp && spot != null) Object.keys(M).forEach(key => { const [e, s] = key.split('|'); if (e !== exp || !M[key].C || !M[key].P) return; if (!best || Math.abs(+s - spot) < Math.abs(best.strike - spot)) best = { strike: +s, call: M[key].C, put: M[key].P, exp }; });
+  cache.set(k, best); return best;
+}
+async function straddleCandles(u, tf, nowSec, cache, log) {
+  const k = 'str|' + u + '|' + tf; if (cache.has(k)) return cache.get(k);
+  const L = await straddleLegs(u, nowSec * 1000, cache, log); if (!L) { cache.set(k, null); return null; }
+  const [a, b] = await Promise.all([fetchCandles(L.call, tf, nowSec, cache, log), fetchCandles(L.put, tf, nowSec, cache, log)]);
+  if (!a || !b || !a.length || !b.length) { cache.set(k, null); return null; }
+  const times = [...new Set(a.map(x => x.t).concat(b.map(x => x.t)))].sort((x, y) => x - y);
+  const at = (arr, t) => { for (let i = arr.length - 1; i >= 0; i--) { const c = arr[i]; if (c.t === t) return c; if (c.t < t) return { t, o: c.c, h: c.c, l: c.c, c: c.c }; } return null; };
+  const out = [];
+  for (const t of times) {
+    const x = at(a, t), y = at(b, t); if (!x || !y) continue;
+    const o = x.o + y.o, c = x.c + y.c, ub = x.h + y.h, lb = x.l + y.l, top = Math.max(o, c), bot = Math.min(o, c);
+    out.push({ t, o, c, h: top + 0.5 * Math.max(0, ub - top), l: bot - 0.5 * Math.max(0, bot - lb) });
+  }
+  out.meta = 'ATM ' + L.strike + ', exp ' + L.exp.slice(8) + '/' + L.exp.slice(5, 7);
+  cache.set(k, out); return out;
 }
 function paused(p, now) {
   if (!p || !p.on) return false;
@@ -259,19 +323,19 @@ async function scanRows(d, now, cache, log, all) {
   for (const sc of d.scans || []) for (const u of sc.und) {
     const secs = TFS[sc.tf];
     if (!all && secs > 360 && (nowSec % secs) > 400) continue;   // bigger timeframes: look only just after a candle closes
-    const candles = await candlesFor(u, sc.tf, nowSec, cache, log);
-    if (!candles || candles.length < 60) { if (all) rows.push({ sc, u, err: 'not enough candles' }); continue; }
-    rows.push({ sc, u, ev: evalConds(candles, sc.conds), price: candles[candles.length - 1].c, closeT: (candles[candles.length - 1].t + secs) * 1000, key: sc.id + '|' + u + '|' + sc.tf });
+    const candles = sc.kind === 'straddle' ? await straddleCandles(u, sc.tf, nowSec, cache, log) : await candlesFor(u, sc.tf, nowSec, cache, log);
+    if (!candles || candles.length < 60) { if (all) rows.push({ sc, u, err: sc.kind === 'straddle' && !candles ? 'could not build the ATM straddle candles' : 'not enough candles' }); continue; }
+    rows.push({ sc, u, meta: candles.meta || '', ev: evalConds(candles, sc.conds, sc.minPrem), price: candles[candles.length - 1].c, closeT: (candles[candles.length - 1].t + secs) * 1000, key: sc.id + '|' + u + '|' + sc.tf });
   }
   return rows;
 }
-const sigMsg = (sc, r, tz) => (sc.side === 'Buy' ? '📈 BUY' : '📉 SELL') + ' signal: ' + r.u + ' ' + sc.tf + ' at ' + money(r.price) + ' (candle closed ' + clock(tz, r.closeT) + '). ' + sc.name
+const sigMsg = (sc, r, tz) => (sc.side === 'Buy' ? '📈 BUY' : '📉 SELL') + ' signal: ' + r.u + (sc.kind === 'straddle' ? ' ATM straddle' + (r.meta ? ' (' + r.meta + ')' : '') : '') + ' ' + sc.tf + ' at ' + money(r.price) + ' (candle closed ' + clock(tz, r.closeT) + '). ' + sc.name
 async function check(req, env) {
   const b = await body(req), d = TOKEN_RE.test(b.token || '') ? await getDev(env, b.token) : null;
   if (!d || !d.chat) return json(env, { ok: false, error: 'not linked' }, 400);
   if (!(d.scans || []).length) { await tgSend(env, d.chat, '🔎 No Guppy alerts are switched on in TradePro yet.'); return json(env, { ok: true, text: 'none' }); }
   const rows = await scanRows(d, Date.now(), new Map(), [], true);
-  const lines = rows.map(r => r.err ? r.u + ' ' + r.sc.tf + ': ' + r.err : r.u + ' ' + r.sc.tf + ' at ' + money(r.price) + ': ' + (r.ev.allNow ? 'ALL conditions met now' : 'not met') + ' (' + r.ev.details.map(x => x.label + (x.ok ? ' ✓' : ' ✗')).join(', ') + ')');
+  const lines = rows.map(r => r.err ? r.u + ' ' + r.sc.tf + ': ' + r.err : r.u + ' ' + r.sc.tf + ' at ' + money(r.price) + ': ' + (r.ev.seq ? (r.ev.allNow ? 'NEW entry (squeeze, crossover + Supertrend, breakout)' : 'no new entry') : (r.ev.allNow ? 'ALL conditions met now' : 'not met')) + ' (' + r.ev.details.map(x => x.label + (x.ok ? ' ✓' : ' ✗')).join(', ') + ')');
   const text = '🔎 Guppy check now:\n' + lines.join('\n') + '\nAlerts fire only when a NEW signal forms on a closed candle' + (d.scans.some(x => paused(x.pause, Date.now())) ? ' (a pause window is active right now).' : '.');
   const r = await tgSend(env, d.chat, text); return json(env, { ok: r.ok, text });
 }
