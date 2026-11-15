@@ -772,6 +772,11 @@
     max-height: 70vh; overflow: hidden;
   }
   .ind-menu.open { display: flex; }
+  .ind-menu.ind-menu-big { min-width: 320px; max-width: min(420px, calc(100vw - 24px)); box-shadow: 0 0 0 100vmax rgba(0,0,0,0.55), 0 14px 40px rgba(0,0,0,0.6); }
+  .ind-menu.ind-menu-big .ind-menu-item { padding: 12px 14px; font-size: 15px; }
+  .ind-menu.ind-menu-big .ind-menu-item small { font-size: 12px; }
+  .ind-menu.ind-menu-big .ind-fav-btn { width: 44px; }
+  .ind-menu.ind-menu-big .ind-menu-search { font-size: 15px; padding: 10px 12px; }
   .ind-menu-search-wrap { padding: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .ind-menu-search {
     width: 100%; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border);
@@ -2163,6 +2168,11 @@
               <button class="zoom-btn" aria-label="Scroll price up" onclick="priceShiftChart(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 15l6-6 6 6"/></svg></button>
               <button class="zoom-btn" aria-label="Scroll price down" onclick="priceShiftChart(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
               <button class="zoom-btn" id="pz-fit" aria-label="Reset price scale to auto-fit" onclick="priceFit()" style="width:auto;padding:0 7px;font-size:11px;font-weight:700">Fit</button>
+            </div>
+            <div class="zoom-cluster" title="Fit the whole chart (price + indicator panes) to the screen height">
+              <button class="zoom-btn" id="fit-screen-btn" aria-label="Fit chart to screen" aria-pressed="false" onclick="toggleFitScreen()" style="width:auto;padding:0 9px;font-size:11px;font-weight:700;gap:5px">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Fit screen</span>
+              </button>
             </div>
           </div>
           <div class="panel-body">
@@ -4345,7 +4355,7 @@ const OI_SH = { r: { base: '#F5A524', add: '#B86A00', edge: '#FFC85C', rem: '#FF
 function oiLeg() { oi.legend = !oi.legend; oiRender(); }
 function oiLegend(canvas, ready) {
   let el = document.getElementById('oi-leg');
-  if (!el) { el = document.createElement('div'); el.id = 'oi-leg'; el.style.cssText = 'position:absolute;z-index:9;left:6px;bottom:52px;background:color-mix(in srgb, var(--surface) 97%, transparent);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:11px;line-height:1.75;box-shadow:0 6px 18px rgba(0,0,0,.55);pointer-events:none;color:var(--text-muted)'; canvas.appendChild(el); }
+  if (!el) { el = document.createElement('div'); el.id = 'oi-leg'; el.style.cssText = 'position:absolute;z-index:9;left:6px;top:54px;background:color-mix(in srgb, var(--surface) 97%, transparent);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:11px;line-height:1.75;box-shadow:0 6px 18px rgba(0,0,0,.55);pointer-events:none;color:var(--text-muted)'; canvas.appendChild(el); }
   if (!oi.on || !oi.legend || !ready) { el.style.display = 'none'; return; }
   const S = OI_SH, since = new Date(oi.base.at + 19800000).toISOString().slice(11, 16);
   const sw = css => `<span style="display:inline-block;width:20px;height:9px;border-radius:2px;vertical-align:middle;margin-right:8px;box-sizing:border-box;${css}"></span>`;
@@ -4361,8 +4371,8 @@ function oiRender() {
   try { spkChartClear(canvas); } catch (e) { /* ignore */ }
   let lay = document.getElementById('oi-layer'), ctl = document.getElementById('oi-ctl');
   if (!lay) {
-    lay = document.createElement('div'); lay.id = 'oi-layer'; lay.style.cssText = 'position:absolute;top:0;right:62px;pointer-events:none;z-index:4;opacity:.6';
-    ctl = document.createElement('div'); ctl.id = 'oi-ctl'; ctl.style.cssText = 'position:absolute;bottom:24px;left:6px;z-index:7;display:flex;gap:6px;align-items:center;font-size:11px';
+    lay = document.createElement('div'); lay.id = 'oi-layer'; lay.style.cssText = 'position:absolute;top:0;right:62px;pointer-events:none;z-index:4;opacity:.92';
+    ctl = document.createElement('div'); ctl.id = 'oi-ctl'; ctl.style.cssText = 'position:absolute;top:24px;left:6px;z-index:7;display:flex;gap:6px;align-items:center;font-size:12px;background:color-mix(in srgb, var(--bg) 82%, transparent);padding:2px 4px;border-radius:999px';
     canvas.appendChild(lay); canvas.appendChild(ctl);
     oiBindTap(canvas, lay);
   }
@@ -4382,19 +4392,19 @@ function oiRender() {
   oiLegend(canvas, ready);
   if (!oi.on) return;
   if (!ready || !chartGeom) { lay.innerHTML = oi.err ? `<div style="font-size:10px;color:var(--red);padding:2px 4px">OI: ${sscanEsc(oi.err)}</div>` : ''; return; }
-  const g = chartGeom, axis = document.getElementById('price-axis'), H = parseFloat(axis && axis.style.height) || 340, W = Math.round(Math.min(170, canvas.clientWidth * (canvas.clientWidth < 520 ? 0.26 : 0.42)));
+  const g = chartGeom, axis = document.getElementById('price-axis'), H = parseFloat(axis && axis.style.height) || 340, W = Math.round(Math.min(canvas.clientWidth >= 900 ? 280 : 170, canvas.clientWidth * (canvas.clientWidth < 520 ? 0.26 : 0.42)));
   const yAt = v => g.GAP + g.priceAreaH * (1 - (v - g.yMin) / (g.yMax - g.yMin));
   const rows = oiRows().filter(r => r.k >= g.yMin && r.k <= g.yMax);
   let maxV = 0; rows.forEach(r => { maxV = Math.max(maxV, r.C, r.P, r.bC, r.bP); });
   if (!rows.length || !maxV) { lay.innerHTML = ''; return; }
   let gap = Infinity; for (let i = 1; i < rows.length; i++) gap = Math.min(gap, yAt(rows[i - 1].k) - yAt(rows[i].k));
-  const rh = Math.max(4, Math.min(16, (isFinite(gap) ? gap : 14) - 1.5)), bh = rh / 2 - 0.4, sc = (W - 8) / maxV, RED = '#F6465D', GRN = '#2EBD85';
+  const rh = Math.max(6, Math.min(18, (isFinite(gap) ? gap : 14) - 1.5)), bh = rh / 2 - 0.4, sc = (W - 8) / maxV, RED = '#F6465D', GRN = '#2EBD85';
   /* Shades tell the story: mid tone = OI already there · DARK deep shade = new buildup · LIGHT pale shade (dashed edge) = unwinding */
   const SH = OI_SH;
   let svg = '';
   const bar = (y, cur, base, id) => {
     const c = SH[id], solid = Math.min(cur, base) * sc, inc = Math.max(0, cur - base) * sc, dec = Math.max(0, base - cur) * sc;
-    if (solid > 0) svg += `<rect x="${(W - solid).toFixed(1)}" y="${y.toFixed(1)}" width="${solid.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.base}" fill-opacity=".26"/>`;
+    if (solid > 0) svg += `<rect x="${(W - solid).toFixed(1)}" y="${y.toFixed(1)}" width="${solid.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.base}" fill-opacity=".5"/>`;
     if (inc > 0.4) svg += `<rect x="${(W - solid - inc).toFixed(1)}" y="${y.toFixed(1)}" width="${inc.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.add}" stroke="${c.edge}" stroke-width="1.2"/>`;
     if (dec > 0.4) svg += `<rect x="${(W - solid - dec).toFixed(1)}" y="${y.toFixed(1)}" width="${dec.toFixed(1)}" height="${bh.toFixed(1)}" fill="${c.rem}" fill-opacity=".85" stroke="${c.rem}" stroke-width="1" stroke-dasharray="2,2"/>`;
   };
@@ -4405,7 +4415,7 @@ function oiRender() {
   let wC = null, wP = null; rows.forEach(r => { if (!wC || r.C > wC.C) wC = r; if (!wP || r.P > wP.P) wP = r; });
   const kf = v => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'k' : String(Math.round(v)), same = wC && wP && wC.k === wP.k;
   const wall = (r, side, v, b) => { if (!r || !(v > 0)) return ''; const len = Math.max(v, b) * sc, yy = yAt(r.k) + (same ? (side === 'r' ? -1 : 8.5) : 3.5);
-    return `<text x="${(W - len - 5).toFixed(1)}" y="${yy.toFixed(1)}" text-anchor="end" font-size="9.5" font-weight="700" fill="${SH[side].edge}" stroke="var(--bg)" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${side === 'r' ? 'CE' : 'PE'} ${kf(v)}</text>`; };
+    return `<text x="${(W - len - 5).toFixed(1)}" y="${yy.toFixed(1)}" text-anchor="end" font-size="${canvas.clientWidth >= 900 ? 12 : 9.5}" font-weight="700" fill="${SH[side].edge}" stroke="var(--bg)" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${side === 'r' ? 'CE' : 'PE'} ${kf(v)}</text>`; };
   const lg = wall(wC, 'r', wC && wC.C, wC && wC.bC) + wall(wP, 'g', wP && wP.P, wP && wP.bP);
   lay.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">${svg}${lg}</svg>`;
   oiCard(lay, rows, yAt, SH);
@@ -5710,6 +5720,30 @@ function priceZoomChart(dir) { // dir < 0 = zoom out (wider range), > 0 = zoom i
   renderChart(true); pzLabel();
 }
 function priceShiftChart(dir) { priceShift += dir * 0.3 * Math.min(priceZoom, 3); renderChart(true); pzLabel(); }
+/* ---- Fit to screen: chart (price + indicator panes) is sized to the visible screen height so nothing is cut off ---- */
+let fitScreen = false;
+try { fitScreen = localStorage.getItem('tradepro_fit_screen_v1') === '1'; } catch (e) { /* ignore */ }
+function fitScreenAvail() {
+  const lbl = document.getElementById('replay-symbol-label'), head = lbl && lbl.parentElement;
+  const vh = (window.tpVH ? window.tpVH() : window.innerHeight);
+  const headH = head ? head.offsetHeight : 40;
+  return Math.max(220, vh - headH - 96);   // 96 = bottom Sell/Buy bar + time-axis strip + breathing room
+}
+function fitScreenSync() {
+  const b = document.getElementById('fit-screen-btn');
+  if (b) { b.setAttribute('aria-pressed', fitScreen ? 'true' : 'false'); b.style.color = fitScreen ? 'var(--accent)' : ''; b.style.borderColor = fitScreen ? 'var(--accent)' : ''; }
+}
+function toggleFitScreen() {
+  fitScreen = !fitScreen;
+  try { localStorage.setItem('tradepro_fit_screen_v1', fitScreen ? '1' : '0'); } catch (e) { /* ignore */ }
+  fitScreenSync();
+  priceZoom = 1; priceShift = 0;
+  renderChart(true); pzLabel();
+  const lbl = document.getElementById('replay-symbol-label'), head = lbl && lbl.parentElement;
+  if (fitScreen && head) { const y = head.getBoundingClientRect().top + window.pageYOffset - 6; try { window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' }); } catch (e) { window.scrollTo(0, Math.max(0, y)); } }
+}
+(function () { let t = 0, w = 0, h = 0; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { if (fitScreen && (window.innerHeight !== h || window.innerWidth !== w)) { w = window.innerWidth; h = window.innerHeight; renderChart(false); } }, 250); }); })();
+document.addEventListener('DOMContentLoaded', fitScreenSync);
 function priceFit() { priceZoom = 1; priceShift = 0; renderChart(true); pzLabel(); }
 function pzLabel() { const b = document.getElementById('pz-fit'); if (b) b.textContent = priceZoom === 1 && !priceShift ? 'Fit' : (priceZoom >= 10 ? Math.round(priceZoom) : priceZoom.toFixed(1)) + '×'; }
 let chartType = 'candles'; // 'candles' | 'heikinashi' | 'renko' — which style renderChart draws
@@ -7366,10 +7400,12 @@ function renderIndicatorMenuList() {
   list.innerHTML = html;
   list.scrollTop = scrollTop;
 }
+let indMenuOpenedAt = 0;
 function toggleIndicatorMenu(e) {
   if (e) e.stopPropagation();
   const menu = document.getElementById('ind-menu');
-  if (menu.classList.contains('open')) { menu.classList.remove('open'); return; }
+  // TV / remote browsers can fire the click twice; a 2nd click right after opening must not shut the menu again.
+  if (menu.classList.contains('open')) { if (Date.now() - indMenuOpenedAt < 450) return; menu.classList.remove('open'); return; }
   const btn = e && e.currentTarget ? e.currentTarget : document.querySelector('.ind-add-btn');
   const rect = btn.getBoundingClientRect();
   indicatorSearchQuery = '';
@@ -7381,11 +7417,25 @@ function toggleIndicatorMenu(e) {
   `;
   renderIndicatorMenuList();
   menu.classList.add('open');
+  indMenuOpenedAt = Date.now();
+  const vh = window.innerHeight, shortView = window.innerWidth > 700 && vh < 800;   // TV / zoomed-in desktop: little vertical room
   const menuWidth = menu.offsetWidth || 230;
-  const left = Math.min(rect.left, window.innerWidth - menuWidth - 12);
-  menu.style.left = Math.max(12, left) + 'px';
-  menu.style.top = (rect.bottom + 6) + 'px';
-  setTimeout(() => { const inp = document.getElementById('ind-menu-search-input'); if (inp) inp.focus(); }, 10);
+  const spaceBelow = vh - rect.bottom - 14;
+  if (shortView || spaceBelow < 300) {
+    // Not enough room under the button: centre the menu in the screen and fit it to the viewport, bigger rows for TV use.
+    menu.classList.add('ind-menu-big');
+    menu.style.maxHeight = Math.max(240, vh - 24) + 'px';
+    menu.style.left = Math.max(12, Math.round((window.innerWidth - (menu.offsetWidth || 320)) / 2)) + 'px';
+    menu.style.top = Math.max(12, Math.round((vh - menu.offsetHeight) / 2)) + 'px';
+  } else {
+    menu.classList.remove('ind-menu-big');
+    menu.style.maxHeight = Math.min(vh * 0.7, spaceBelow) + 'px';
+    const left = Math.min(rect.left, window.innerWidth - menuWidth - 12);
+    menu.style.left = Math.max(12, left) + 'px';
+    menu.style.top = (rect.bottom + 6) + 'px';
+  }
+  // Auto-focusing the search box pops the on-screen keyboard on TVs and short screens and used to bury / close the menu.
+  if (!shortView) setTimeout(() => { const inp = document.getElementById('ind-menu-search-input'); if (inp) inp.focus(); }, 10);
 }
 document.addEventListener('click', (e) => {
   const menu = document.getElementById('ind-menu');
@@ -7403,7 +7453,8 @@ window.addEventListener('resize', () => {
   // Mobile keyboards resize the viewport's HEIGHT only (opening the search box triggers
   // exactly this) — only close on a real WIDTH change (rotation or an actual window resize),
   // which is the case where the menu's fixed position would actually go stale.
-  if (window.innerWidth !== indMenuViewportWidth) menu.classList.remove('open');
+  const kb = document.activeElement && menu.contains(document.activeElement);
+  if (window.innerWidth !== indMenuViewportWidth && !kb && Date.now() - indMenuOpenedAt > 900) menu.classList.remove('open');
   indMenuViewportWidth = window.innerWidth;
 });
 
@@ -8197,7 +8248,7 @@ function renderChart(forceEnd) {
     return;
   }
 
-  const BASE_H0 = window.innerWidth <= 700 ? (window.TP_SPLIT ? Math.round(Math.max(200, ((window.tpVH ? window.tpVH() : window.innerHeight) - 330) / 2)) : Math.round(Math.max(320, Math.min(780, window.innerHeight - 260)))) : 340;
+  const BASE_H0 = fitScreen ? fitScreenAvail() - 14 : window.innerWidth <= 700 ? (window.TP_SPLIT ? Math.round(Math.max(200, ((window.tpVH ? window.tpVH() : window.innerHeight) - 330) / 2)) : Math.round(Math.max(320, Math.min(780, window.innerHeight - 260)))) : 340;
   const volOn = activeIndicators.some(i => i.key === 'volume');   // volume bars only when the user adds the Volume indicator
   const VOLH = volOn ? 56 : 0, PAD = 10, GAP = PAD + 16;
   const OSC_GAP = oscGap(), OSC_H = oscDefaultH(), effH = {};
@@ -8239,6 +8290,10 @@ function renderChart(forceEnd) {
       BASE_H = Math.max(minBase, FIT_TOTAL - used);
     } else {
       oscInstances.forEach(i => { effH[i.id] = req[i.id] === 1000 ? 460 : req[i.id]; });
+      if (fitScreen) {   // desktop / TV: panes keep their size, the price chart takes whatever screen height is left
+        const used = oscInstances.reduce((t, i) => t + OSC_GAP + (effH[i.id] || 0), 0);
+        BASE_H = Math.max(160, FIT_TOTAL - used);
+      }
     }
   }
   const H = BASE_H + (oscInstances.length ? oscInstances.reduce((t, i) => t + OSC_GAP + oscHOf(i), 0) : 14); // +14: time labels get their own strip, clear of the volume bars
