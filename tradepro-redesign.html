@@ -4339,9 +4339,28 @@ async function oiFetch() {
     const now = Date.now(), d = new Date(now); let ss = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); if (ss > now) ss -= 86400000;
     let b = null; try { b = JSON.parse(localStorage.getItem(OI_KEY + '_base_' + und) || 'null'); } catch (e) { /* ignore */ }
     if (!b || b.ss !== ss) { b = { ss, at: now, raw }; try { localStorage.setItem(OI_KEY + '_base_' + und, JSON.stringify(b)); } catch (e) { /* ignore */ } }
-    oi.und = und; oi.raw = raw; oi.base = b; oi.err = null;
+    const first = !oi.raw; oi.und = und; oi.raw = raw; oi.base = b; oi.err = null;
+    if (first) { try { renderChart(true); } catch (e) { /* ignore */ } }
   } catch (e) { oi.err = liveErrText(e); }
   oi.at = Date.now(); oi.busy = false; oiRender();
+}
+/* Auto-fit: when OI is on, widen the price range just enough to include the nearest real strike above and below the visible candles
+   (so phone-sized windows still show bars). Capped at 3x the candle range so candles never get squashed; if no strike is within the cap, nothing is drawn (blank, never fake). */
+function oiFitRange(lo, hi) {
+  const und = oiUnd();
+  if (!(oi.on && liveMode && LIVE.kind === 'perp' && und && oi.raw && oi.base && oi.und === und)) return [lo, hi];
+  const ks = new Set();
+  for (const k in oi.raw) { const [e, s] = k.split('|'); if (oi.exp !== 'ALL' && e !== oi.exp) continue; ks.add(+s); }
+  if (!ks.size) return [lo, hi];
+  const span = hi - lo, cap = span * 3, pad = span * 0.06;
+  let nl = lo, nh = hi;
+  const arr = [...ks].sort((x, y) => x - y);
+  if (!arr.some(k => k >= lo && k <= hi)) {
+    const up = arr.find(k => k > hi), dn = [...arr].reverse().find(k => k < lo);
+    if (up != null && up - hi <= cap) nh = up + pad;
+    if (dn != null && lo - dn <= cap) nl = dn - pad;
+  }
+  return [nl, nh];
 }
 function oiRows() {
   const rows = {}, exps = new Set(Object.keys(oi.raw).map(k => k.split('|')[0]));
@@ -8318,6 +8337,7 @@ function renderChart(forceEnd) {
   // below), just pinned to the chart's top/bottom edge via clampY, same as its price tag.
   const padY = (winHigh - winLow) * 0.1 || Math.max(winHigh * 0.01, 1);
   let yMax = winHigh + padY, yMin = winLow - padY;
+  if (priceZoom === 1 && !priceShift) { try { const fr = oiFitRange(yMin, yMax); yMin = fr[0]; yMax = fr[1]; } catch (e) { /* OI fit must never break the chart */ } }
   if (priceZoom !== 1 || priceShift) {   // manual vertical zoom / scroll around the visible candles' midpoint
     const rng = yMax - yMin, mid = (yMax + yMin) / 2 + priceShift * rng, half = rng / 2 * priceZoom;
     yMax = mid + half; yMin = mid - half;
