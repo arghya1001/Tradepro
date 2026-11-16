@@ -5727,6 +5727,7 @@ const LIVE = {
   spotByUnd: {},       // 'BTC' -> latest spot price seen in the option tickers
   legs: [],            // [{symbol, w}] — what the chart is built from (1 leg for perps/options, N for a strategy)
   legData: {},         // symbol -> that leg's own candles (strategy mode combines them)
+  leg1m: null,         // symbol -> { 'YYYY-MM-DDTHH:MM' -> 1m candle } — used only to draw accurate combined wicks
   strat: { type: 'straddle', w: 1, und: 'BTC', exp: '', center: null, legs: [{ t: 'C', o: 0, w: 1 }, { t: 'P', o: 0, w: 1 }] },  // legs = the custom builder's rows (offset is in strikes from the centre)
   clMsg: '',
   stratNames: {},      // stratSymbol -> friendly name (e.g. 'Iron condor') when opened from the Strategies tab
@@ -10666,6 +10667,44 @@ function liveLegAt(arr, t) { // the leg's candle at t, or a flat bar carried for
   }
   return null;
 }
+/* Straddle wicks: the CE and PE highs rarely happen in the same minute, so summing the legs' 5m highs
+   makes the wick ~3x too long (the "doji" look). When 1-minute leg data is loaded, the wick comes from the
+   combined 1-minute path instead. Falls back to the old estimate when 1m data is missing. */
+function liveComboWick1m(t, legs, o5, c5) {
+  if (legs.length < 2 || LIVE.res === '1m' || !LIVE.leg1m) return null;
+  const start = liveTimeToSec(t), n = Math.round(LIVE_RES[LIVE.res] / 60);
+  if (start == null || !(n > 1)) return null;
+  let hi = -Infinity, lo = Infinity, seen = 0;
+  const cur = legs.map(l => { const k = liveLegAt(LIVE.legData[l.symbol] || [], t); return k ? k.o : null; });
+  if (cur.some(x => x == null)) return null;
+  for (let m = 0; m < n; m++) {
+    const key = liveTimeStr(start + 60 * m, '1m');
+    let ob = 0, cb = 0, ub = 0, lb = 0, any = false;
+    legs.forEach((l, i) => {
+      const k = (LIVE.leg1m[l.symbol] || {})[key];
+      let ko, kh, kl, kc;
+      if (k) { ko = k.o; kh = k.h; kl = k.l; kc = k.c; cur[i] = kc; any = true; } else { ko = kh = kl = kc = cur[i]; }
+      ob += l.w * ko; cb += l.w * kc;
+      ub += l.w > 0 ? l.w * kh : l.w * kl; lb += l.w > 0 ? l.w * kl : l.w * kh;
+    });
+    if (any) seen++;
+    const tp = Math.max(ob, cb), bt = Math.min(ob, cb);
+    hi = Math.max(hi, tp + 0.5 * Math.max(0, ub - tp), ob, cb);
+    lo = Math.min(lo, bt - 0.5 * Math.max(0, bt - lb), ob, cb);
+  }
+  if (!seen || !isFinite(hi) || !isFinite(lo)) return null;
+  return { h: Math.max(hi, o5, c5), l: Math.min(lo, o5, c5) };
+}
+async function liveLoad1mLegs(legs, gen, minutes) {
+  if (legs.length < 2 || LIVE.res === '1m') { LIVE.leg1m = null; return; }
+  try {
+    const end = Math.floor(Date.now() / 1000), span = Math.min(minutes, 1900) * 60;
+    const js = await Promise.all(legs.map(l => liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(l.symbol)}&resolution=1m&start=${end - span}&end=${end}`)));
+    if (gen !== LIVE.gen) return;
+    const store = LIVE.leg1m || (LIVE.leg1m = {});
+    legs.forEach((l, i) => { const mp = store[l.symbol] || (store[l.symbol] = {}); liveParseRestCandles(js[i], '1m').forEach(c => { mp[c.t] = c; }); });
+  } catch (e) { /* keep the old estimate */ }
+}
 function liveComboCandle(t, legs) {
   let o = 0, c = 0, ub = 0, lb = 0, v = 0;
   for (const leg of legs) {
@@ -10677,6 +10716,8 @@ function liveComboCandle(t, legs) {
   }
   const top = Math.max(o, c), bot = Math.min(o, c);
   const single = legs.length === 1;
+  const wk = single ? null : liveComboWick1m(t, legs, o, c);
+  if (wk) return { t, o, h: wk.h, l: wk.l, c, v };
   return { t, o, h: single ? ub : top + 0.5 * Math.max(0, ub - top), l: single ? lb : bot - 0.5 * Math.max(0, bot - lb), c, v };
 }
 function liveBuildComboHistory(legs) {
@@ -10707,6 +10748,7 @@ async function liveSyncRecentMulti(gen) {
   start = Math.max(start, end - secs * 1900);
   const jsons = await Promise.all(legs.map(l => liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(l.symbol)}&resolution=${res}&start=${start}&end=${end}`)));
   if (gen !== LIVE.gen || res !== LIVE.res || LIVE.legs.length !== legs.length) return false;
+  await liveLoad1mLegs(legs, gen, Math.min(1900, Math.ceil((end - start) / 60) + 5));
   const times = new Set();
   jsons.forEach((j, i) => liveParseRestCandles(j, res).forEach(c => { liveLegMerge(legs[i].symbol, c); times.add(c.t); }));
   const out = [];
@@ -11088,7 +11130,7 @@ function liveStart() {
   if (tfSel) tfSel.value = LIVE.res;
   LIVE.kind = inIdx ? 'india' : /^S~/.test(LIVE.symbol) ? 'strategy' : /^[CP]-/.test(LIVE.symbol) ? 'options' : 'perp';
   LIVE.legs = LIVE.kind === 'strategy' ? [] : [{ symbol: LIVE.symbol, w: 1 }];
-  LIVE.legData = {};
+  LIVE.legData = {}; LIVE.leg1m = null;
   const stratInfo = LIVE.kind === 'strategy' ? liveParseStratSymbol(LIVE.symbol) : null;
   const liveName = stratInfo ? liveStratLabel(stratInfo, LIVE.symbol) : inIdx ? incShort(LIVE.symbol) : LIVE.symbol;
   currentInstrument = { id: 'live-' + LIVE.symbol, label: liveName, assetClass: inIdx ? 'Equity' : 'Crypto', type: inIdx ? 'equity' : LIVE.kind === 'perp' ? 'futures' : 'options', months: [], live: true };
@@ -11131,8 +11173,10 @@ async function liveLoadAndConnect(gen) {
       if (gen !== LIVE.gen) return;
       const jsons = await Promise.all(legs.map(l => liveFetchJson(`/v2/history/candles?symbol=${encodeURIComponent(l.symbol)}&resolution=${res}&start=${end - secs * LIVE_HISTORY_BARS}&end=${end}`)));
       if (gen !== LIVE.gen) return;
-      LIVE.legs = legs; LIVE.legData = {};
+      LIVE.legs = legs; LIVE.legData = {}; LIVE.leg1m = null;
       jsons.forEach((j, i) => { LIVE.legData[legs[i].symbol] = liveParseRestCandles(j, res); });
+      await liveLoad1mLegs(legs, gen, Math.min(1900, Math.ceil(secs * LIVE_HISTORY_BARS / 60)));
+      if (gen !== LIVE.gen) return;
       candles = liveBuildComboHistory(legs);
       if (candles.length < 2) throw new Error('not enough overlapping trades across the legs — try a nearer strike or a longer timeframe');
     } else {
