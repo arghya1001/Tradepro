@@ -14555,41 +14555,38 @@ const AIL_DOCK = 'tradepro_ai_dock_v1'; let ailDockSig = '';
 function ailDockOpen() { try { return localStorage.getItem(AIL_DOCK) !== 'min'; } catch (e) { return true; } }
 function ailDockToggle() { try { localStorage.setItem(AIL_DOCK, ailDockOpen() ? 'min' : 'open'); } catch (e) { /* ignore */ } ailDock(true); }
 function ailDock(force) {
-  const host = document.getElementById('chart-canvas'); if (!host) return;
-  let el = document.getElementById('ail-dock'); if (!el) { el = document.createElement('div'); el.id = 'ail-dock'; host.appendChild(el); }
+  const anchor = document.getElementById('replay-nodata'); if (!anchor || !anchor.parentNode) return;
+  let el = document.getElementById('ail-dock'); if (!el) { el = document.createElement('div'); el.id = 'ail-dock'; anchor.parentNode.insertBefore(el, anchor); }
   const sym = ailSym(), tf = ailTf(), mine = ail.journal.filter(x => !x.bt && x.sym === sym), c = mine[mine.length - 1] || null, open = ailDockOpen();
   const sig = [open, sym, tf, ail.cfg.tfs.join(), ail.busy, c && c.id, c && c.status, c && c.r, mine.length, ail.msg].join('|');
   if (!force && sig === ailDockSig) return; ailDockSig = sig;
-  const st = ailStats(mine), cls = c ? (c.bias === 'long' ? 'b-long' : c.bias === 'short' ? 'b-short' : 'b-neutral') : 'b-neutral';
-  const stat = !c ? '' : c.status === 'open' ? 'tracking' : c.status === 'neutral' ? 'no trade' : c.status === 'win' ? 'WIN +' + c.r + 'R' : c.status === 'loss' ? 'LOSS -1R' : 'timed out ' + (c.r >= 0 ? '+' : '') + c.r + 'R';
-  const bias = c ? c.bias.toUpperCase() : '';
-  const fp = v => v == null ? '–' : ailEsc(String(v));
-  if (!open) { el.className = 'min'; el.innerHTML = `<button class="ail-pill" onclick="ailDockToggle()" aria-label="Open AI panel">AI${c ? ` <span class="${cls}">${bias}</span>` : ''}${c && c.status !== 'open' && c.status !== 'neutral' ? ` <i class="ail-res ${c.status}">${stat}</i>` : ''}</button>`; return; }
+  const st = ailStats(mine), cls = c ? (c.bias === 'long' ? 'b-long' : c.bias === 'short' ? 'b-short' : 'b-neutral') : 'b-neutral', fp = v => v == null ? '–' : ailEsc(String(v));
+  const stat = !c ? '' : c.status === 'open' ? 'tracking' : c.status === 'neutral' ? 'no trade' : c.status === 'win' ? 'WIN +' + c.r + 'R' : c.status === 'loss' ? 'LOSS −1R' : 'timed out ' + (c.r >= 0 ? '+' : '') + c.r + 'R';
+  const trade = c && c.bias !== 'neutral';
+  const head = `<button class="ail-bar" onclick="ailDockToggle()" aria-expanded="${open}"><b>AI</b>${c ? `<span class="${cls}">${c.bias.toUpperCase()}</span><span class="ail-cf">${c.confidence}%</span>` : '<span class="ail-cf">no call yet</span>'}${trade ? `<span class="ail-px">${fp(c.entry)} → ${fp(c.target)}</span>` : ''}${c ? `<i class="ail-res ${c.status}">${stat}</i>` : ''}<span class="ail-car">${open ? '▴' : '▾'}</span></button>`;
+  if (!open) { el.className = 'min'; el.innerHTML = head; return; }
   el.className = 'open';
-  el.innerHTML = `<div class="ail-dk-h"><b>AI</b><span class="ail-dk-s">${ailEsc(sym)} · ${ailEsc(tf)}</span><button onclick="ailDockToggle()" aria-label="Collapse AI panel">–</button></div>` +
-    (c ? `<div class="ail-dk-b"><span class="${cls}">${bias}</span><span>conf ${c.confidence}</span><span class="ail-res ${c.status}">${stat}</span></div>` +
-      (c.bias !== 'neutral' ? `<div class="ail-dk-g"><div><b>${fp(c.entry)}</b><span>entry</span></div><div><b>${fp(c.stop)}</b><span>stop</span></div><div><b>${fp(c.target)}</b><span>target</span></div></div>` : '') +
-      (c.oiRead ? `<div class="ail-dk-p"><b>OI:</b> ${ailEsc(c.oiRead)}</div>` : '') +
-      (c.opt ? `<div class="ail-dk-p"><b>Option idea:</b> ${ailEsc(ailOptTxt(c.opt))}</div>` : '') +
-      (c.align ? `<div class="ail-dk-p">${ailEsc((c.mtf || []).join('·'))} → ${ailEsc(c.tf)}: ${ailEsc(c.align)}</div>` : '') +
-      (c.patterns && c.patterns.length ? `<div class="ail-dk-p">${c.patterns.map(ailEsc).join(' · ')}</div>` : '') +
-      (c.srv && c.status === 'open' ? `<div class="ail-dk-p">Tracked on your Worker, even with the app closed</div>` : '') : `<div class="ail-dk-p">No AI call on this chart yet.</div>`) +
-    (st.scored ? `<div class="ail-dk-p">Live record: ${st.wins}W · ${st.losses}L${st.open ? ' · ' + st.open + ' open' : ''}</div>` : '') +
+  const note = (k, v) => v ? `<div class="ail-dk-p"><b>${k}</b> ${ailEsc(v)}</div>` : '';
+  el.innerHTML = head + `<div class="ail-dk-body">` +
+    (trade ? `<div class="ail-dk-g"><div><b>${fp(c.entry)}</b><span>entry</span></div><div><b>${fp(c.stop)}</b><span>stop</span></div><div><b>${fp(c.target)}</b><span>target</span></div><div><b>${c.hz}</b><span>${ailEsc(c.tf)} candles</span></div></div>` : '') +
+    (c && c.align ? note('Timeframes', (c.mtf || []).join(' · ') + ': ' + c.align) : '') + (c ? note('OI', c.oiRead) : '') + (c && c.opt ? note('Option idea', ailOptTxt(c.opt) + (c.opt.why ? ' — ' + c.opt.why : '')) : '') +
+    (c && c.patterns && c.patterns.length ? note('Signals', c.patterns.join(' · ')) : '') + (c && c.srv && c.status === 'open' ? note('', 'Tracked on your Worker even with the app closed') : '') +
+    (st.scored ? note('Live record', st.wins + 'W · ' + st.losses + 'L' + (st.open ? ' · ' + st.open + ' open' : '')) : '') +
     (ail.msg ? `<div class="ail-dk-p warn">${ailEsc(ail.msg)}</div>` : '') +
-    ailTfChips() + `<div class="ail-dk-a"><button class="pri" onclick="ailAnalyzeNow()" ${ail.busy ? 'disabled' : ''}>${ail.busy ? 'Thinking…' : 'Analyze'}</button><button onclick="ailOpen()">Lab</button></div>`;
+    ailTfChips() + `<div class="ail-dk-a"><button class="pri" onclick="ailAnalyzeNow()" ${ail.busy ? 'disabled' : ''}>${ail.busy ? 'Thinking…' : 'Analyze'}</button><button onclick="ailOpen()">Lab</button></div></div>`;
 }
 (function () {
   const css = document.createElement('style');
-  css.textContent = `#ail-dock{position:absolute;top:34px;left:6px;z-index:7;font-family:var(--sans);font-size:11.5px;color:var(--text)}
-#ail-dock.open{width:min(236px,calc(100% - 84px));background:color-mix(in srgb,var(--surface-2) 92%,transparent);border:1px solid var(--border);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(6px);box-shadow:0 4px 18px rgba(0,0,0,.28)}
-#ail-dock .ail-pill{display:flex;gap:6px;align-items:center;background:color-mix(in srgb,var(--surface-2) 92%,transparent);border:1px solid var(--border);color:var(--text);border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;backdrop-filter:blur(6px)}
-.ail-dk-h{display:flex;align-items:center;gap:6px}.ail-dk-h b{font-size:12px}.ail-dk-s{color:var(--text-muted);flex:1;font-family:var(--mono);font-size:10.5px}
-.ail-dk-h button{border:0;background:none;color:var(--text-muted);font-size:16px;line-height:1;cursor:pointer;padding:0 4px}
-.ail-dk-b{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.ail-dk-b>span:first-child{font-weight:800;font-size:13px}
-.ail-dk-g{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.ail-dk-g div{display:flex;flex-direction:column}.ail-dk-g b{font-family:var(--mono);font-size:11.5px}.ail-dk-g span{font-size:10px;color:var(--text-faint)}
-.ail-dk-p{font-size:10.5px;color:var(--text-muted);line-height:1.4}.ail-dk-p.warn{color:var(--warn,#E0A03A)}
+  css.textContent = `#ail-dock{margin:6px 0 4px;font-family:var(--sans);font-size:11.5px;color:var(--text);border:1px solid var(--border);border-radius:10px;background:var(--surface-2);overflow:hidden}
+.ail-bar{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;color:var(--text);padding:7px 10px;font:inherit;cursor:pointer;text-align:left;min-height:34px}
+.ail-bar b{font-size:12px;letter-spacing:.04em}.ail-bar>span:first-of-type{font-weight:800}.ail-cf{color:var(--text-muted);font-family:var(--mono);font-size:11px}.ail-px{color:var(--text-muted);font-family:var(--mono);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ail-bar .ail-res{margin-left:auto;white-space:nowrap}.ail-car{color:var(--text-faint);font-size:11px}
+.ail-dk-body{padding:2px 10px 10px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border);padding-top:8px}
+.ail-dk-g{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.ail-dk-g div{display:flex;flex-direction:column}.ail-dk-g b{font-family:var(--mono);font-size:12px}.ail-dk-g span{font-size:10px;color:var(--text-faint)}
+.ail-dk-p{font-size:11px;color:var(--text-muted);line-height:1.4}.ail-dk-p b{color:var(--text)}.ail-dk-p.warn{color:var(--warn,#E0A03A)}
 .ail-res{font-style:normal;font-weight:700;font-size:11px;color:var(--text-muted)}.ail-res.win{color:var(--green)}.ail-res.loss{color:var(--red)}
-.ail-chips{display:flex;gap:4px;flex-wrap:wrap}.ail-chips button{border:1px solid var(--border);background:none;color:var(--text-muted);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer}.ail-chips button.on{background:var(--accent,#14C2B0);border-color:transparent;color:#04201c}\n.ail-dk-a{display:flex;gap:6px}.ail-dk-a button{flex:1;border:1px solid var(--border);background:none;color:var(--text);border-radius:7px;padding:5px 0;font-size:11px;font-weight:700;cursor:pointer}.ail-dk-a button.pri{background:var(--accent,#14C2B0);border-color:transparent;color:#04201c}.ail-dk-a button[disabled]{opacity:.5;cursor:default}`;
+.ail-chips{display:flex;gap:4px;flex-wrap:wrap}.ail-chips button{border:1px solid var(--border);background:none;color:var(--text-muted);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer}.ail-chips button.on{background:var(--accent,#14C2B0);border-color:transparent;color:#04201c}
+.ail-dk-a{display:flex;gap:6px}.ail-dk-a button{flex:1;border:1px solid var(--border);background:none;color:var(--text);border-radius:7px;padding:6px 0;font-size:11.5px;font-weight:700;cursor:pointer}.ail-dk-a button.pri{flex:2;background:var(--accent,#14C2B0);border-color:transparent;color:#04201c}.ail-dk-a button[disabled]{opacity:.5;cursor:default}`;
   document.head.appendChild(css);
   setTimeout(() => { ailDock(true); ailSync(); }, 1500);
   setInterval(() => { ailDock(); }, 4000);
