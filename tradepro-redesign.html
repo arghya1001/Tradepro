@@ -2174,6 +2174,9 @@
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Fit screen</span>
               </button>
             </div>
+            <div class="zoom-cluster" title="AI research assistant: reads the chart data and proposes trades, then scores them">
+              <button class="zoom-btn" id="ail-btn" aria-label="AI Lab" onclick="ailOpen()" style="width:auto;padding:0 9px;font-size:11px;font-weight:700">AI Lab</button>
+            </div>
           </div>
           <div class="panel-body">
             <div class="chart-body-row">
@@ -4339,28 +4342,21 @@ async function oiFetch() {
     const now = Date.now(), d = new Date(now); let ss = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); if (ss > now) ss -= 86400000;
     let b = null; try { b = JSON.parse(localStorage.getItem(OI_KEY + '_base_' + und) || 'null'); } catch (e) { /* ignore */ }
     if (!b || b.ss !== ss) { b = { ss, at: now, raw }; try { localStorage.setItem(OI_KEY + '_base_' + und, JSON.stringify(b)); } catch (e) { /* ignore */ } }
-    const first = !oi.raw; oi.und = und; oi.raw = raw; oi.base = b; oi.err = null;
-    if (first) { try { renderChart(true); } catch (e) { /* ignore */ } }
+    oi.und = und; oi.raw = raw; oi.base = b; oi.err = null;
   } catch (e) { oi.err = liveErrText(e); }
   oi.at = Date.now(); oi.busy = false; oiRender();
 }
-/* Auto-fit: when OI is on, widen the price range just enough to include the nearest real strike above and below the visible candles
-   (so phone-sized windows still show bars). Capped at 3x the candle range so candles never get squashed; if no strike is within the cap, nothing is drawn (blank, never fake). */
-function oiFitRange(lo, hi) {
-  const und = oiUnd();
-  if (!(oi.on && liveMode && LIVE.kind === 'perp' && und && oi.raw && oi.base && oi.und === und)) return [lo, hi];
-  const ks = new Set();
-  for (const k in oi.raw) { const [e, s] = k.split('|'); if (oi.exp !== 'ALL' && e !== oi.exp) continue; ks.add(+s); }
-  if (!ks.size) return [lo, hi];
-  const span = hi - lo, cap = span * 3, pad = span * 0.06;
-  let nl = lo, nh = hi;
-  const arr = [...ks].sort((x, y) => x - y);
-  if (!arr.some(k => k >= lo && k <= hi)) {
-    const up = arr.find(k => k > hi), dn = [...arr].reverse().find(k => k < lo);
-    if (up != null && up - hi <= cap) nh = up + pad;
-    if (dn != null && lo - dn <= cap) nl = dn - pad;
-  }
-  return [nl, nh];
+/* Max pain: the strike where option BUYERS would collectively collect the least at expiry (sum of call + put intrinsic value is smallest).
+   Computed from today's per-strike OI for ONE expiry. With "All expiries" selected it uses the nearest expiry, which is the one a daily straddle is exposed to. */
+function oiMaxPain(expPick) {
+  if (typeof oi === 'undefined' || !oi.raw) return null;
+  const exps = [...new Set(Object.keys(oi.raw).map(k => k.split('|')[0]))].sort(); if (!exps.length) return null;
+  const exp = expPick && expPick !== 'ALL' && exps.includes(expPick) ? expPick : exps[0];
+  const C = {}, P = {}; for (const k in oi.raw) { const [e, st, t] = k.split('|'); if (e !== exp) continue; (t === 'C' ? C : P)[+st] = oi.raw[k]; }
+  const strikes = [...new Set(Object.keys(C).concat(Object.keys(P)).map(Number))].sort((a, b) => a - b); if (strikes.length < 3) return null;
+  let best = null;
+  strikes.forEach(K => { let pain = 0; for (const st in C) pain += C[st] * Math.max(0, K - st); for (const st in P) pain += P[st] * Math.max(0, st - K); if (!best || pain < best.pain) best = { k: K, pain }; });
+  return { k: best.k, exp };
 }
 function oiRows() {
   const rows = {}, exps = new Set(Object.keys(oi.raw).map(k => k.split('|')[0]));
@@ -4374,7 +4370,7 @@ const OI_SH = { r: { base: '#F5A524', add: '#B86A00', edge: '#FFC85C', rem: '#FF
 function oiLeg() { oi.legend = !oi.legend; oiRender(); }
 function oiLegend(canvas, ready) {
   let el = document.getElementById('oi-leg');
-  if (!el) { el = document.createElement('div'); el.id = 'oi-leg'; el.style.cssText = 'position:absolute;z-index:9;left:6px;top:54px;background:color-mix(in srgb, var(--surface) 97%, transparent);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:11px;line-height:1.75;box-shadow:0 6px 18px rgba(0,0,0,.55);pointer-events:none;color:var(--text-muted)'; canvas.appendChild(el); }
+  if (!el) { el = document.createElement('div'); el.id = 'oi-leg'; el.style.cssText = 'position:absolute;z-index:9;left:6px;' + (window.innerWidth > 700 ? 'top:54px' : 'bottom:52px') + ';background:color-mix(in srgb, var(--surface) 97%, transparent);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:11px;line-height:1.75;box-shadow:0 6px 18px rgba(0,0,0,.55);pointer-events:none;color:var(--text-muted)'; canvas.appendChild(el); }
   if (!oi.on || !oi.legend || !ready) { el.style.display = 'none'; return; }
   const S = OI_SH, since = new Date(oi.base.at + 19800000).toISOString().slice(11, 16);
   const sw = css => `<span style="display:inline-block;width:20px;height:9px;border-radius:2px;vertical-align:middle;margin-right:8px;box-sizing:border-box;${css}"></span>`;
@@ -4391,12 +4387,15 @@ function oiRender() {
   let lay = document.getElementById('oi-layer'), ctl = document.getElementById('oi-ctl');
   if (!lay) {
     lay = document.createElement('div'); lay.id = 'oi-layer'; lay.style.cssText = 'position:absolute;top:0;right:62px;pointer-events:none;z-index:4;opacity:.92';
-    ctl = document.createElement('div'); ctl.id = 'oi-ctl'; ctl.style.cssText = 'position:absolute;top:24px;left:6px;z-index:7;display:flex;gap:6px;align-items:center;font-size:12px;background:color-mix(in srgb, var(--bg) 82%, transparent);padding:2px 4px;border-radius:999px';
+    ctl = document.createElement('div'); ctl.id = 'oi-ctl'; ctl.style.cssText = window.innerWidth > 700 ? 'position:absolute;top:24px;left:6px;z-index:7;display:flex;gap:6px;align-items:center;font-size:12px;background:color-mix(in srgb, var(--bg) 82%, transparent);padding:2px 4px;border-radius:999px' : 'position:absolute;bottom:24px;left:6px;z-index:7;display:flex;gap:6px;align-items:center;font-size:11px';
     canvas.appendChild(lay); canvas.appendChild(ctl);
+    const mpl = document.createElement('div'); mpl.id = 'oi-mp'; mpl.style.cssText = 'position:absolute;left:0;right:62px;height:0;border-top:1.5px dashed #FF6BD6;z-index:3;pointer-events:none;display:none';
+    mpl.innerHTML = '<span style="position:absolute;right:6px;top:-17px;font-size:11px;font-weight:700;color:#FF9BE6;background:color-mix(in srgb, var(--bg) 82%, transparent);padding:0 5px;border-radius:4px;white-space:nowrap"></span>'; canvas.appendChild(mpl);
     oiBindTap(canvas, lay);
   }
   const und = oiUnd(), show = !!(liveMode && LIVE.kind === 'perp' && und);
   ctl.style.display = show ? 'flex' : 'none'; lay.style.display = show && oi.on ? '' : 'none';
+  const mpEl = document.getElementById('oi-mp'); if (mpEl) mpEl.style.display = 'none';
   if (!show) return;
   if (!oi.busy && (oi.und !== und || Date.now() - oi.at > 60000)) oiFetch();
   const ready = oi.raw && oi.und === und && oi.base;
@@ -4414,6 +4413,16 @@ function oiRender() {
   const g = chartGeom, axis = document.getElementById('price-axis'), H = parseFloat(axis && axis.style.height) || 340, W = Math.round(Math.min(canvas.clientWidth >= 900 ? 280 : 170, canvas.clientWidth * (canvas.clientWidth < 520 ? 0.26 : 0.42)));
   const yAt = v => g.GAP + g.priceAreaH * (1 - (v - g.yMin) / (g.yMax - g.yMin));
   const rows = oiRows().filter(r => r.k >= g.yMin && r.k <= g.yMax);
+  try {   // max-pain line across the chart
+    const mp = oiMaxPain(oi.exp), mpl = document.getElementById('oi-mp');
+    if (mp && mpl) {
+      const spot = replayCandles.length ? replayCandles[Math.min(replayIndex, replayCandles.length) - 1].c : null, dist = spot ? ((mp.k / spot - 1) * 100) : null;
+      const above = mp.k > g.yMax, below = mp.k < g.yMin, kk = Math.min(g.yMax, Math.max(g.yMin, mp.k));   // off-screen: pin to the edge with an arrow
+      mpl.style.top = Math.min(H - 2, Math.max(18, yAt(kk))).toFixed(1) + 'px'; mpl.style.display = 'block';
+      const narrow = canvas.clientWidth < 520, dtxt = dist == null ? '' : (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%';
+      mpl.firstChild.textContent = (above ? '↑ ' : below ? '↓ ' : '') + (narrow ? 'MP ' + mp.k.toLocaleString('en-US') + (dtxt ? ' (' + dtxt + ')' : '') : 'Max pain ' + mp.k.toLocaleString('en-US') + ' · ' + liveExpLabel(mp.exp) + (dtxt ? ' · ' + dtxt + ' from price' : ''));
+    }
+  } catch (e) { /* the max-pain line must never break the chart */ }
   let maxV = 0; rows.forEach(r => { maxV = Math.max(maxV, r.C, r.P, r.bC, r.bP); });
   if (!rows.length || !maxV) { lay.innerHTML = ''; return; }
   let gap = Infinity; for (let i = 1; i < rows.length; i++) gap = Math.min(gap, yAt(rows[i - 1].k) - yAt(rows[i].k));
@@ -8337,7 +8346,6 @@ function renderChart(forceEnd) {
   // below), just pinned to the chart's top/bottom edge via clampY, same as its price tag.
   const padY = (winHigh - winLow) * 0.1 || Math.max(winHigh * 0.01, 1);
   let yMax = winHigh + padY, yMin = winLow - padY;
-  if (priceZoom === 1 && !priceShift) { try { const fr = oiFitRange(yMin, yMax); yMin = fr[0]; yMax = fr[1]; } catch (e) { /* OI fit must never break the chart */ } }
   if (priceZoom !== 1 || priceShift) {   // manual vertical zoom / scroll around the visible candles' midpoint
     const rng = yMax - yMin, mid = (yMax + yMin) / 2 + priceShift * rng, half = rng / 2 * priceZoom;
     yMax = mid + half; yMin = mid - half;
@@ -14125,6 +14133,267 @@ document.addEventListener('click', function (e) {
   if (b.dataset.ty) { SRC.type = b.dataset.ty; try { localStorage.setItem('tradepro_sr_ctype', SRC.type); } catch (er) { /* ignore */ } srDraw(); }
   else if (b.dataset.ivl) { SRC.ivl = b.dataset.ivl; if (SRC.kind === 'cr') srCryptoLoad(SRC.ivl); srDraw(); }
 });
+</script>
+
+<style id="ail-style">
+#ail-bg{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:12px}
+#ail-bg.open{display:flex}
+.ail-sheet{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:14px;width:min(640px,100%);max-height:calc(100vh - 24px);overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.ail-top{display:flex;align-items:center;gap:10px}.ail-top b{font-size:16px}.ail-top button{margin-left:auto;all:unset;cursor:pointer;padding:6px 10px;border-radius:8px;color:var(--text-muted)}
+.ail-sub{color:var(--text-faint);font-size:11.5px}
+.ail-card{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.ail-h{font-weight:700;font-size:12.5px;display:flex;gap:8px;align-items:center}
+.ail-card label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--text-muted)}
+.ail-card select,.ail-card input,.ail-actions input{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit}
+.ail-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ail-actions input{width:64px}
+.ail-actions button,.ail-link{all:unset;cursor:pointer;padding:9px 13px;border-radius:9px;border:1px solid var(--border);font-weight:600;font-size:12.5px;background:var(--surface-2)}
+.ail-actions button.primary{background:var(--accent);color:var(--on-accent,#04201c);border-color:var(--accent)}
+.ail-actions button[disabled]{opacity:.5;cursor:default}.ail-link{align-self:flex-start;color:var(--text-muted);font-weight:500;padding:4px 0;border:0;background:none;text-decoration:underline}
+.ail-msg{padding:8px 10px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted)}
+.ail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.ail-grid div{display:flex;flex-direction:column}.ail-grid b{font-size:16px;font-family:var(--mono)}.ail-grid span{font-size:11px;color:var(--text-faint)}
+.ail-note{font-size:11.5px;color:var(--text-muted);line-height:1.5}.ail-note.warn{color:var(--warn,#E0A03A)}.ail-note.foot{color:var(--text-faint)}
+.ail-tags{display:flex;flex-wrap:wrap;gap:6px}.ail-tags span{border:1px solid var(--border);border-radius:999px;padding:2px 9px;font-size:11px}
+.ail-card ul{margin:0;padding-left:18px;color:var(--text-muted);line-height:1.5}
+.ail-card table{width:100%;border-collapse:collapse;font-size:12px}.ail-card th{text-align:left;color:var(--text-faint);font-weight:600;padding:3px 4px}.ail-card td{padding:4px;border-top:1px solid var(--border)}.ail-card td i{color:var(--text-faint);font-size:10px}
+.b-long{color:var(--green);font-weight:700}.b-short{color:var(--red);font-weight:700}.b-neutral{color:var(--text-muted)}
+</style>
+<script>
+/* ================= AI Lab: research assistant that reads the chart data, proposes trades, and is scored on what happened next =================
+   Research only. The model gets TEXT (candles, indicators, Guppy, patterns, OI walls), never a screenshot.
+   Every call is journaled and scored against the candles that follow, so accuracy can be measured instead of guessed. */
+const AIL_KEY = 'tradepro_ai_v1', AIL_JOURNAL = 'tradepro_ai_journal_v1';
+const AIL_PROVIDERS = {
+  mock:       { label: 'Mock (offline test, no AI)', model: 'rule-based-mock', needsKey: false },
+  groq:       { label: 'Groq (free, open models)', model: 'llama-3.3-70b-versatile', url: 'https://api.groq.com/openai/v1/chat/completions', needsKey: true, json: true, delay: 2500 },
+  openrouter: { label: 'OpenRouter (free open models)', model: 'meta-llama/llama-3.3-70b-instruct:free', url: 'https://openrouter.ai/api/v1/chat/completions', needsKey: true, json: false, delay: 4000 }
+};
+const ail = { cfg: { provider: 'mock', model: 'rule-based-mock', key: '' }, busy: false, last: null, msg: '', run: null, journal: [] };
+try { const c = JSON.parse(localStorage.getItem(AIL_KEY) || 'null'); if (c && AIL_PROVIDERS[c.provider]) Object.assign(ail.cfg, c); } catch (e) { /* ignore */ }
+try { const j = JSON.parse(localStorage.getItem(AIL_JOURNAL) || '[]'); if (Array.isArray(j)) ail.journal = j; } catch (e) { /* ignore */ }
+function ailSaveCfg() { try { localStorage.setItem(AIL_KEY, JSON.stringify(ail.cfg)); } catch (e) { /* ignore */ } }
+function ailSaveJournal() { try { localStorage.setItem(AIL_JOURNAL, JSON.stringify(ail.journal.slice(-400))); } catch (e) { /* ignore */ } }
+const ailEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- Context: everything the model is allowed to see (only candles up to the analysed one) ---------- */
+function ailRound(v, ref) { if (v == null || !isFinite(v)) return null; const d = ref >= 1000 ? 1 : ref >= 10 ? 2 : ref >= 1 ? 4 : 6; return +v.toFixed(d); }
+function ailPatterns(cs) {   // simple textbook candle patterns on the last 1-3 candles
+  const out = [], n = cs.length; if (n < 3) return out;
+  const a = cs[n - 3], b = cs[n - 2], c = cs[n - 1], body = x => Math.abs(x.c - x.o), up = x => x.c > x.o, dn = x => x.c < x.o, rng = x => x.h - x.l || 1e-9;
+  if (dn(b) && up(c) && c.o <= b.c && c.c >= b.o) out.push('Bullish engulfing');
+  if (up(b) && dn(c) && c.o >= b.c && c.c <= b.o) out.push('Bearish engulfing');
+  if (dn(a) && body(b) < body(a) * 0.4 && up(c) && c.c > (a.o + a.c) / 2) out.push('Morning star');
+  if (up(a) && body(b) < body(a) * 0.4 && dn(c) && c.c < (a.o + a.c) / 2) out.push('Evening star');
+  if (up(a) && up(b) && up(c) && b.c > a.c && c.c > b.c) out.push('Three white soldiers');
+  if (dn(a) && dn(b) && dn(c) && b.c < a.c && c.c < b.c) out.push('Three black crows');
+  const lw = Math.min(c.o, c.c) - c.l, uw = c.h - Math.max(c.o, c.c);
+  if (lw > body(c) * 2 && uw < body(c) * 0.6 && body(c) / rng(c) < 0.4) out.push('Hammer / long lower wick');
+  if (uw > body(c) * 2 && lw < body(c) * 0.6 && body(c) / rng(c) < 0.4) out.push('Shooting star / long upper wick');
+  if (body(c) / rng(c) < 0.1) out.push('Doji');
+  return out;
+}
+function ailContext(candles, opts) {
+  opts = opts || {};
+  const n = candles.length, cl = candles.map(c => c.c), last = candles[n - 1], ref = last.c;
+  const e = p => emaSeries(cl, p), at = (arr, k) => arr[arr.length - 1 - (k || 0)];
+  const e9 = e(9), e20 = e(20), e50 = e(50), rsi = rsiSeries(cl, 14), mac = macdSeries(candles, 12, 26, 9), atr = atrSeriesGeneric(candles, 14);
+  const g = gmmaSeries(candles), avg = arrs => arrs.map(a => a.reduce((s, x) => s + (x == null ? NaN : x), 0) / arrs.length);
+  const gS = cl.map((_, i) => { const v = g.short.map(a => a[i]); return v.some(x => x == null) ? null : v.reduce((s, x) => s + x, 0) / v.length; });
+  const gL = cl.map((_, i) => { const v = g.long.map(a => a[i]); return v.some(x => x == null) ? null : v.reduce((s, x) => s + x, 0) / v.length; });
+  let sinceCross = null;
+  for (let i = n - 1; i > 0; i--) { if (gS[i] == null || gL[i] == null || gS[i - 1] == null || gL[i - 1] == null) break; if ((gS[i] > gL[i]) !== (gS[i - 1] > gL[i - 1])) { sinceCross = n - 1 - i; break; } }
+  const a14 = at(atr) || ref * 0.002, hh = Math.max(...candles.slice(-50).map(c => c.h)), ll = Math.min(...candles.slice(-50).map(c => c.l));
+  const ribbonW = g.short.concat(g.long).map(a => a[n - 1]).filter(x => x != null);
+  const ctx = {
+    symbol: opts.symbol || '', timeframe: opts.tf || '', last_candle_index: n - 1,
+    price: ailRound(ref, ref), atr14: ailRound(a14, ref),
+    recent_candles_ohlc_oldest_to_newest: candles.slice(-40).map(c => [ailRound(c.o, ref), ailRound(c.h, ref), ailRound(c.l, ref), ailRound(c.c, ref)]),
+    ema: { ema9: ailRound(at(e9), ref), ema20: ailRound(at(e20), ref), ema50: ailRound(at(e50), ref) },
+    rsi14: at(rsi) == null ? null : +at(rsi).toFixed(1), rsi14_5_candles_ago: at(rsi, 5) == null ? null : +at(rsi, 5).toFixed(1),
+    macd: { macd: ailRound(at(mac.macd), ref), signal: ailRound(at(mac.signal), ref), histogram: ailRound(at(mac.hist), ref), histogram_prev: ailRound(at(mac.hist, 1), ref) },
+    guppy: { short_ribbon_avg: ailRound(at(gS), ref), long_ribbon_avg: ailRound(at(gL), ref), short_above_long: at(gS) != null && at(gL) != null ? at(gS) > at(gL) : null, candles_since_last_cross: sinceCross, ribbon_width_in_atr: ribbonW.length ? +((Math.max(...ribbonW) - Math.min(...ribbonW)) / a14).toFixed(2) : null },
+    swing_high_50: ailRound(hh, ref), swing_low_50: ailRound(ll, ref),
+    candle_patterns_last3: ailPatterns(candles)
+  };
+  if (opts.oi) ctx.options_open_interest = opts.oi;
+  return ctx;
+}
+function ailOiSummary() {   // live mode only: biggest call/put OI strikes and what changed since 17:30 IST. Not available historically.
+  try {
+    if (typeof oi === 'undefined' || !oi.on || !oi.raw || !oi.base || typeof oiRows !== 'function') return null;
+    const rows = oiRows(); if (!rows.length) return null;
+    const top = (key, bk) => rows.slice().sort((a, b) => b[key] - a[key]).slice(0, 3).map(r => ({ strike: r.k, oi: Math.round(r[key]), change_since_1730_ist: Math.round(r[key] - r[bk]) }));
+    const mp = oiMaxPain(oi.exp); return { top_call_oi_strikes_resistance: top('C', 'bC'), top_put_oi_strikes_support: top('P', 'bP'), expiry: oi.exp, max_pain_strike: mp ? mp.k : null, max_pain_expiry: mp ? mp.exp : null };
+  } catch (e) { return null; }
+}
+
+/* ---------- Prompt + providers ---------- */
+const AIL_SYSTEM = 'You are a market research assistant inside a paper-trading simulator. You receive numeric chart data as JSON: recent candles, EMAs, RSI, MACD, Guppy ribbon state, candle patterns and sometimes options open interest. ' +
+  'Judge the next move using ONLY this data. Reply with a single JSON object and nothing else, with keys: ' +
+  '"bias" ("long", "short" or "neutral"), "confidence" (integer 0-100, how sure you are), "entry" (number, use the current price), "stop" (number), "target" (number), "horizon_candles" (integer 3-48, how many candles the idea should play out in), ' +
+  '"patterns" (array of strings: patterns/signals you used), "reasoning" (array of at most 4 short strings), "risks" (array of at most 3 short strings). ' +
+  'Rules: for long, stop < entry < target; for short, target < entry < stop. Keep stop and target within about 0.8 to 4 times atr14 of entry. If signals conflict or there is no clear edge, answer "neutral" with confidence under 50 and set entry/stop/target to the current price. Never invent data you were not given.';
+function ailMock(ctx) {   // deterministic stand-in for a real model: lets the whole pipeline be tested offline
+  let s = 0; const gu = ctx.guppy, r = ctx.rsi14, h = ctx.macd.histogram;
+  if (gu.short_above_long === true) s += 1; else if (gu.short_above_long === false) s -= 1;
+  if (r != null) { if (r > 55) s += 1; else if (r < 45) s -= 1; }
+  if (h != null) s += h > 0 ? 0.5 : -0.5;
+  const p = ctx.price, a = ctx.atr14 || p * 0.002, pats = ctx.candle_patterns_last3 || [];
+  const bias = s >= 1.5 ? 'long' : s <= -1.5 ? 'short' : 'neutral';
+  const o = { bias, confidence: bias === 'neutral' ? 30 : Math.min(90, Math.round(50 + Math.abs(s) * 12)), entry: p, stop: p, target: p, horizon_candles: 12, patterns: pats.slice(), reasoning: [], risks: ['Mock model: simple rules, not real AI'] };
+  if (bias === 'long') { o.stop = p - 1.5 * a; o.target = p + 2.2 * a; } else if (bias === 'short') { o.stop = p + 1.5 * a; o.target = p - 2.2 * a; }
+  o.reasoning.push('Guppy short ribbon ' + (gu.short_above_long ? 'above' : 'below') + ' long ribbon', 'RSI ' + r, 'MACD histogram ' + h);
+  return JSON.stringify(o);
+}
+async function ailCallModel(ctx) {
+  const P = AIL_PROVIDERS[ail.cfg.provider];
+  if (ail.cfg.provider === 'mock') return ailMock(ctx);
+  if (!ail.cfg.key) throw new Error('Add your API key in the AI panel first.');
+  const body = { model: ail.cfg.model || P.model, temperature: 0.2, max_tokens: 700, messages: [{ role: 'system', content: AIL_SYSTEM }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] };
+  if (P.json) body.response_format = { type: 'json_object' };
+  const res = await fetch(P.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ail.cfg.key }, body: JSON.stringify(body) });
+  if (!res.ok) { let t = ''; try { t = (await res.text()).slice(0, 160); } catch (e) { /* ignore */ } throw new Error(res.status === 401 ? 'The API key was rejected (401).' : res.status === 429 ? 'Free-tier rate limit hit (429). Wait a minute and try again.' : 'AI service error ' + res.status + ' ' + t); }
+  const j = await res.json(); return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+}
+function ailParse(txt, price, atr) {   // tolerant JSON extraction + sanity checks. A call that breaks the rules is turned into "neutral", never silently trusted.
+  let o = null; const m = String(txt).match(/\{[\s\S]*\}/);
+  try { o = JSON.parse(m ? m[0] : txt); } catch (e) { return { ok: false, why: 'The model did not return valid JSON.' }; }
+  let bias = String(o.bias || 'neutral').toLowerCase(); if (!/^(long|short|neutral)$/.test(bias)) bias = 'neutral';
+  const num = v => { v = +v; return isFinite(v) ? v : null; };
+  const r = { bias, confidence: Math.max(0, Math.min(100, Math.round(num(o.confidence) || 0))), entry: price, stop: num(o.stop), target: num(o.target), hz: Math.max(3, Math.min(48, Math.round(num(o.horizon_candles) || 12))),
+    patterns: Array.isArray(o.patterns) ? o.patterns.slice(0, 6).map(String) : [], reasoning: Array.isArray(o.reasoning) ? o.reasoning.slice(0, 4).map(String) : [], risks: Array.isArray(o.risks) ? o.risks.slice(0, 3).map(String) : [], note: '' };
+  if (bias !== 'neutral') {
+    const okL = bias === 'long' && r.stop != null && r.target != null && r.stop < price && r.target > price;
+    const okS = bias === 'short' && r.stop != null && r.target != null && r.stop > price && r.target < price;
+    const risk = r.stop == null ? 0 : Math.abs(price - r.stop);
+    if (!(okL || okS)) { r.note = 'Stop/target were on the wrong side of price, so this was treated as neutral.'; r.bias = 'neutral'; }
+    else if (atr && (risk < atr * 0.3 || risk > atr * 8)) { r.note = 'Stop distance was unrealistic for this volatility, so this was treated as neutral.'; r.bias = 'neutral'; }
+  }
+  return { ok: true, call: r };
+}
+
+/* ---------- Scoring: what happened after the call? Entry = close of the analysed candle. If stop and target both sit inside one candle, it counts as a LOSS (conservative). ---------- */
+function ailScore(call, fwd) {
+  if (call.bias === 'neutral') return { status: 'neutral' };
+  const long = call.bias === 'long', risk = Math.abs(call.entry - call.stop), reward = Math.abs(call.target - call.entry);
+  for (let i = 0; i < Math.min(fwd.length, call.hz); i++) {
+    const c = fwd[i], hitStop = long ? c.l <= call.stop : c.h >= call.stop, hitTgt = long ? c.h >= call.target : c.l <= call.target;
+    if (hitStop) return { status: 'loss', r: -1, bars: i + 1, exit: call.stop };
+    if (hitTgt) return { status: 'win', r: +(reward / risk).toFixed(2), bars: i + 1, exit: call.target };
+  }
+  if (fwd.length >= call.hz) { const px = fwd[call.hz - 1].c, r = (long ? px - call.entry : call.entry - px) / risk; return { status: 'expired', r: +r.toFixed(2), bars: call.hz, exit: px }; }
+  return { status: 'open' };
+}
+function ailRandomBaseline(call, fwd) {   // same stop/target distances, but averaged over both directions = a coin-flip trader
+  const rk = Math.abs(call.entry - call.stop), rw = Math.abs(call.target - call.entry); if (!rk) return null;
+  const mk = b => ({ bias: b, entry: call.entry, stop: b === 'long' ? call.entry - rk : call.entry + rk, target: b === 'long' ? call.entry + rw : call.entry - rw, hz: call.hz });
+  const a = ailScore(mk('long'), fwd), b = ailScore(mk('short'), fwd); if (a.status === 'open' || b.status === 'open') return null;
+  return { win: ((a.status === 'win') + (b.status === 'win')) / 2, r: ((a.r || 0) + (b.r || 0)) / 2 };
+}
+function ailStats(list) {
+  const done = list.filter(x => x.status === 'win' || x.status === 'loss' || x.status === 'expired'), wins = done.filter(x => x.status === 'win').length, losses = done.filter(x => x.status === 'loss').length;
+  const decided = wins + losses, sumR = done.reduce((s, x) => s + (x.r || 0), 0), base = list.filter(x => x.base);
+  return { total: list.length, neutral: list.filter(x => x.status === 'neutral').length, open: list.filter(x => x.status === 'open').length, scored: done.length, wins, losses, expired: done.length - decided,
+    winRate: decided ? wins / decided : null, avgR: done.length ? sumR / done.length : null,
+    longs: list.filter(x => x.bias === 'long').length, shorts: list.filter(x => x.bias === 'short').length,
+    baseWin: base.length ? base.reduce((s, x) => s + x.base.win, 0) / base.length : null, baseR: base.length ? base.reduce((s, x) => s + x.base.r, 0) / base.length : null, baseN: base.length };
+}
+function ailResolveOpen() {   // live use: score earlier open calls against the candles that arrived since
+  const cs = (typeof replayCandles !== 'undefined' && replayCandles) || []; if (!cs.length) return;
+  let changed = false;
+  ail.journal.forEach(x => {
+    if (x.status !== 'open' || x.sym !== ailSym() || x.tf !== ailTf()) return;
+    const fwd = cs.slice(0, replayIndex).filter(c => c.t > x.t); if (!fwd.length) return;
+    const s = ailScore(x, fwd); if (s.status !== 'open') { Object.assign(x, s); changed = true; }
+  });
+  if (changed) ailSaveJournal();
+}
+function ailSym() { try { return liveMode ? LIVE.symbol : (currentInstrument ? currentInstrument.label : ''); } catch (e) { return ''; } }
+function ailTf() { try { return liveMode ? LIVE.res : (document.getElementById('replay-timeframe') || {}).value || ''; } catch (e) { return ''; } }
+
+/* ---------- Runs ---------- */
+async function ailAnalyzeNow() {
+  if (ail.busy) return; const all = replayCandles.slice(0, replayIndex);
+  if (all.length < 60) { ail.msg = 'Need at least 60 candles on the chart. Load more history first.'; ailRender(); return; }
+  ail.busy = true; ail.msg = 'Asking the AI…'; ailRender();
+  try {
+    const ctx = ailContext(all, { symbol: ailSym(), tf: ailTf(), oi: ailOiSummary() }), raw = await ailCallModel(ctx), p = ailParse(raw, ctx.price, ctx.atr14);
+    if (!p.ok) { ail.msg = p.why; ail.last = { raw: String(raw).slice(0, 400) }; }
+    else {
+      const c = p.call, last = all[all.length - 1], rec = Object.assign({ id: Date.now(), ts: Date.now(), sym: ailSym(), tf: ailTf(), t: last.t, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, status: c.bias === 'neutral' ? 'neutral' : 'open' }, c);
+      ail.journal.push(rec); ailSaveJournal(); ail.last = rec; ail.msg = '';
+    }
+  } catch (e) { ail.msg = e.message || String(e); }
+  ail.busy = false; ailRender();
+}
+async function ailResearchRun(n) {
+  if (ail.busy) return; n = Math.max(3, Math.min(60, n | 0 || 20));
+  const cs = replayCandles; if (cs.length < 140) { ail.msg = 'Need at least 140 candles loaded for a research run. Load more history or use a faster timeframe.'; ailRender(); return; }
+  const P = AIL_PROVIDERS[ail.cfg.provider], first = 80, lastI = cs.length - 50, span = lastI - first;
+  const idx = []; for (let k = 0; k < n; k++) idx.push(Math.round(first + (span * (k + 0.5)) / n));
+  ail.busy = true; ail.run = { done: 0, n, stop: false }; const sym = ailSym(), tf = ailTf(); let fails = 0;
+  for (const i of idx) {
+    if (ail.run.stop) break;
+    ail.msg = 'Research run: ' + (ail.run.done + 1) + ' of ' + n + (ail.cfg.provider === 'mock' ? '' : ' (paced for the free tier)') + '…'; ailRender();
+    try {
+      const upto = cs.slice(0, i + 1), ctx = ailContext(upto, { symbol: sym, tf }), raw = await ailCallModel(ctx), p = ailParse(raw, ctx.price, ctx.atr14);   // the model only ever sees candles up to i
+      if (!p.ok) { fails++; } else {
+        const c = p.call, fwd = cs.slice(i + 1, i + 1 + 48), s = ailScore(c, fwd), base = c.bias === 'neutral' ? null : ailRandomBaseline(c, fwd);
+        ail.journal.push(Object.assign({ id: Date.now() + i, ts: Date.now(), sym, tf, t: cs[i].t, prov: ail.cfg.provider, model: ail.cfg.model, bt: true, base }, c, s));
+      }
+    } catch (e) { ail.msg = e.message || String(e); ail.busy = false; ail.run = null; ailSaveJournal(); ailRender(); return; }
+    ail.run.done++; ailRender();
+    if (P.delay) await new Promise(r => setTimeout(r, P.delay));
+  }
+  ail.msg = 'Research run finished' + (fails ? ' (' + fails + ' replies could not be read)' : '') + '.'; ail.busy = false; ail.run = null; ailSaveJournal(); ailRender();
+}
+function ailStopRun() { if (ail.run) ail.run.stop = true; }
+function ailClear() { if (!confirm('Clear the whole AI journal?')) return; ail.journal = []; ail.last = null; ailSaveJournal(); ailRender(); }
+function ailSetProv(v) { ail.cfg.provider = v; ail.cfg.model = AIL_PROVIDERS[v].model; ailSaveCfg(); ailRender(); }
+function ailSetModel(v) { ail.cfg.model = v.trim(); ailSaveCfg(); }
+function ailSetKey(v) { ail.cfg.key = v.trim(); ailSaveCfg(); }
+
+/* ---------- UI ---------- */
+function ailOpen() { let el = document.getElementById('ail-bg'); if (!el) { el = document.createElement('div'); el.id = 'ail-bg'; el.onclick = e => { if (e.target === el) ailClose(); }; document.body.appendChild(el); } el.classList.add('open'); ailResolveOpen(); ailRender(); }
+function ailClose() { const el = document.getElementById('ail-bg'); if (el) el.classList.remove('open'); }
+function ailPct(v) { return v == null ? '–' : Math.round(v * 100) + '%'; }
+function ailRender() {
+  const el = document.getElementById('ail-bg'); if (!el || !el.classList.contains('open')) return;
+  const P = AIL_PROVIDERS[ail.cfg.provider], inp = document.activeElement && document.activeElement.closest && document.activeElement.closest('#ail-bg') ? document.activeElement.id : '';
+  const live = ail.journal.filter(x => !x.bt), bt = ail.journal.filter(x => x.bt), sL = ailStats(live), sB = ailStats(bt);
+  const statBlock = (title, s, note) => `<div class="ail-card"><div class="ail-h">${title}</div>` + (s.total ? `<div class="ail-grid">
+      <div><b>${s.total}</b><span>calls</span></div><div><b>${s.longs}/${s.shorts}/${s.neutral}</b><span>long / short / neutral</span></div>
+      <div><b>${ailPct(s.winRate)}</b><span>win rate (${s.wins}W · ${s.losses}L${s.expired ? ' · ' + s.expired + ' timed out' : ''})</span></div>
+      <div><b>${s.avgR == null ? '–' : (s.avgR >= 0 ? '+' : '') + s.avgR.toFixed(2) + 'R'}</b><span>avg result per trade</span></div></div>` +
+      (s.baseN ? `<div class="ail-note">Coin-flip baseline with the same stops and targets: win rate <b>${ailPct(s.baseWin)}</b>, avg <b>${(s.baseR >= 0 ? '+' : '') + s.baseR.toFixed(2)}R</b> (${s.baseN} calls). The AI is only adding value if it beats this.</div>` : '') +
+      (s.scored < 30 && s.scored ? `<div class="ail-note warn">Only ${s.scored} scored trades. Results this small are mostly luck, so aim for 50+ before drawing conclusions.</div>` : '') : `<div class="ail-note">${note}</div>`) + `</div>`;
+  const rows = ail.journal.slice(-14).reverse().map(x => `<tr><td>${ailEsc(x.sym)} ${ailEsc(x.tf)}${x.bt ? ' <i>hist</i>' : ''}</td><td class="b-${x.bias}">${x.bias}</td><td>${x.confidence}</td><td>${x.status === 'neutral' ? '–' : ailEsc(x.status)}</td><td>${x.r == null ? '–' : (x.r > 0 ? '+' : '') + x.r + 'R'}</td></tr>`).join('');
+  const l = ail.last;
+  const lastCard = l && l.bias ? `<div class="ail-card"><div class="ail-h">Latest idea <span class="b-${l.bias}">${l.bias.toUpperCase()}</span> · confidence ${l.confidence}</div>` +
+    (l.bias === 'neutral' ? '<div class="ail-note">No clear edge right now.</div>' : `<div class="ail-grid"><div><b>${ailEsc(l.entry)}</b><span>entry (price now)</span></div><div><b>${ailEsc(l.stop)}</b><span>stop</span></div><div><b>${ailEsc(l.target)}</b><span>target</span></div><div><b>${l.hz}</b><span>candles to play out</span></div></div>`) +
+    (l.note ? `<div class="ail-note warn">${ailEsc(l.note)}</div>` : '') +
+    (l.patterns.length ? `<div class="ail-tags">${l.patterns.map(p => `<span>${ailEsc(p)}</span>`).join('')}</div>` : '') +
+    (l.reasoning.length ? `<ul>${l.reasoning.map(r => `<li>${ailEsc(r)}</li>`).join('')}</ul>` : '') +
+    (l.risks.length ? `<div class="ail-note"><b>Risks:</b> ${l.risks.map(ailEsc).join(' · ')}</div>` : '') + `<div class="ail-note">${l.status === 'open' ? 'Being tracked. It is scored automatically as new candles arrive.' : 'Result: ' + ailEsc(l.status)}</div></div>` : (l && l.raw ? `<div class="ail-card"><div class="ail-note warn">Unreadable reply: ${ailEsc(l.raw)}</div></div>` : '');
+  el.innerHTML = `<div class="ail-sheet" role="dialog" aria-label="AI Lab">
+    <div class="ail-top"><b>AI Lab</b><span class="ail-sub">research only · not advice</span><button onclick="ailClose()" aria-label="Close">✕</button></div>
+    <div class="ail-card"><div class="ail-h">Setup</div>
+      <label>AI service<select id="ail-prov" onchange="ailSetProv(this.value)">${Object.keys(AIL_PROVIDERS).map(k => `<option value="${k}" ${k === ail.cfg.provider ? 'selected' : ''}>${AIL_PROVIDERS[k].label}</option>`).join('')}</select></label>
+      ${P.needsKey ? `<label>Model<input id="ail-model" value="${ailEsc(ail.cfg.model)}" onchange="ailSetModel(this.value)"></label><label>Your API key (kept only in this browser)<input id="ail-key" type="password" autocomplete="off" value="${ailEsc(ail.cfg.key)}" onchange="ailSetKey(this.value)" placeholder="paste free key"></label>` : '<div class="ail-note">Mock mode uses simple Guppy + RSI + MACD rules instead of a real AI. It is only for checking that everything works.</div>'}
+    </div>
+    <div class="ail-actions"><button class="primary" ${ail.busy ? 'disabled' : ''} onclick="ailAnalyzeNow()">Analyze this chart now</button>
+      <button ${ail.busy ? 'disabled' : ''} onclick="ailResearchRun(+document.getElementById('ail-n').value)">Research run on history</button>
+      <input id="ail-n" type="number" min="3" max="60" value="20" title="How many past moments to test"><span class="ail-sub">points</span>
+      ${ail.run ? '<button onclick="ailStopRun()">Stop</button>' : ''}</div>
+    ${ail.msg ? `<div class="ail-msg">${ailEsc(ail.msg)}</div>` : ''}
+    ${lastCard}
+    ${statBlock('Research run results (past data, scored instantly)', sB, 'Run a research run to test the AI on past candles. It only sees candles up to each test point, then is scored on what came next.')}
+    ${statBlock('Live calls (scored as new candles arrive)', sL, 'Use "Analyze this chart now" on the live chart. Each idea is tracked and scored automatically.')}
+    ${rows ? `<div class="ail-card"><div class="ail-h">Recent calls</div><table><tr><th>Chart</th><th>Call</th><th>Conf.</th><th>Result</th><th>R</th></tr>${rows}</table><button class="ail-link" onclick="ailClear()">Clear journal</button></div>` : ''}
+    <div class="ail-note foot">R = profit in units of the risk taken (stop distance). Entry is the close of the analysed candle. If stop and target both fall inside one candle it counts as a loss. Language models are not reliable forecasters, so judge this by the numbers above, not by how convincing the reasoning sounds.</div>
+  </div>`;
+  if (inp) { const f = document.getElementById(inp); if (f) f.focus(); }
+}
+
 </script>
 </body>
 </html>
