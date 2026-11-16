@@ -16,6 +16,8 @@ export default {
       if (url.pathname === '/sync' && req.method === 'POST') return await sync(req, env);
       if (url.pathname === '/state' && req.method === 'GET') return await state(url, env);
       if (url.pathname === '/test' && req.method === 'POST') return await test(req, env);
+      if (url.pathname === '/aicall' && req.method === 'POST') return await aiCall(req, env);
+      if (url.pathname === '/aistate' && req.method === 'GET') return await aiState(url, env);
       if (url.pathname === '/ai' && req.method === 'POST') return await ai(req, env);
       if (url.pathname === '/check' && req.method === 'POST') return await check(req, env);
       if (url.pathname === '/debug') { if (!env.WEBHOOK_SECRET || url.searchParams.get('key') !== env.WEBHOOK_SECRET) return new Response('no', { status: 401 }); return json(env, await debug(env)); }
@@ -33,7 +35,7 @@ const num = v => { const n = parseFloat(v); return isFinite(n) ? n : null; };
 /* ---------- storage ---------- */
 const getDev = async (env, t) => JSON.parse((await env.TP.get('dev:' + t)) || 'null');
 const putDev = (env, t, d) => env.TP.put('dev:' + t, JSON.stringify(d));
-const newDev = () => ({ rules: [], quiet: { on: false, start: '23:30', end: '07:00', tz: 'Asia/Kolkata', mode: 'hold' }, on: true, chat: null, hits: {}, held: [], scans: [], bars: {} });
+const newDev = () => ({ rules: [], quiet: { on: false, start: '23:30', end: '07:00', tz: 'Asia/Kolkata', mode: 'hold' }, on: true, chat: null, hits: {}, held: [], scans: [], bars: {}, aicalls: [], aidone: [] });
 async function register(env, t) {
   const idx = JSON.parse((await env.TP.get('idx')) || '[]');
   if (idx.includes(t)) return true;
@@ -124,10 +126,58 @@ async function ai(req, env) {
   if (used >= AI_DAILY) return json(env, { ok: false, error: 'daily AI limit reached' }, 429);
   await env.TP.put(k, String(used + 1), { expirationTtl: 172800 });
   try {
-    const r = await env.AI.run(AI_MODEL, { messages: msgs, temperature: 0.2, max_tokens: 700 });
+    const r = await env.AI.run(AI_MODEL, { messages: msgs, temperature: 0.2, max_tokens: 900 });
     const t = r && r.response;
     return json(env, { ok: true, text: typeof t === 'string' ? t : JSON.stringify(t || '') });
   } catch (e) { return json(env, { ok: false, error: 'AI error: ' + String(e).slice(0, 120) }, 502); }
+}
+
+/* ---------- AI call tracking: scores the app's AI trade ideas against real candles, even when the app is closed ---------- */
+const MAX_AI_OPEN = 40, MAX_AI_DONE = 100;
+async function aiCall(req, env) {
+  const b = await body(req); if (!TOKEN_RE.test(b.token || '')) return json(env, { ok: false, error: 'bad token' }, 400);
+  const c = b.call || {}, id = num(c.id), t = num(c.t), entry = num(c.entry), stop = num(c.stop), target = num(c.target), hz = Math.round(num(c.hz) || 0);
+  const bias = c.bias === 'short' ? 'short' : c.bias === 'long' ? 'long' : null, sym = String(c.sym || ''), tf = String(c.tf || '');
+  if (id == null || t == null || entry == null || stop == null || target == null || !bias || !TFS[tf] || !/^[A-Z0-9]{2,14}$/.test(sym) || hz < 3 || hz > 48) return json(env, { ok: false, error: 'bad call' }, 400);
+  if (bias === 'long' ? !(stop < entry && target > entry) : !(stop > entry && target < entry)) return json(env, { ok: false, error: 'stop/target on wrong side' }, 400);
+  const d = (await getDev(env, b.token)) || newDev();
+  if (!(await register(env, b.token))) return json(env, { ok: false, error: 'device limit' }, 429);
+  d.aicalls = d.aicalls || []; d.aidone = d.aidone || [];
+  if (!d.aicalls.some(x => x.id === id) && !d.aidone.some(x => x.id === id)) d.aicalls.push({ id, sym, tf, t, bias, entry, stop, target, hz, conf: Math.round(num(c.conf) || 0), at: Date.now() });
+  d.aicalls = d.aicalls.slice(-MAX_AI_OPEN);
+  await putDev(env, b.token, d);
+  return json(env, { ok: true, open: d.aicalls.length });
+}
+async function aiState(url, env) {
+  const t = url.searchParams.get('token') || ''; if (!TOKEN_RE.test(t)) return json(env, { ok: false, error: 'bad token' }, 400);
+  const d = await getDev(env, t); return json(env, { ok: true, open: d ? (d.aicalls || []).map(x => x.id) : [], done: d ? (d.aidone || []) : [] });
+}
+function aiScore(c, fwd) {   // same rules as the app's AI Lab scorer: stop and target in one candle = loss
+  const long = c.bias === 'long', risk = Math.abs(c.entry - c.stop), reward = Math.abs(c.target - c.entry);
+  for (let i = 0; i < Math.min(fwd.length, c.hz); i++) {
+    const k = fwd[i], hitStop = long ? k.l <= c.stop : k.h >= c.stop, hitTgt = long ? k.h >= c.target : k.l <= c.target;
+    if (hitStop) return { status: 'loss', r: -1, bars: i + 1, exit: c.stop };
+    if (hitTgt) return { status: 'win', r: +(reward / risk).toFixed(2), bars: i + 1, exit: c.target };
+  }
+  if (fwd.length >= c.hz) { const px = fwd[c.hz - 1].c, r = (long ? px - c.entry : c.entry - px) / risk; return { status: 'expired', r: +r.toFixed(2), bars: c.hz, exit: px }; }
+  return { status: 'open' };
+}
+async function trackAI(env) {
+  const idx = JSON.parse((await env.TP.get('idx')) || '[]'), now = Date.now(), nowSec = Math.floor(now / 1000), cache = new Map(); let scored = 0;
+  for (const t of idx) {
+    const d = await getDev(env, t); if (!d || !(d.aicalls || []).length) continue;
+    const keep = []; let dirty = false; d.aidone = d.aidone || [];
+    for (const c of d.aicalls) {
+      const secs = TFS[c.tf], cs = await fetchCandles(c.sym, c.tf, nowSec, cache, null), fwd = cs.filter(x => x.t > c.t);
+      if (!cs.length) { if (now - c.at < 5 * 86400000) keep.push(c); else dirty = true; continue; }   // exchange unreachable: try again next minute, give up after 5 days
+      const s = aiScore(c, fwd);
+      if (s.status === 'open') { if (now - c.at < (c.hz + 4) * secs * 1000 + 3 * 86400000) keep.push(c); else dirty = true; continue; }
+      d.aidone.push({ id: c.id, status: s.status, r: s.r, bars: s.bars, exit: s.exit, at: now }); scored++; dirty = true;
+      if (d.chat) await tgSend(env, d.chat, '🤖 AI call result: ' + c.sym.replace(/USD$/, '') + ' ' + c.tf + ' ' + c.bias.toUpperCase() + ' → ' + (s.status === 'win' ? 'WIN ' : s.status === 'loss' ? 'LOSS ' : 'TIMED OUT ') + (s.r >= 0 ? '+' : '') + s.r + 'R after ' + s.bars + ' candles');
+    }
+    if (dirty) { d.aicalls = keep; d.aidone = d.aidone.slice(-MAX_AI_DONE); await putDev(env, t, d); }
+  }
+  return scored;
 }
 
 /* ---------- Telegram ---------- */
@@ -391,6 +441,7 @@ async function loadDevs(env) {
 async function run(env) {
   let s;
   try { s = await watch(env); } catch (e) { s = { err: String(e).slice(0, 200) }; }
+  try { await trackAI(env); } catch (e) { /* AI tracking must never break alerts */ }
   const now = Date.now(), prev = JSON.parse((await env.TP.get('last')) || 'null');
   if (!prev || now - prev.t > 600000 || s.fired || (s.err && (!prev.err || now - prev.t > 300000)) || (prev.err && !s.err)) await env.TP.put('last', JSON.stringify({ t: now, ...s }));
 }

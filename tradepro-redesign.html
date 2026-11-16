@@ -14212,8 +14212,9 @@ const AIL_PROVIDERS = {
   groq:       { label: 'Groq (free, open models)', model: 'llama-3.3-70b-versatile', url: 'https://api.groq.com/openai/v1/chat/completions', needsKey: true, json: true, delay: 2500 },
   openrouter: { label: 'OpenRouter (free open models)', model: 'meta-llama/llama-3.3-70b-instruct:free', url: 'https://openrouter.ai/api/v1/chat/completions', needsKey: true, json: false, delay: 4000 }
 };
-const ail = { cfg: { provider: 'mock', model: 'rule-based-mock', key: '' }, busy: false, last: null, msg: '', run: null, journal: [] };
+const ail = { cfg: { provider: 'mock', model: 'rule-based-mock', key: '', tfs: [] }, busy: false, last: null, msg: '', run: null, journal: [] };
 try { const c = JSON.parse(localStorage.getItem(AIL_KEY) || 'null'); if (c && AIL_PROVIDERS[c.provider]) Object.assign(ail.cfg, c); } catch (e) { /* ignore */ }
+try { if (ail.cfg.tfv !== 2) { ail.cfg.tfs = ['4h', '1h', '15m', '5m']; ail.cfg.tfv = 2; ailSaveCfg(); } } catch (e) { /* ignore */ }
 try { const j = JSON.parse(localStorage.getItem(AIL_JOURNAL) || '[]'); if (Array.isArray(j)) ail.journal = j; } catch (e) { /* ignore */ }
 function ailSaveCfg() { try { localStorage.setItem(AIL_KEY, JSON.stringify(ail.cfg)); } catch (e) { /* ignore */ } }
 function ailSaveJournal() { try { localStorage.setItem(AIL_JOURNAL, JSON.stringify(ail.journal.slice(-400))); } catch (e) { /* ignore */ } }
@@ -14271,6 +14272,105 @@ function ailOiSummary() {   // live mode only: biggest call/put OI strikes and w
   } catch (e) { return null; }
 }
 
+
+/* ---------- Multi-timeframe: one holistic call that reads 2-3 timeframes of the live chart together (on demand only) ---------- */
+const AIL_TFS = ['5m', '15m', '30m', '1h', '4h'];
+const AIL_SYSTEM_MTF = 'You are a market research assistant inside a paper-trading simulator. You receive numeric data for ONE crypto instrument: several timeframes ("timeframes": one block per timeframe with recent candles, EMAs, RSI, MACD, Guppy ribbon state, candle patterns, atr14) and "oi_flow": perpetual-futures open interest, options open-interest walls, and per-strike OI flows since the 17:30 IST baseline. ' +
+  'OI flow flags: LB = long build-up (OI up, premium up: new buying), SB = short build-up (OI up, premium down: new writing), LU = long unwinding (OI down, premium down: longs exiting), SC = short covering (OI down, premium up: writers exiting). ' +
+  'How to read them: call writing (SB on C) = resistance and bearish; put writing (SB on P) = support and bullish; call buying (LB on C) = bullish; put buying (LB on P) = bearish; call short covering (SC on C) = resistance weakening, bullish; put short covering (SC on P) = support weakening, bearish; call long unwinding (LU on C) = bullish conviction fading; put long unwinding (LU on P) = bearish conviction fading. For the perpetual: price up + OI up = long build-up (trend confirmed), price down + OI up = short build-up, price down + OI down = long unwinding (selling is liquidation/exit, often exhaustion), price up + OI down = short covering (rally is weak, often squeezes fade). Funding far from zero means a crowded side. ' +
+  'Read top-down: the highest timeframe sets the bias, the middle ones the setup and levels, the lowest the entry and stop; then check whether the OI flow confirms or contradicts it. If the timeframes or the OI flow clearly conflict, or there is no edge, answer "neutral". Use ONLY the data given. ' +
+  'Reply with a single JSON object and nothing else, with keys: "bias" ("long", "short" or "neutral"), "confidence" (integer 0-100), "trade_tf" (one of the provided timeframe names), "alignment" (one short sentence: how the timeframes agree or disagree), "oi_read" (one short sentence: what the OI flow says), ' +
+  '"entry" (current price), "stop" (number), "target" (number), "horizon_candles" (integer 3-48, counted in candles of trade_tf), "patterns" (array of strings), "reasoning" (array of at most 4 short strings), "risks" (array of at most 3 short strings), ' +
+  '"option_idea" (object or null: {"action": "buy_call"|"buy_put"|"sell_call"|"sell_put", "strike": a strike taken ONLY from oi_flow.chain_near_spot, "why": one short sentence}). The option idea must match the bias (long: buy_call or sell_put; short: buy_put or sell_call) and be null when bias is neutral. ' +
+  'Rules: for long, stop < entry < target; for short, target < entry < stop. Keep stop and target within about 0.8 to 4 times the atr14 OF trade_tf from entry. If neutral, set entry/stop/target to the current price. Never invent data you were not given.';
+function ailMtfOk() { try { return liveMode && /^[A-Z0-9]{2,14}$/.test(LIVE.symbol || '') && ail.cfg.tfs.length >= 2; } catch (e) { return false; } }
+function ailSortedTfs() { return ail.cfg.tfs.slice().sort((a, b) => AIL_TFS.indexOf(a) - AIL_TFS.indexOf(b)); }
+async function ailLoadTf(sym, tf) {
+  const secs = LIVE_RES[tf], end = Math.floor(Date.now() / 1000), j = await liveFetchJson('/v2/history/candles?symbol=' + encodeURIComponent(sym) + '&resolution=' + tf + '&start=' + (end - secs * 400) + '&end=' + end);
+  return liveParseRestCandles(j, tf);
+}
+function ailMtfContext(map, sym, oi) {   // map: { tf: candles }; the last candle of each is the forming one, like the single-chart path
+  const tfs = Object.keys(map).sort((a, b) => AIL_TFS.indexOf(a) - AIL_TFS.indexOf(b)), out = { symbol: sym, timeframes_low_to_high: tfs, timeframes: {} };
+  tfs.forEach((tf, i) => { const c = ailContext(map[tf], { symbol: sym, tf }); if (i < tfs.length - 1) c.recent_candles_ohlc_oldest_to_newest = c.recent_candles_ohlc_oldest_to_newest.slice(-20); delete c.symbol; delete c.last_candle_index; out.timeframes[tf] = c; });
+  out.price = out.timeframes[tfs[0]].price;
+  if (oi) out.options_open_interest = oi;
+  return out;
+}
+function ailMockMtf(ctx) {
+  const tfs = ctx.timeframes_low_to_high, rs = tfs.map(tf => JSON.parse(ailMock(ctx.timeframes[tf]))), ok = rs.every(r => r.bias === rs[0].bias) && rs[0].bias !== 'neutral';
+  const o = ok ? rs[0] : Object.assign({}, rs[0], { bias: 'neutral', confidence: 30, stop: ctx.price, target: ctx.price });
+  o.trade_tf = tfs[0]; o.alignment = ok ? 'All timeframes agree (mock)' : 'Timeframes disagree (mock)'; return JSON.stringify(o);
+}
+const ailOptTxt = o => (/^buy/.test(o.action) ? 'BUY ' : 'SELL ') + o.strike + (/call/.test(o.action) ? ' CALL' : ' PUT') + (o.expiry ? ' · exp ' + o.expiry.slice(8) + '/' + o.expiry.slice(5, 7) : '');
+function ailToggleTf(tf) {
+  const i = ail.cfg.tfs.indexOf(tf);
+  if (i >= 0) ail.cfg.tfs.splice(i, 1); else if (ail.cfg.tfs.length >= 4) { ail.msg = 'Pick at most 4 timeframes.'; ailRender(); ailDock(true); return; } else ail.cfg.tfs.push(tf);
+  ail.msg = ''; ailSaveCfg(); ailRender(); ailDock(true);
+}
+const ailTfChips = () => `<div class="ail-chips">${AIL_TFS.map(t => `<button class="${ail.cfg.tfs.includes(t) ? 'on' : ''}" onclick="ailToggleTf('${t}')">${t}</button>`).join('')}</div>`;
+
+async function ailOiFlow(sym, map) {   // perpetual + options open-interest flow, classified like the Markets tab flags; null when the underlying is not BTC/ETH
+  const m = /^(BTC|ETH)USD$/.exec(sym); if (!m) return null; const und = m[1], out = { underlying: und };
+  const lo = Object.keys(map).sort((a, b) => AIL_TFS.indexOf(a) - AIL_TFS.indexOf(b))[0], cs = map[lo], secs = LIVE_RES[lo], back = Math.round(6 * 3600 / secs);
+  const pchg = cs && cs.length > back ? (cs[cs.length - 1].c - cs[cs.length - 1 - back].c) / cs[cs.length - 1 - back].c * 100 : null;
+  try {
+    const pj = await liveFetchJson('/v2/tickers/' + encodeURIComponent(sym)), t = pj && pj.result;
+    if (t) {
+      const oiChg = liveNum(t.oi_change_usd_6h), pr = { price_change_6h_pct: pchg == null ? null : +pchg.toFixed(2), funding_rate: liveNum(t.funding_rate), open_interest_usd: liveNum(t.oi_value_usd), oi_change_6h_usd_or_pct_sign_is_direction: oiChg };
+      if (oiChg != null && pchg != null && Math.abs(pchg) >= 0.1 && oiChg !== 0) pr.read = pchg > 0 ? (oiChg > 0 ? 'long build-up' : 'short covering') : (oiChg > 0 ? 'short build-up' : 'long unwinding');
+      out.perp = pr;
+    }
+  } catch (e) { /* perp data is optional */ }
+  try {
+    const json = await liveFetchJson('/v2/tickers?contract_types=call_options,put_options&underlying_asset_symbols=' + und), raw = {}, px = {}; let spot = null;
+    (json.result || []).forEach(t => { const o = liveParseOptSymbol(t && t.symbol); if (!o || o.und !== und) return; if (spot == null) spot = liveNum(t.spot_price); const v = liveNum(t.oi_contracts != null ? t.oi_contracts : t.oi); if (v) { const k = o.exp + '|' + o.strike + '|' + o.type; raw[k] = v; const p = liveNum(t.mark_price != null ? t.mark_price : t.close); if (p) px[k] = p; } });
+    if (!Object.keys(raw).length) return out;
+    spot = spot || (cs && cs.length ? cs[cs.length - 1].c : null);
+    const now = Date.now(), d = new Date(now); let ss = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); if (ss > now) ss -= 86400000;
+    let b = null; try { b = JSON.parse(localStorage.getItem(OI_KEY + '_base_' + und) || 'null'); } catch (e) { /* ignore */ }
+    if (!b || b.ss !== ss) { b = { ss, at: now, raw, px }; try { localStorage.setItem(OI_KEY + '_base_' + und, JSON.stringify(b)); } catch (e) { /* ignore */ } out.note = 'The 17:30 IST baseline starts now, so flows are not available yet.'; }
+    const exps = [...new Set(Object.keys(raw).map(k => k.split('|')[0]))].sort(), near = exps[0], two = new Set(exps.slice(0, 2));
+    let C = 0, P = 0, bC = 0, bP = 0; for (const k in raw) { const [e, , t] = k.split('|'); if (!two.has(e)) continue; if (t === 'C') C += raw[k]; else P += raw[k]; const bv = (b.raw || {})[k] || 0; if (t === 'C') bC += bv; else bP += bv; }
+    out.expiry_nearest = near; out.spot = spot ? Math.round(spot) : null; out.calls_oi_two_nearest_expiries = Math.round(C); out.puts_oi_two_nearest_expiries = Math.round(P);
+    out.pcr_now = C ? +(P / C).toFixed(2) : null; out.pcr_at_baseline = bC ? +(bP / bC).toFixed(2) : null; out.call_oi_change_since_baseline = Math.round(C - bC); out.put_oi_change_since_baseline = Math.round(P - bP);
+    const at = {}; for (const k in raw) { const [e, s, t] = k.split('|'); if (e !== near) continue; (at[s] = at[s] || {})[t] = k; }
+    const strikes = Object.keys(at).map(Number), top = ty => strikes.map(s => ({ strike: s, oi: Math.round(raw[at[s][ty]] || 0) })).sort((x, y) => y.oi - x.oi).slice(0, 3).filter(x => x.oi > 0);
+    out.call_oi_walls_resistance = top('C'); out.put_oi_walls_support = top('P');
+    if (spot) out.chain_near_spot = strikes.slice().sort((x, y) => Math.abs(x - spot) - Math.abs(y - spot)).slice(0, 9).sort((x, y) => x - y).map(s => ({ strike: s, call_oi: Math.round(raw[(at[s] || {}).C] || 0), put_oi: Math.round(raw[(at[s] || {}).P] || 0), call_premium: px[(at[s] || {}).C] != null ? +px[at[s].C].toFixed(1) : null, put_premium: px[(at[s] || {}).P] != null ? +px[at[s].P].toFixed(1) : null }));
+    if (b.px && b.raw && !out.note) {
+      const tot = C + P, minAbs = Math.max(20, tot * 0.01), flows = [], W = { SB: { C: -1, P: 1 }, LB: { C: 1, P: -1 }, SC: { C: 1, P: -1 }, LU: { C: -1, P: 1 } }; let tilt = 0;
+      for (const k in raw) {
+        const [e, s, t] = k.split('|'); if (!two.has(e) || (spot && Math.abs(+s - spot) / spot > 0.06)) continue;
+        const b0 = b.raw[k] || 0, dl = raw[k] - b0; if (Math.abs(dl) < minAbs || (b0 < 5 && dl < 0)) continue;
+        const p0 = b.px[k], p1 = px[k], pc = p0 && p1 ? (p1 - p0) / p0 * 100 : null; let flag = null;
+        if (pc != null && Math.abs(pc) >= 1) flag = dl > 0 ? (pc > 0 ? 'LB' : 'SB') : (pc < 0 ? 'LU' : 'SC');
+        flows.push({ strike: +s, type: t, expiry: e, flag: flag || (dl > 0 ? 'OI up, premium flat' : 'OI down, premium flat'), oi_change: Math.round(dl), oi_change_pct: b0 ? Math.round(dl / b0 * 100) : null, premium_change_pct: pc == null ? null : Math.round(pc) });
+        if (flag) tilt += W[flag][t] * Math.abs(dl);
+      }
+      flows.sort((x, y) => Math.abs(y.oi_change) - Math.abs(x.oi_change)); out.flows_since_1730_ist_top = flows.slice(0, 8);
+      out.net_flow_tilt_hint = !flows.length ? 'no large flows' : Math.abs(tilt) < tot * 0.005 ? 'balanced' : tilt > 0 ? 'bullish' : 'bearish';
+    } else if (!out.note) out.note = 'Premium baseline is not stored yet (open Markets > Options once today), so only OI walls and totals are given.';
+  } catch (e) { /* options data is optional */ }
+  return out;
+}
+async function ailAnalyzeMtf() {
+  const sym = LIVE.symbol, tfs = ailSortedTfs(), map = {};
+  const lists = await Promise.all(tfs.map(tf => ailLoadTf(sym, tf).catch(() => [])));
+  tfs.forEach((tf, i) => { if (lists[i].length >= 60) map[tf] = lists[i]; });
+  if (Object.keys(map).length < 2) throw new Error('Could not load enough candles for the chosen timeframes. Check your connection and try again.');
+  const flow = await ailOiFlow(sym, map).catch(() => null), ctx = ailMtfContext(map, sym, null);
+  if (flow) ctx.oi_flow = flow; else { const o2 = ailOiSummary(); if (o2) ctx.options_open_interest = o2; }
+  const raw = ail.cfg.provider === 'mock' ? ailMockMtf(ctx) : await ailCallModel(ctx, AIL_SYSTEM_MTF);
+  let o = null; try { const m = String(raw).match(/\{[\s\S]*\}/); o = JSON.parse(m ? m[0] : raw); } catch (e) { o = null; }
+  const have = ctx.timeframes_low_to_high, tt = o && have.includes(o.trade_tf) ? o.trade_tf : have[0], p = ailParse(raw, ctx.price, ctx.timeframes[tt].atr14);
+  let opt = null, strikes = ((ctx.oi_flow && ctx.oi_flow.chain_near_spot) || []).map(x => x.strike);
+  if (o && o.option_idea && p.ok && p.call.bias !== 'neutral') {
+    const oa = String(o.option_idea.action || ''), okA = p.call.bias === 'long' ? ['buy_call', 'sell_put'] : ['buy_put', 'sell_call'], k = +o.option_idea.strike;
+    if (okA.includes(oa) && strikes.includes(k)) opt = { action: oa, strike: k, expiry: ctx.oi_flow.expiry_nearest, why: String(o.option_idea.why || '').slice(0, 160) };
+  }
+  return { p, raw, tt, align: o && o.alignment ? String(o.alignment).slice(0, 160) : '', oiRead: o && o.oi_read ? String(o.oi_read).slice(0, 200) : '', opt, last: map[tt][map[tt].length - 1], tfs: have };
+}
+
 /* ---------- Prompt + providers ---------- */
 const AIL_SYSTEM = 'You are a market research assistant inside a paper-trading simulator. You receive numeric chart data as JSON: recent candles, EMAs, RSI, MACD, Guppy ribbon state, candle patterns and sometimes options open interest. ' +
   'Judge the next move using ONLY this data. Reply with a single JSON object and nothing else, with keys: ' +
@@ -14289,18 +14389,19 @@ function ailMock(ctx) {   // deterministic stand-in for a real model: lets the w
   o.reasoning.push('Guppy short ribbon ' + (gu.short_above_long ? 'above' : 'below') + ' long ribbon', 'RSI ' + r, 'MACD histogram ' + h);
   return JSON.stringify(o);
 }
-async function ailCallModel(ctx) {
+async function ailCallModel(ctx, system) {
+  system = system || AIL_SYSTEM;
   const P = AIL_PROVIDERS[ail.cfg.provider];
   if (ail.cfg.provider === 'mock') return ailMock(ctx);
   if (P.viaWorker) {
     if (!phReady()) throw new Error('Set your Worker URL first (Markets > Alerts > phone alerts).');
-    const r = await fetch(PH.url.replace(/\/+$/, '') + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), messages: [{ role: 'system', content: AIL_SYSTEM }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] }) });
+    const r = await fetch(PH.url.replace(/\/+$/, '') + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), messages: [{ role: 'system', content: system }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] }) });
     let j = null; try { j = await r.json(); } catch (e) { /* ignore */ }
     if (!r.ok || !j || !j.ok) throw new Error('Cloudflare AI: ' + ((j && j.error) || 'HTTP ' + r.status));
     return j.text || '';
   }
   if (!ail.cfg.key) throw new Error('Add your API key in the AI panel first.');
-  const body = { model: ail.cfg.model || P.model, temperature: 0.2, max_tokens: 700, messages: [{ role: 'system', content: AIL_SYSTEM }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] };
+  const body = { model: ail.cfg.model || P.model, temperature: 0.2, max_tokens: 900, messages: [{ role: 'system', content: system }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] };
   if (P.json) body.response_format = { type: 'json_object' };
   const res = await fetch(P.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ail.cfg.key }, body: JSON.stringify(body) });
   if (!res.ok) { let t = ''; try { t = (await res.text()).slice(0, 160); } catch (e) { /* ignore */ } throw new Error(res.status === 401 ? 'The API key was rejected (401).' : res.status === 429 ? 'Free-tier rate limit hit (429). Wait a minute and try again.' : 'AI service error ' + res.status + ' ' + t); }
@@ -14368,14 +14469,27 @@ async function ailAnalyzeNow() {
   if (all.length < 60) { ail.msg = 'Need at least 60 candles on the chart. Load more history first.'; ailRender(); return; }
   ail.busy = true; ail.msg = 'Asking the AI…'; ailRender();
   try {
+    if (ail.cfg.tfs.length >= 2 && !ailMtfOk()) throw new Error('Multi-timeframe needs the live chart on a plain symbol like BTCUSD. Clear the timeframe picks to analyse this chart only.');
+    if (ailMtfOk()) {
+      ail.msg = 'Reading ' + ailSortedTfs().join(' + ') + '…'; ailRender();
+      const m = await ailAnalyzeMtf();
+      if (!m.p.ok) { ail.msg = m.p.why; ail.last = { raw: String(m.raw).slice(0, 400) }; }
+      else {
+        const c = m.p.call, rec = Object.assign({ id: Date.now(), ts: Date.now(), sym: LIVE.symbol, tf: m.tt, t: m.last.t, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, mtf: m.tfs, align: m.align, oiRead: m.oiRead, opt: m.opt, status: c.bias === 'neutral' ? 'neutral' : 'open' }, c);
+        ail.journal.push(rec); ailSaveJournal(); ail.last = rec; ail.msg = '';
+        if (ailEligible(rec)) ailPush(rec).then(ok => { if (ok) ailSaveJournal(); ailDock(true); });
+      }
+      ail.busy = false; ailRender(); ailDock(true); return;
+    }
     const ctx = ailContext(all, { symbol: ailSym(), tf: ailTf(), oi: ailOiSummary() }), raw = await ailCallModel(ctx), p = ailParse(raw, ctx.price, ctx.atr14);
     if (!p.ok) { ail.msg = p.why; ail.last = { raw: String(raw).slice(0, 400) }; }
     else {
       const c = p.call, last = all[all.length - 1], rec = Object.assign({ id: Date.now(), ts: Date.now(), sym: ailSym(), tf: ailTf(), t: last.t, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, status: c.bias === 'neutral' ? 'neutral' : 'open' }, c);
       ail.journal.push(rec); ailSaveJournal(); ail.last = rec; ail.msg = '';
+      if (ailEligible(rec)) ailPush(rec).then(ok => { if (ok) { ailSaveJournal(); } ailDock(true); });
     }
   } catch (e) { ail.msg = e.message || String(e); }
-  ail.busy = false; ailRender();
+  ail.busy = false; ailRender(); ailDock(true);
 }
 async function ailResearchRun(n) {
   if (ail.busy) return; n = Math.max(3, Math.min(60, n | 0 || 20));
@@ -14404,8 +14518,87 @@ function ailSetProv(v) { ail.cfg.provider = v; ail.cfg.model = AIL_PROVIDERS[v].
 function ailSetModel(v) { ail.cfg.model = v.trim(); ailSaveCfg(); }
 function ailSetKey(v) { ail.cfg.key = v.trim(); ailSaveCfg(); }
 
+
+/* ---------- Server tracking: the Worker scores live calls against real candles even when this page is closed ---------- */
+const AIL_SRV_TF = ['5m', '15m', '30m', '1h', '4h'];
+function ailEligible(x) { return !x.bt && (x.bias === 'long' || x.bias === 'short') && x.status === 'open' && /^[A-Z0-9]{2,14}$/.test(x.sym || '') && AIL_SRV_TF.includes(x.tf) && typeof phReady === 'function' && phReady(); }
+async function ailPush(x) {
+  const t = liveTimeToSec(x.t); if (t == null) return false;
+  try {
+    const j = await phCall('/aicall', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), call: { id: x.id, sym: x.sym, tf: x.tf, t, bias: x.bias, entry: x.entry, stop: x.stop, target: x.target, hz: x.hz, conf: x.confidence } }) });
+    if (j && j.ok) { x.srv = true; return true; }
+  } catch (e) { /* offline or old Worker: the call is still tracked locally while the app is open */ }
+  return false;
+}
+async function ailSync() {
+  if (ailSync.busy || typeof phReady !== 'function' || !phReady()) return; ailSync.busy = true;
+  try {
+    const j = await phCall('/aistate?token=' + phToken());
+    if (j && j.ok) {
+      const done = new Map((j.done || []).map(d => [d.id, d])), open = new Set(j.open || []); let ch = false;
+      ail.journal.forEach(x => {
+        if (x.bt || x.status !== 'open') return;
+        const d = done.get(x.id);
+        if (d) { Object.assign(x, { status: d.status, r: d.r, bars: d.bars, exit: d.exit }); ch = true; }
+        else if (x.srv && !open.has(x.id)) x.srv = false;   // the Worker lost it: send it again below
+      });
+      for (const x of ail.journal) if (ailEligible(x) && !x.srv && await ailPush(x)) ch = true;
+      if (ch) { ailSaveJournal(); ailRender(); }
+      ailDock(true);
+    }
+  } catch (e) { /* ignore: next sync will retry */ }
+  ailSync.busy = false;
+}
+
+/* ---------- On-chart dock: collapsible AI panel in the chart's top-left corner ---------- */
+const AIL_DOCK = 'tradepro_ai_dock_v1'; let ailDockSig = '';
+function ailDockOpen() { try { return localStorage.getItem(AIL_DOCK) !== 'min'; } catch (e) { return true; } }
+function ailDockToggle() { try { localStorage.setItem(AIL_DOCK, ailDockOpen() ? 'min' : 'open'); } catch (e) { /* ignore */ } ailDock(true); }
+function ailDock(force) {
+  const host = document.getElementById('chart-canvas'); if (!host) return;
+  let el = document.getElementById('ail-dock'); if (!el) { el = document.createElement('div'); el.id = 'ail-dock'; host.appendChild(el); }
+  const sym = ailSym(), tf = ailTf(), mine = ail.journal.filter(x => !x.bt && x.sym === sym), c = mine[mine.length - 1] || null, open = ailDockOpen();
+  const sig = [open, sym, tf, ail.cfg.tfs.join(), ail.busy, c && c.id, c && c.status, c && c.r, mine.length, ail.msg].join('|');
+  if (!force && sig === ailDockSig) return; ailDockSig = sig;
+  const st = ailStats(mine), cls = c ? (c.bias === 'long' ? 'b-long' : c.bias === 'short' ? 'b-short' : 'b-neutral') : 'b-neutral';
+  const stat = !c ? '' : c.status === 'open' ? 'tracking' : c.status === 'neutral' ? 'no trade' : c.status === 'win' ? 'WIN +' + c.r + 'R' : c.status === 'loss' ? 'LOSS -1R' : 'timed out ' + (c.r >= 0 ? '+' : '') + c.r + 'R';
+  const bias = c ? c.bias.toUpperCase() : '';
+  const fp = v => v == null ? '–' : ailEsc(String(v));
+  if (!open) { el.className = 'min'; el.innerHTML = `<button class="ail-pill" onclick="ailDockToggle()" aria-label="Open AI panel">AI${c ? ` <span class="${cls}">${bias}</span>` : ''}${c && c.status !== 'open' && c.status !== 'neutral' ? ` <i class="ail-res ${c.status}">${stat}</i>` : ''}</button>`; return; }
+  el.className = 'open';
+  el.innerHTML = `<div class="ail-dk-h"><b>AI</b><span class="ail-dk-s">${ailEsc(sym)} · ${ailEsc(tf)}</span><button onclick="ailDockToggle()" aria-label="Collapse AI panel">–</button></div>` +
+    (c ? `<div class="ail-dk-b"><span class="${cls}">${bias}</span><span>conf ${c.confidence}</span><span class="ail-res ${c.status}">${stat}</span></div>` +
+      (c.bias !== 'neutral' ? `<div class="ail-dk-g"><div><b>${fp(c.entry)}</b><span>entry</span></div><div><b>${fp(c.stop)}</b><span>stop</span></div><div><b>${fp(c.target)}</b><span>target</span></div></div>` : '') +
+      (c.oiRead ? `<div class="ail-dk-p"><b>OI:</b> ${ailEsc(c.oiRead)}</div>` : '') +
+      (c.opt ? `<div class="ail-dk-p"><b>Option idea:</b> ${ailEsc(ailOptTxt(c.opt))}</div>` : '') +
+      (c.align ? `<div class="ail-dk-p">${ailEsc((c.mtf || []).join('·'))} → ${ailEsc(c.tf)}: ${ailEsc(c.align)}</div>` : '') +
+      (c.patterns && c.patterns.length ? `<div class="ail-dk-p">${c.patterns.map(ailEsc).join(' · ')}</div>` : '') +
+      (c.srv && c.status === 'open' ? `<div class="ail-dk-p">Tracked on your Worker, even with the app closed</div>` : '') : `<div class="ail-dk-p">No AI call on this chart yet.</div>`) +
+    (st.scored ? `<div class="ail-dk-p">Live record: ${st.wins}W · ${st.losses}L${st.open ? ' · ' + st.open + ' open' : ''}</div>` : '') +
+    (ail.msg ? `<div class="ail-dk-p warn">${ailEsc(ail.msg)}</div>` : '') +
+    ailTfChips() + `<div class="ail-dk-a"><button class="pri" onclick="ailAnalyzeNow()" ${ail.busy ? 'disabled' : ''}>${ail.busy ? 'Thinking…' : 'Analyze'}</button><button onclick="ailOpen()">Lab</button></div>`;
+}
+(function () {
+  const css = document.createElement('style');
+  css.textContent = `#ail-dock{position:absolute;top:34px;left:6px;z-index:7;font-family:var(--sans);font-size:11.5px;color:var(--text)}
+#ail-dock.open{width:min(236px,calc(100% - 84px));background:color-mix(in srgb,var(--surface-2) 92%,transparent);border:1px solid var(--border);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(6px);box-shadow:0 4px 18px rgba(0,0,0,.28)}
+#ail-dock .ail-pill{display:flex;gap:6px;align-items:center;background:color-mix(in srgb,var(--surface-2) 92%,transparent);border:1px solid var(--border);color:var(--text);border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;backdrop-filter:blur(6px)}
+.ail-dk-h{display:flex;align-items:center;gap:6px}.ail-dk-h b{font-size:12px}.ail-dk-s{color:var(--text-muted);flex:1;font-family:var(--mono);font-size:10.5px}
+.ail-dk-h button{border:0;background:none;color:var(--text-muted);font-size:16px;line-height:1;cursor:pointer;padding:0 4px}
+.ail-dk-b{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.ail-dk-b>span:first-child{font-weight:800;font-size:13px}
+.ail-dk-g{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.ail-dk-g div{display:flex;flex-direction:column}.ail-dk-g b{font-family:var(--mono);font-size:11.5px}.ail-dk-g span{font-size:10px;color:var(--text-faint)}
+.ail-dk-p{font-size:10.5px;color:var(--text-muted);line-height:1.4}.ail-dk-p.warn{color:var(--warn,#E0A03A)}
+.ail-res{font-style:normal;font-weight:700;font-size:11px;color:var(--text-muted)}.ail-res.win{color:var(--green)}.ail-res.loss{color:var(--red)}
+.ail-chips{display:flex;gap:4px;flex-wrap:wrap}.ail-chips button{border:1px solid var(--border);background:none;color:var(--text-muted);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer}.ail-chips button.on{background:var(--accent,#14C2B0);border-color:transparent;color:#04201c}\n.ail-dk-a{display:flex;gap:6px}.ail-dk-a button{flex:1;border:1px solid var(--border);background:none;color:var(--text);border-radius:7px;padding:5px 0;font-size:11px;font-weight:700;cursor:pointer}.ail-dk-a button.pri{background:var(--accent,#14C2B0);border-color:transparent;color:#04201c}.ail-dk-a button[disabled]{opacity:.5;cursor:default}`;
+  document.head.appendChild(css);
+  setTimeout(() => { ailDock(true); ailSync(); }, 1500);
+  setInterval(() => { ailDock(); }, 4000);
+  setInterval(() => { ailSync(); }, 120000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) ailSync(); });
+})();
+
 /* ---------- UI ---------- */
-function ailOpen() { let el = document.getElementById('ail-bg'); if (!el) { el = document.createElement('div'); el.id = 'ail-bg'; el.onclick = e => { if (e.target === el) ailClose(); }; document.body.appendChild(el); } el.classList.add('open'); ailResolveOpen(); ailRender(); }
+function ailOpen() { let el = document.getElementById('ail-bg'); if (!el) { el = document.createElement('div'); el.id = 'ail-bg'; el.onclick = e => { if (e.target === el) ailClose(); }; document.body.appendChild(el); } el.classList.add('open'); ailResolveOpen(); ailRender(); ailSync(); }
 function ailClose() { const el = document.getElementById('ail-bg'); if (el) el.classList.remove('open'); }
 function ailPct(v) { return v == null ? '–' : Math.round(v * 100) + '%'; }
 function ailRender() {
@@ -14418,10 +14611,13 @@ function ailRender() {
       <div><b>${s.avgR == null ? '–' : (s.avgR >= 0 ? '+' : '') + s.avgR.toFixed(2) + 'R'}</b><span>avg result per trade</span></div></div>` +
       (s.baseN ? `<div class="ail-note">Coin-flip baseline with the same stops and targets: win rate <b>${ailPct(s.baseWin)}</b>, avg <b>${(s.baseR >= 0 ? '+' : '') + s.baseR.toFixed(2)}R</b> (${s.baseN} calls). The AI is only adding value if it beats this.</div>` : '') +
       (s.scored < 30 && s.scored ? `<div class="ail-note warn">Only ${s.scored} scored trades. Results this small are mostly luck, so aim for 50+ before drawing conclusions.</div>` : '') : `<div class="ail-note">${note}</div>`) + `</div>`;
-  const rows = ail.journal.slice(-14).reverse().map(x => `<tr><td>${ailEsc(x.sym)} ${ailEsc(x.tf)}${x.bt ? ' <i>hist</i>' : ''}</td><td class="b-${x.bias}">${x.bias}</td><td>${x.confidence}</td><td>${x.status === 'neutral' ? '–' : ailEsc(x.status)}</td><td>${x.r == null ? '–' : (x.r > 0 ? '+' : '') + x.r + 'R'}</td></tr>`).join('');
+  const rows = ail.journal.slice(-14).reverse().map(x => `<tr><td>${ailEsc(x.sym)} ${ailEsc(x.tf)}${x.bt ? ' <i>hist</i>' : ''}${x.mtf ? ' <i>MTF</i>' : ''}</td><td class="b-${x.bias}">${x.bias}</td><td>${x.confidence}</td><td>${x.status === 'neutral' ? '–' : ailEsc(x.status)}</td><td>${x.r == null ? '–' : (x.r > 0 ? '+' : '') + x.r + 'R'}</td></tr>`).join('');
   const l = ail.last;
   const lastCard = l && l.bias ? `<div class="ail-card"><div class="ail-h">Latest idea <span class="b-${l.bias}">${l.bias.toUpperCase()}</span> · confidence ${l.confidence}</div>` +
     (l.bias === 'neutral' ? '<div class="ail-note">No clear edge right now.</div>' : `<div class="ail-grid"><div><b>${ailEsc(l.entry)}</b><span>entry (price now)</span></div><div><b>${ailEsc(l.stop)}</b><span>stop</span></div><div><b>${ailEsc(l.target)}</b><span>target</span></div><div><b>${l.hz}</b><span>candles to play out</span></div></div>`) +
+    (l.align ? `<div class="ail-note"><b>Timeframes (${ailEsc((l.mtf || []).join(' · '))}):</b> ${ailEsc(l.align)}${l.tf ? ' · managed on ' + ailEsc(l.tf) : ''}</div>` : '') +
+    (l.oiRead ? `<div class="ail-note"><b>OI flow:</b> ${ailEsc(l.oiRead)}</div>` : '') +
+    (l.opt ? `<div class="ail-note"><b>Option idea (not scored):</b> ${ailEsc(ailOptTxt(l.opt))}${l.opt.why ? ' — ' + ailEsc(l.opt.why) : ''}</div>` : '') +
     (l.note ? `<div class="ail-note warn">${ailEsc(l.note)}</div>` : '') +
     (l.patterns.length ? `<div class="ail-tags">${l.patterns.map(p => `<span>${ailEsc(p)}</span>`).join('')}</div>` : '') +
     (l.reasoning.length ? `<ul>${l.reasoning.map(r => `<li>${ailEsc(r)}</li>`).join('')}</ul>` : '') +
@@ -14432,6 +14628,7 @@ function ailRender() {
       <label>AI service<select id="ail-prov" onchange="ailSetProv(this.value)">${Object.keys(AIL_PROVIDERS).map(k => `<option value="${k}" ${k === ail.cfg.provider ? 'selected' : ''}>${AIL_PROVIDERS[k].label}</option>`).join('')}</select></label>
       ${P.needsKey ? `<label>Model<input id="ail-model" value="${ailEsc(ail.cfg.model)}" onchange="ailSetModel(this.value)"></label><label>Your API key (kept only in this browser)<input id="ail-key" type="password" autocomplete="off" value="${ailEsc(ail.cfg.key)}" onchange="ailSetKey(this.value)" placeholder="paste free key"></label>` : '<div class="ail-note">Mock mode uses simple Guppy + RSI + MACD rules instead of a real AI. It is only for checking that everything works.</div>'}
     </div>
+    <div class="ail-card"><div class="ail-h">Timeframes to read together</div>${ailTfChips()}<div class="ail-note">By default the AI reads 4h + 1h + 15m + 5m together with perpetual and options open-interest flow (long/short build-up, unwinding, covering, walls) and gives one trade. Pick 2 to 4 to change it, or none to analyse only the chart you are on (live chart needed). It runs only when you ask.</div></div>
     <div class="ail-actions"><button class="primary" ${ail.busy ? 'disabled' : ''} onclick="ailAnalyzeNow()">Analyze this chart now</button>
       <button ${ail.busy ? 'disabled' : ''} onclick="ailResearchRun(+document.getElementById('ail-n').value)">Research run on history</button>
       <input id="ail-n" type="number" min="3" max="60" value="20" title="How many past moments to test"><span class="ail-sub">points</span>
