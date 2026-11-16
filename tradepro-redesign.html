@@ -14208,6 +14208,7 @@ document.addEventListener('click', function (e) {
 const AIL_KEY = 'tradepro_ai_v1', AIL_JOURNAL = 'tradepro_ai_journal_v1';
 const AIL_PROVIDERS = {
   mock:       { label: 'Mock (offline test, no AI)', model: 'rule-based-mock', needsKey: false },
+  cloudflare: { label: 'Cloudflare AI (via your Worker, no key)', model: 'llama-3.3-70b (set in Worker)', needsKey: false, viaWorker: true, delay: 1500 },
   groq:       { label: 'Groq (free, open models)', model: 'llama-3.3-70b-versatile', url: 'https://api.groq.com/openai/v1/chat/completions', needsKey: true, json: true, delay: 2500 },
   openrouter: { label: 'OpenRouter (free open models)', model: 'meta-llama/llama-3.3-70b-instruct:free', url: 'https://openrouter.ai/api/v1/chat/completions', needsKey: true, json: false, delay: 4000 }
 };
@@ -14291,6 +14292,13 @@ function ailMock(ctx) {   // deterministic stand-in for a real model: lets the w
 async function ailCallModel(ctx) {
   const P = AIL_PROVIDERS[ail.cfg.provider];
   if (ail.cfg.provider === 'mock') return ailMock(ctx);
+  if (P.viaWorker) {
+    if (!phReady()) throw new Error('Set your Worker URL first (Markets > Alerts > phone alerts).');
+    const r = await fetch(PH.url.replace(/\/+$/, '') + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), messages: [{ role: 'system', content: AIL_SYSTEM }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] }) });
+    let j = null; try { j = await r.json(); } catch (e) { /* ignore */ }
+    if (!r.ok || !j || !j.ok) throw new Error('Cloudflare AI: ' + ((j && j.error) || 'HTTP ' + r.status));
+    return j.text || '';
+  }
   if (!ail.cfg.key) throw new Error('Add your API key in the AI panel first.');
   const body = { model: ail.cfg.model || P.model, temperature: 0.2, max_tokens: 700, messages: [{ role: 'system', content: AIL_SYSTEM }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] };
   if (P.json) body.response_format = { type: 'json_object' };

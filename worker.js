@@ -1,6 +1,6 @@
 // TradePro phone alerts: Cloudflare Worker (cron every minute) -> Telegram.
 // Handles price, funding and PCR alerts. Quiet hours: hold and summarize, or drop.
-// Bindings needed: KV namespace TP; secrets BOT_TOKEN, WEBHOOK_SECRET; vars BOT_USERNAME, ALLOWED_ORIGIN.
+// Bindings needed: KV namespace TP; Workers AI binding AI (for the /ai route); secrets BOT_TOKEN, WEBHOOK_SECRET; vars BOT_USERNAME, ALLOWED_ORIGIN.
 
 const BASES = ['https://api.india.delta.exchange', 'https://cdn.india.deltaex.org'];
 const TOKEN_RE = /^[a-f0-9]{32}$/;
@@ -16,6 +16,7 @@ export default {
       if (url.pathname === '/sync' && req.method === 'POST') return await sync(req, env);
       if (url.pathname === '/state' && req.method === 'GET') return await state(url, env);
       if (url.pathname === '/test' && req.method === 'POST') return await test(req, env);
+      if (url.pathname === '/ai' && req.method === 'POST') return await ai(req, env);
       if (url.pathname === '/check' && req.method === 'POST') return await check(req, env);
       if (url.pathname === '/debug') { if (!env.WEBHOOK_SECRET || url.searchParams.get('key') !== env.WEBHOOK_SECRET) return new Response('no', { status: 401 }); return json(env, await debug(env)); }
     } catch (e) { return json(env, { ok: false, error: 'server error' }, 500); }
@@ -109,6 +110,24 @@ async function test(req, env) {
   if (!d || !d.chat) return json(env, { ok: false, error: 'not linked' }, 400);
   const r = await tgSend(env, d.chat, '✅ TradePro test alert. Phone alerts are working.');
   return json(env, { ok: r.ok });
+}
+
+/* ---------- Cloudflare Workers AI (used by the app's AI Lab) ---------- */
+const AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast', AI_DAILY = 300;
+async function ai(req, env) {
+  if (!env.AI) return json(env, { ok: false, error: 'Workers AI binding "AI" is not set on this Worker' }, 501);
+  const b = await body(req);
+  if (!TOKEN_RE.test(b.token || '') || !(await getDev(env, b.token))) return json(env, { ok: false, error: 'open Markets > Alerts once so this device is registered' }, 403);
+  const msgs = (Array.isArray(b.messages) ? b.messages : []).slice(0, 4).map(m => ({ role: m && m.role === 'system' ? 'system' : 'user', content: String((m && m.content) || '').slice(0, 20000) }));
+  if (!msgs.length) return json(env, { ok: false, error: 'no messages' }, 400);
+  const day = new Date().toISOString().slice(0, 10), k = 'aiq:' + b.token + ':' + day, used = +((await env.TP.get(k)) || 0);
+  if (used >= AI_DAILY) return json(env, { ok: false, error: 'daily AI limit reached' }, 429);
+  await env.TP.put(k, String(used + 1), { expirationTtl: 172800 });
+  try {
+    const r = await env.AI.run(AI_MODEL, { messages: msgs, temperature: 0.2, max_tokens: 700 });
+    const t = r && r.response;
+    return json(env, { ok: true, text: typeof t === 'string' ? t : JSON.stringify(t || '') });
+  } catch (e) { return json(env, { ok: false, error: 'AI error: ' + String(e).slice(0, 120) }, 502); }
 }
 
 /* ---------- Telegram ---------- */
