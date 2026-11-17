@@ -513,6 +513,17 @@
   .rb-trig { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
   .rb-trig .seg { margin-top: 0; } .rb-trig .seg-btn { padding: 5px 12px; font-size: 12px; }
   .rb-hint { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; }
+  .rb-ai { background: var(--surface-2); border: 1px solid var(--accent-dim); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .rb-ai-h { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; color: var(--accent); }
+  .rb-ai textarea { width: 100%; resize: vertical; min-height: 64px; font-size: 14px; line-height: 1.5; box-sizing: border-box; }
+  .rb-ai-f { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .rb-ai-b { display: inline-flex; gap: 8px; margin-left: auto; }
+  .rb-ai-note { font-size: 13px; line-height: 1.5; border-radius: 10px; padding: 9px 11px; background: var(--surface); border: 1px solid var(--border-soft); }
+  .rb-ai-note ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-muted); font-size: 12.5px; }
+  .rb-ai-note.warn { border-color: var(--warn); } .rb-ai-note.err { border-color: var(--red); color: var(--red); }
+  .rb-ai-skip { border: 1px solid var(--warn); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 5px; background: var(--surface); }
+  .rb-ai-st { font-size: 13px; font-weight: 500; } .rb-ai-sg { font-size: 12.5px; color: var(--text-muted); border-left: 2px solid var(--border); padding-left: 8px; }
+  .rb-ai-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
   .rb-alerts { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-faint); font-size: 12.5px; margin-top: 12px; }
   .rb-prow { all: unset; cursor: pointer; box-sizing: border-box; width: 100%; display: flex; align-items: stretch; gap: 10px; border-top: 1px solid var(--border-soft); } .rb-prow:hover { background: var(--surface-2); }
   .rb-pbar { width: 3px; flex-shrink: 0; }
@@ -2529,7 +2540,7 @@
       <div class="seg" id="builder-category">
         <button type="button" class="seg-btn" data-cat="bullish" onclick="setCategory('bullish')">Bullish</button>
         <button type="button" class="seg-btn" data-cat="bearish" onclick="setCategory('bearish')">Bearish</button>
-        <button type="button" class="seg-btn" data-cat="neutral" onclick="setCategory('neutral')">Neutral</button>
+        <button type="button" class="seg-btn" data-cat="neutral" onclick="setCategory('neutral')">Others</button>
       </div>
 
       <label class="field-label">Legs</label>
@@ -2606,7 +2617,7 @@
       <div class="seg" id="sscan-cat">
         <button type="button" class="seg-btn" data-cat="bullish" onclick="setSScanCat('bullish')">Bullish</button>
         <button type="button" class="seg-btn" data-cat="bearish" onclick="setSScanCat('bearish')">Bearish</button>
-        <button type="button" class="seg-btn" data-cat="neutral" onclick="setSScanCat('neutral')">Neutral</button>
+        <button type="button" class="seg-btn" data-cat="neutral" onclick="setSScanCat('neutral')">Others</button>
       </div>
 
       <label class="field-label">Underlying</label>
@@ -3260,7 +3271,7 @@ function renderSScans() {
   items.forEach(m => { if (m.match) cnt.match++; cnt[m.cat] = (cnt[m.cat] || 0) + 1; });
   const dotOf = k => k === 'bullish' ? '<i class="sc2-cdot" style="background:var(--green)"></i>' : k === 'bearish' ? '<i class="sc2-cdot" style="background:var(--red)"></i>' : k === 'neutral' ? '<i class="sc2-cdot" style="background:var(--text-muted)"></i>' : '';
   const ce = document.getElementById('sc2-live-chips');
-  if (ce) ce.innerHTML = [['all', 'All'], ['match', 'Match'], ['bullish', 'Bullish'], ['bearish', 'Bearish']].concat(cnt.neutral ? [['neutral', 'Neutral']] : []).map(([k, l]) => `<button class="sc2-chip${scLiveFilter === k ? ' on' : ''}" onclick="scSetLive('${k}')">${dotOf(k)}${l} <span class="sc2-n">${cnt[k]}</span></button>`).join('');
+  if (ce) ce.innerHTML = [['all', 'All'], ['match', 'Match'], ['bullish', 'Bullish'], ['bearish', 'Bearish']].concat(cnt.neutral ? [['neutral', 'Others']] : []).map(([k, l]) => `<button class="sc2-chip${scLiveFilter === k ? ' on' : ''}" onclick="scSetLive('${k}')">${dotOf(k)}${l} <span class="sc2-n">${cnt[k]}</span></button>`).join('');
   const bd = document.getElementById('sc2-live-n'); if (bd) { bd.textContent = cnt.match; bd.classList.toggle('on', cnt.match > 0); }
   const show = items.filter(m => scLiveFilter === 'all' || (scLiveFilter === 'match' ? m.match : m.cat === scLiveFilter)).sort((x, y) => (y.match - x.match) || (x.ord - y.ord));
   el.innerHTML = show.length ? `<div class="sc2-list">${show.map(m => m.html).join('')}</div>` : '<div class="sc2-empty"><b>Nothing in this view</b>No scans match this filter right now.</div>';
@@ -4499,7 +4510,7 @@ var SC_LOCK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" strok
 try { scTabNow = localStorage.getItem('tradepro_sc_tab') || 'live'; } catch (e) { /* storage unavailable */ }
 if (['live', 'perf', 'lib', 'stand'].indexOf(scTabNow) < 0) scTabNow = 'live';
 
-function scCatInfo(c) { return c === 'bearish' ? { col: 'var(--red)', label: 'Bearish', cls: 'bear' } : c === 'neutral' ? { col: 'var(--text-muted)', label: 'Neutral', cls: 'neu' } : { col: 'var(--green)', label: 'Bullish', cls: 'bull' }; }
+function scCatInfo(c) { return c === 'bearish' ? { col: 'var(--red)', label: 'Bearish', cls: 'bear' } : c === 'neutral' ? { col: 'var(--text-muted)', label: 'Others', cls: 'neu' } : { col: 'var(--green)', label: 'Bullish', cls: 'bull' }; }
 /* RULE ENGINE START — pure functions (no DOM, no network). One evaluator serves the live scan, the history view and, later, server-side alerts. */
 var RS_TF = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800, '1M': 2592000 };
 var RS_TF_ORDER = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'];
@@ -4541,8 +4552,145 @@ function rsEmaArr(vals, len) {
   for (let i = len; i < vals.length; i++) out[i] = a * vals[i] + (1 - a) * out[i - 1];
   return out;
 }
-function rsIndSeries(S, ind, len) {
-  const key = ind + ':' + len; if (S.cache[key]) return S.cache[key];
+/* ---- indicator registry: one definition drives the engine, the builder pickers and the AI prompt ---- */
+function rsP(k, label, def, min, max, step, int) { return { k, label, def, min, max, step: step || 1, int: !!int }; }
+var RS_LEN = (def, max, label) => rsP('len', label || 'Length', def, 1, max || 500, 1, true);
+var RS_M = (label, def, min, max, step) => rsP('p2', label, def, min, max, step || 0.1, false);
+var RS_GROUPS = ['Moving averages', 'Trend', 'Momentum', 'Volatility', 'Volume', 'Channels'];
+function rsTr(F, i) { return Math.max(F[i].h - F[i].l, Math.abs(F[i].h - F[i - 1].c), Math.abs(F[i].l - F[i - 1].c)); }
+function rsAtrW(F, len) { const n = F.length, v = new Array(n).fill(null); if (n > len) { let s = 0; for (let i = 1; i <= len; i++) s += rsTr(F, i); v[len] = s / len; for (let i = len + 1; i < n; i++) v[i] = (v[i - 1] * (len - 1) + rsTr(F, i)) / len; } return v; }
+function rsSmaN(v, len) { const n = v.length, o = new Array(n).fill(null), f = v.findIndex(x => x != null); if (f < 0) return o; let s = 0; for (let i = f; i < n; i++) { if (v[i] == null) continue; s += v[i]; if (i - f >= len) s -= v[i - len]; if (i - f >= len - 1) o[i] = s / len; } return o; }
+function rsEmaN(v, len) { const o = new Array(v.length).fill(null), f = v.findIndex(x => x != null); if (f < 0) return o; const t = rsEmaArr(v.slice(f), len); for (let i = 0; i < t.length; i++) o[f + i] = t[i]; return o; }
+function rsWmaN(v, len) { const n = v.length, o = new Array(n).fill(null), f = v.findIndex(x => x != null); if (f < 0) return o; const d = len * (len + 1) / 2; for (let i = f + len - 1; i < n; i++) { let s = 0; for (let j = 0; j < len; j++) s += v[i - len + 1 + j] * (j + 1); o[i] = s / d; } return o; }
+function rsRsiW(cl, len) { const n = cl.length, v = new Array(n).fill(null); if (n <= len) return v; let sg = 0, sl = 0; for (let i = 1; i <= len; i++) { const d = cl[i] - cl[i - 1]; sg += d > 0 ? d : 0; sl += d < 0 ? -d : 0; } let g = sg / len, l = sl / len; v[len] = l === 0 ? 100 : 100 - 100 / (1 + g / l); for (let i = len + 1; i < n; i++) { const d = cl[i] - cl[i - 1]; g = (g * (len - 1) + (d > 0 ? d : 0)) / len; l = (l * (len - 1) + (d < 0 ? -d : 0)) / len; v[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); } return v; }
+function rsWinHL(F, i, len) { let hh = -Infinity, ll = Infinity; for (let j = i - len + 1; j <= i; j++) { if (F[j].h > hh) hh = F[j].h; if (F[j].l < ll) ll = F[j].l; } return [hh, ll]; }
+function rsSuper(F, len, m) {
+  const n = F.length, line = new Array(n).fill(null), dir = new Array(n).fill(null), atr = rsAtrW(F, len); if (n <= len) return { v: line, dir };
+  let fu = 0, fl = 0, d = 1;
+  for (let i = len; i < n; i++) {
+    const hl2 = (F[i].h + F[i].l) / 2, bu = hl2 + m * atr[i], bl = hl2 - m * atr[i];
+    if (i === len) { fu = bu; fl = bl; d = F[i].c > hl2 ? 1 : -1; }
+    else { const pfu = fu, pfl = fl, pc = F[i - 1].c; fu = (bu < pfu || pc > pfu) ? bu : pfu; fl = (bl > pfl || pc < pfl) ? bl : pfl; if (d === -1) d = F[i].c > fu ? 1 : -1; else d = F[i].c < fl ? -1 : 1; }
+    line[i] = d === 1 ? fl : fu; dir[i] = d;
+  }
+  return { v: line, dir };
+}
+function rsPsar(F, step) {
+  const n = F.length, v = new Array(n).fill(null); if (n < 3) return { v };
+  let up = F[1].c >= F[0].c, ep = up ? F[1].h : F[1].l, sar = up ? F[0].l : F[0].h, af = step; const mx = step * 10;
+  for (let i = 2; i < n; i++) {
+    sar = sar + af * (ep - sar);
+    if (up) { sar = Math.min(sar, F[i - 1].l, F[i - 2].l); if (F[i].l < sar) { up = false; sar = ep; ep = F[i].l; af = step; } else if (F[i].h > ep) { ep = F[i].h; af = Math.min(af + step, mx); } }
+    else { sar = Math.max(sar, F[i - 1].h, F[i - 2].h); if (F[i].h > sar) { up = true; sar = ep; ep = F[i].h; af = step; } else if (F[i].l < ep) { ep = F[i].l; af = Math.min(af + step, mx); } }
+    v[i] = sar;
+  }
+  return { v };
+}
+function rsAdx(F, len) {
+  const n = F.length, pdi = new Array(n).fill(null), mdi = new Array(n).fill(null), adx = new Array(n).fill(null); if (n < len * 2) return { v: adx, pdi, mdi };
+  let str = 0, sp = 0, sm = 0; const dx = [];
+  const dm = i => { const up = F[i].h - F[i - 1].h, dn = F[i - 1].l - F[i].l; return [up > dn && up > 0 ? up : 0, dn > up && dn > 0 ? dn : 0]; };
+  for (let i = 1; i <= len; i++) { const [p, q] = dm(i); sp += p; sm += q; str += rsTr(F, i); }
+  for (let i = len; i < n; i++) {
+    if (i > len) { const [p, q] = dm(i); str = str - str / len + rsTr(F, i); sp = sp - sp / len + p; sm = sm - sm / len + q; }
+    pdi[i] = str ? 100 * sp / str : 0; mdi[i] = str ? 100 * sm / str : 0; const s = pdi[i] + mdi[i]; dx[i] = s ? 100 * Math.abs(pdi[i] - mdi[i]) / s : 0;
+  }
+  let a = 0; for (let i = len; i < 2 * len; i++) a += dx[i]; a /= len; adx[2 * len - 1] = a;
+  for (let i = 2 * len; i < n; i++) { a = (a * (len - 1) + dx[i]) / len; adx[i] = a; }
+  return { v: adx, pdi, mdi };
+}
+function rsBoll(F, len, m) {
+  const n = F.length, cl = F.map(x => x.c), mid = rsSmaN(cl, len), up = new Array(n).fill(null), lo = new Array(n).fill(null), w = new Array(n).fill(null), pb = new Array(n).fill(null);
+  for (let i = len - 1; i < n; i++) { let s = 0; for (let j = i - len + 1; j <= i; j++) s += (cl[j] - mid[i]) * (cl[j] - mid[i]); const sd = Math.sqrt(s / len); up[i] = mid[i] + m * sd; lo[i] = mid[i] - m * sd; w[i] = mid[i] ? (up[i] - lo[i]) / mid[i] * 100 : null; pb[i] = up[i] === lo[i] ? 0.5 : (cl[i] - lo[i]) / (up[i] - lo[i]); }
+  return { up, lo, w, pb };
+}
+function rsStoch(F, len, sm) { const n = F.length, raw = new Array(n).fill(null); for (let i = len - 1; i < n; i++) { const [hh, ll] = rsWinHL(F, i, len); raw[i] = hh === ll ? 50 : (F[i].c - ll) / (hh - ll) * 100; } const k = rsSmaN(raw, Math.max(1, sm)); return { k, d: rsSmaN(k, 3) }; }
+function rsIchi(F) {
+  const n = F.length, t = new Array(n).fill(null), k = new Array(n).fill(null), b = new Array(n).fill(null), a = new Array(n).fill(null), sb = new Array(n).fill(null);
+  for (let i = 0; i < n; i++) { if (i >= 8) { const [h, l] = rsWinHL(F, i, 9); t[i] = (h + l) / 2; } if (i >= 25) { const [h, l] = rsWinHL(F, i, 26); k[i] = (h + l) / 2; } if (i >= 51) { const [h, l] = rsWinHL(F, i, 52); b[i] = (h + l) / 2; } }
+  for (let i = 26; i < n; i++) { if (t[i - 26] != null && k[i - 26] != null) a[i] = (t[i - 26] + k[i - 26]) / 2; sb[i] = b[i - 26]; }
+  return { t, k, a, sb };
+}
+function rsRollSum(v, len) { const n = v.length, o = new Array(n).fill(null); let s = 0; for (let i = 0; i < n; i++) { s += v[i]; if (i >= len) s -= v[i - len]; if (i >= len - 1) o[i] = s; } return o; }
+
+var RS_DEF = {
+  /* Moving averages */
+  ema: { label: 'EMA', g: 'Moving averages', par: [RS_LEN(20)] },
+  sma: { label: 'SMA', g: 'Moving averages', par: [RS_LEN(50)] },
+  wma: { label: 'WMA', g: 'Moving averages', par: [RS_LEN(20)], need: p => p.len + 3, calc: (F, L) => ({ v: rsWmaN(F.map(x => x.c), L) }) },
+  hma: { label: 'Hull MA', g: 'Moving averages', par: [RS_LEN(21)], need: p => p.len + Math.ceil(Math.sqrt(p.len)) + 3, calc: (F, L) => { const c = F.map(x => x.c), a = rsWmaN(c, Math.max(1, Math.floor(L / 2))), b = rsWmaN(c, L), r = c.map((_, i) => a[i] != null && b[i] != null ? 2 * a[i] - b[i] : null); return { v: rsWmaN(r, Math.max(1, Math.round(Math.sqrt(L)))) }; } },
+  vwma: { label: 'Volume-weighted MA', g: 'Moving averages', par: [RS_LEN(20)], need: p => p.len + 3, calc: (F, L) => { const pv = rsRollSum(F.map(x => x.c * x.v), L), vv = rsRollSum(F.map(x => x.v), L); return { v: pv.map((x, i) => x == null ? null : vv[i] ? x / vv[i] : F[i].c) }; } },
+  dema: { label: 'Double EMA', g: 'Moving averages', par: [RS_LEN(20)], need: p => p.len * 5, calc: (F, L) => { const e1 = rsEmaN(F.map(x => x.c), L), e2 = rsEmaN(e1, L); return { v: e1.map((x, i) => x != null && e2[i] != null ? 2 * x - e2[i] : null) }; } },
+  tema: { label: 'Triple EMA', g: 'Moving averages', par: [RS_LEN(20)], need: p => p.len * 7, calc: (F, L) => { const e1 = rsEmaN(F.map(x => x.c), L), e2 = rsEmaN(e1, L), e3 = rsEmaN(e2, L); return { v: e1.map((x, i) => x != null && e2[i] != null && e3[i] != null ? 3 * x - 3 * e2[i] + e3[i] : null) }; } },
+  /* Trend */
+  st: { label: 'Supertrend', g: 'Trend', par: [RS_LEN(10, 100, 'ATR length'), RS_M('Multiplier', 3, 0.1, 20)], need: p => p.len * 3 + 5, calc: (F, L, M) => { const r = rsSuper(F, L, M); return { v: r.v }; } },
+  stdir: { label: 'Supertrend direction', g: 'Trend', note: '1 = uptrend, -1 = downtrend', par: [RS_LEN(10, 100, 'ATR length'), RS_M('Multiplier', 3, 0.1, 20)], need: p => p.len * 3 + 5, calc: (F, L, M) => { const r = rsSuper(F, L, M); return { v: r.dir }; } },
+  psar: { label: 'Parabolic SAR', g: 'Trend', par: [RS_M('Step', 0.02, 0.001, 0.2, 0.001)], need: () => 60, calc: (F, L, M) => rsPsar(F, M) },
+  adx: { label: 'ADX', g: 'Trend', par: [RS_LEN(14, 100)], need: p => p.len * 4, calc: (F, L) => ({ v: rsAdx(F, L).v }) },
+  pdi: { label: '+DI', g: 'Trend', par: [RS_LEN(14, 100)], need: p => p.len * 4, calc: (F, L) => ({ v: rsAdx(F, L).pdi }) },
+  mdi: { label: '-DI', g: 'Trend', par: [RS_LEN(14, 100)], need: p => p.len * 4, calc: (F, L) => ({ v: rsAdx(F, L).mdi }) },
+  aroonup: { label: 'Aroon up', g: 'Trend', par: [RS_LEN(25, 200)], need: p => p.len + 3, calc: (F, L) => { const v = new Array(F.length).fill(null); for (let i = L; i < F.length; i++) { let ix = i - L; for (let j = i - L; j <= i; j++) if (F[j].h >= F[ix].h) ix = j; v[i] = 100 * (L - (i - ix)) / L; } return { v }; } },
+  aroondn: { label: 'Aroon down', g: 'Trend', par: [RS_LEN(25, 200)], need: p => p.len + 3, calc: (F, L) => { const v = new Array(F.length).fill(null); for (let i = L; i < F.length; i++) { let ix = i - L; for (let j = i - L; j <= i; j++) if (F[j].l <= F[ix].l) ix = j; v[i] = 100 * (L - (i - ix)) / L; } return { v }; } },
+  ichtenkan: { label: 'Ichimoku conversion (9)', g: 'Trend', par: [], need: () => 100, calc: F => ({ v: rsIchi(F).t }) },
+  ichkijun: { label: 'Ichimoku base (26)', g: 'Trend', par: [], need: () => 100, calc: F => ({ v: rsIchi(F).k }) },
+  ichspana: { label: 'Ichimoku span A (cloud)', g: 'Trend', note: 'The cloud value at this candle (plotted 26 candles ahead)', par: [], need: () => 120, calc: F => ({ v: rsIchi(F).a }) },
+  ichspanb: { label: 'Ichimoku span B (cloud)', g: 'Trend', note: 'The cloud value at this candle (plotted 26 candles ahead)', par: [], need: () => 120, calc: F => ({ v: rsIchi(F).sb }) },
+  /* Momentum */
+  rsi: { label: 'RSI', g: 'Momentum', par: [RS_LEN(14, 200)] },
+  stochk: { label: 'Stochastic %K', g: 'Momentum', par: [RS_LEN(14, 200, 'Length'), rsP('p2', 'Smoothing', 3, 1, 50, 1, true)], need: p => p.len + p.p2 + 6, calc: (F, L, M) => ({ v: rsStoch(F, L, M).k }) },
+  stochd: { label: 'Stochastic %D', g: 'Momentum', par: [RS_LEN(14, 200, 'Length'), rsP('p2', 'Smoothing', 3, 1, 50, 1, true)], need: p => p.len + p.p2 + 8, calc: (F, L, M) => ({ v: rsStoch(F, L, M).d }) },
+  stochrsi: { label: 'Stochastic RSI %K', g: 'Momentum', par: [RS_LEN(14, 100), rsP('p2', 'Smoothing', 3, 1, 50, 1, true)], need: p => p.len * 3 + p.p2 + 6, calc: (F, L, M) => { const r = rsRsiW(F.map(x => x.c), L), n = r.length, raw = new Array(n).fill(null); for (let i = 2 * L - 1; i < n; i++) { let hi = -Infinity, lo = Infinity, ok = true; for (let j = i - L + 1; j <= i; j++) { if (r[j] == null) { ok = false; break; } if (r[j] > hi) hi = r[j]; if (r[j] < lo) lo = r[j]; } if (ok) raw[i] = hi === lo ? 50 : (r[i] - lo) / (hi - lo) * 100; } return { v: rsSmaN(raw, Math.max(1, M)) }; } },
+  macd: { label: 'MACD line', g: 'Momentum', par: [] },
+  macdsig: { label: 'MACD signal', g: 'Momentum', par: [] },
+  macdhist: { label: 'MACD histogram', g: 'Momentum', par: [], need: () => 26 * 3 + 18, calc: F => { const cl = F.map(x => x.c), ef = rsEmaArr(cl, 12), es = rsEmaArr(cl, 26), n = cl.length, m = new Array(n).fill(null); for (let i = 0; i < n; i++) if (ef[i] != null && es[i] != null) m[i] = ef[i] - es[i]; const first = m.findIndex(x => x != null), h = new Array(n).fill(null); if (first >= 0) { const sg = rsEmaArr(m.slice(first), 9); for (let i = 0; i < sg.length; i++) if (sg[i] != null) h[first + i] = m[first + i] - sg[i]; } return { v: h }; } },
+  cci: { label: 'CCI', g: 'Momentum', par: [RS_LEN(20, 200)], need: p => p.len * 2 + 2, calc: (F, L) => { const n = F.length, tp = F.map(x => (x.h + x.l + x.c) / 3), sm = rsSmaN(tp, L), v = new Array(n).fill(null); for (let i = L - 1; i < n; i++) { let md = 0; for (let j = i - L + 1; j <= i; j++) md += Math.abs(tp[j] - sm[i]); md /= L; v[i] = md === 0 ? 0 : (tp[i] - sm[i]) / (0.015 * md); } return { v }; } },
+  willr: { label: 'Williams %R', g: 'Momentum', par: [RS_LEN(14, 200)], need: p => p.len + 3, calc: (F, L) => { const v = new Array(F.length).fill(null); for (let i = L - 1; i < F.length; i++) { const [hh, ll] = rsWinHL(F, i, L); v[i] = hh === ll ? -50 : -100 * (hh - F[i].c) / (hh - ll); } return { v }; } },
+  roc: { label: 'Rate of change %', g: 'Momentum', par: [RS_LEN(10, 200)], need: p => p.len + 3, calc: (F, L) => ({ v: F.map((x, i) => i >= L && F[i - L].c ? (x.c / F[i - L].c - 1) * 100 : null) }) },
+  mom: { label: 'Momentum', g: 'Momentum', par: [RS_LEN(10, 200)], need: p => p.len + 3, calc: (F, L) => ({ v: F.map((x, i) => i >= L ? x.c - F[i - L].c : null) }) },
+  mfi: { label: 'MFI', g: 'Momentum', par: [RS_LEN(14, 200)], need: p => p.len + 3, calc: (F, L) => { const n = F.length, tp = F.map(x => (x.h + x.l + x.c) / 3), v = new Array(n).fill(null); for (let i = L; i < n; i++) { let ps = 0, ng = 0; for (let j = i - L + 1; j <= i; j++) { const fl = tp[j] * F[j].v; if (tp[j] > tp[j - 1]) ps += fl; else if (tp[j] < tp[j - 1]) ng += fl; } v[i] = ng === 0 ? 100 : 100 - 100 / (1 + ps / ng); } return { v }; } },
+  ao: { label: 'Awesome oscillator', g: 'Momentum', par: [], need: () => 45, calc: F => { const md = F.map(x => (x.h + x.l) / 2), a = rsSmaN(md, 5), b = rsSmaN(md, 34); return { v: md.map((_, i) => a[i] != null && b[i] != null ? a[i] - b[i] : null) }; } },
+  /* Volatility */
+  atr: { label: 'ATR', g: 'Volatility', par: [RS_LEN(14, 200)] },
+  bbup: { label: 'Bollinger upper', g: 'Volatility', par: [RS_LEN(20, 200), RS_M('Std dev', 2, 0.1, 10)], need: p => p.len + 3, calc: (F, L, M) => ({ v: rsBoll(F, L, M).up }) },
+  bblo: { label: 'Bollinger lower', g: 'Volatility', par: [RS_LEN(20, 200), RS_M('Std dev', 2, 0.1, 10)], need: p => p.len + 3, calc: (F, L, M) => ({ v: rsBoll(F, L, M).lo }) },
+  bbw: { label: 'Bollinger width %', g: 'Volatility', note: 'Band width as a percent of the middle band. Low values mean a squeeze.', par: [RS_LEN(20, 200), RS_M('Std dev', 2, 0.1, 10)], need: p => p.len + 3, calc: (F, L, M) => ({ v: rsBoll(F, L, M).w }) },
+  bbpb: { label: 'Bollinger %B', g: 'Volatility', note: '0 = on the lower band, 1 = on the upper band', par: [RS_LEN(20, 200), RS_M('Std dev', 2, 0.1, 10)], need: p => p.len + 3, calc: (F, L, M) => ({ v: rsBoll(F, L, M).pb }) },
+  kcup: { label: 'Keltner upper', g: 'Volatility', par: [RS_LEN(20, 200), RS_M('ATR multiple', 2, 0.1, 10)], need: p => p.len * 3 + 15, calc: (F, L, M) => { const e = rsEmaN(F.map(x => x.c), L), a = rsAtrW(F, 10); return { v: e.map((x, i) => x != null && a[i] != null ? x + M * a[i] : null) }; } },
+  kclo: { label: 'Keltner lower', g: 'Volatility', par: [RS_LEN(20, 200), RS_M('ATR multiple', 2, 0.1, 10)], need: p => p.len * 3 + 15, calc: (F, L, M) => { const e = rsEmaN(F.map(x => x.c), L), a = rsAtrW(F, 10); return { v: e.map((x, i) => x != null && a[i] != null ? x - M * a[i] : null) }; } },
+  /* Volume */
+  avgvol: { label: 'Avg volume', g: 'Volume', par: [RS_LEN(20)] },
+  obv: { label: 'On-balance volume', g: 'Volume', note: 'Compare with itself a few candles ago to see the trend', par: [], need: () => 30, calc: F => { const v = new Array(F.length).fill(null); if (F.length) v[0] = 0; for (let i = 1; i < F.length; i++) v[i] = v[i - 1] + (F[i].c > F[i - 1].c ? F[i].v : F[i].c < F[i - 1].c ? -F[i].v : 0); return { v }; } },
+  cmf: { label: 'Chaikin money flow', g: 'Volume', par: [RS_LEN(20, 200)], need: p => p.len + 3, calc: (F, L) => { const mv = rsRollSum(F.map(x => x.h === x.l ? 0 : ((x.c - x.l) - (x.h - x.c)) / (x.h - x.l) * x.v), L), vv = rsRollSum(F.map(x => x.v), L); return { v: mv.map((x, i) => x == null ? null : vv[i] ? x / vv[i] : 0) }; } },
+  vwap: { label: 'VWAP', g: 'Volume', note: 'Length 0 restarts every day (00:00 UTC). A length above 0 is a rolling VWAP.', par: [rsP('len', 'Length (0 = daily)', 0, 0, 500, 1, true)], need: p => p.len ? p.len + 3 : 300, calc: (F, L) => { const n = F.length, v = new Array(n).fill(null), tp = F.map(x => (x.h + x.l + x.c) / 3); if (L > 0) { const pv = rsRollSum(tp.map((t, i) => t * F[i].v), L), vv = rsRollSum(F.map(x => x.v), L); for (let i = 0; i < n; i++) if (pv[i] != null) v[i] = vv[i] ? pv[i] / vv[i] : tp[i]; } else { let day = null, cp = 0, cv = 0; for (let i = 0; i < n; i++) { const d = Math.floor((F[i].ts || 0) / 86400); if (d !== day) { day = d; cp = 0; cv = 0; } cp += tp[i] * F[i].v; cv += F[i].v; v[i] = cv ? cp / cv : tp[i]; } } return { v }; } },
+  /* Channels */
+  hh: { label: 'Highest high', g: 'Channels', note: 'Over the previous candles, not counting the current one', par: [RS_LEN(20)] },
+  ll: { label: 'Lowest low', g: 'Channels', note: 'Over the previous candles, not counting the current one', par: [RS_LEN(20)] }
+};
+Object.keys(RS_DEF).forEach(k => { RS_IND_LABEL[k] = RS_DEF[k].label; });
+// Resolve a source's parameters: missing values fall back to the defaults, out-of-range values are clamped.
+function rsPar(s, D) {
+  D = D || RS_DEF[s.ind] || { par: [] }; const o = {};
+  D.par.forEach(p => { let v = parseFloat(s[p.k]); if (!isFinite(v)) v = p.def; v = Math.max(p.min, Math.min(p.max, v)); o[p.k] = p.int ? Math.round(v) : v; });
+  return o;
+}
+function rsParamErr(s) {
+  const D = RS_DEF[s.ind]; if (!D) return 'Pick an indicator.';
+  for (const p of D.par) { const raw = s[p.k]; if (raw === undefined || raw === null || raw === '') continue; const v = parseFloat(raw); if (!isFinite(v) || v < p.min || v > p.max) return D.label + ': ' + p.label.toLowerCase() + ' must be between ' + p.min + ' and ' + p.max + '.'; }
+  return '';
+}
+function rsIndName(s) { const D = RS_DEF[s.ind]; if (!D) return String(s.ind); if (s.ind === 'vwap' && !rsPar(s, D).len) return 'VWAP (daily)'; const pr = rsPar(s, D), ps = D.par.map(p => pr[p.k]); return D.label + (ps.length ? ' ' + ps.join(', ') : ''); }
+function rsDefOf(s, key) { const D = RS_DEF[s.ind], p = D && D.par.find(q => q.k === key); return p ? p.def : 0; }
+function rsRegVal(src, D, S, i, pos, k) {
+  const pr = rsPar(src, D), ser = rsIndSeries(S, src.ind, pr.len, pr.p2);
+  if (k > 0) return ser.v[pos];
+  const P = S.part[i], Fp = S.finals[pos]; if (!P || !Fp) return null;
+  if (P.o === Fp.o && P.h === Fp.h && P.l === Fp.l && P.c === Fp.c && P.v === Fp.v) return ser.v[pos];   // the candle is complete: the stored value is exact
+  const from = Math.max(0, pos - Math.max(600, (D.need ? D.need(pr) : 0) + 60)), arr = S.finals.slice(from, pos);
+  arr.push({ ts: Fp.ts, o: P.o, h: P.h, l: P.l, c: P.c, v: P.v });   // the forming higher-timeframe candle as it stands now
+  return D.calc(arr, pr.len, pr.p2).v[arr.length - 1];
+}
+function rsIndSeries(S, ind, len, p2) {
+  const key = ind + ':' + len + ':' + (p2 == null ? '' : p2); if (S.cache[key]) return S.cache[key];
   const F = S.finals, n = F.length, cl = F.map(x => x.c); let o;
   if (ind === 'ema') o = { v: rsEmaArr(cl, len) };
   else if (ind === 'sma') { const v = new Array(n).fill(null); let s = 0; for (let i = 0; i < n; i++) { s += cl[i]; if (i >= len) s -= cl[i - len]; if (i >= len - 1) v[i] = s / len; } o = { v };
@@ -4572,11 +4720,13 @@ function rsIndSeries(S, ind, len) {
     const first = m.findIndex(x => x != null), sig = new Array(n).fill(null);
     if (first >= 0) { const tail = rsEmaArr(m.slice(first), 9); for (let i = 0; i < tail.length; i++) sig[first + i] = tail[i]; }
     o = { v: ind === 'macd' ? m : sig, ef, es, m, sig };
+  } else if (RS_DEF[ind] && RS_DEF[ind].calc) { o = RS_DEF[ind].calc(F, len, p2);
   } else o = { v: new Array(n).fill(null) };
   S.cache[key] = o; return o;
 }
 // Value of an indicator for the candle at `pos`; when k === 0 it is the CURRENT candle (still forming at higher timeframes), built from the previous completed ones plus the candle so far.
 function rsIndVal(src, S, i, pos, k) {
+  const D0 = RS_DEF[src.ind]; if (D0 && D0.calc) return rsRegVal(src, D0, S, i, pos, k);
   const len = Math.max(1, src.len | 0 || 14), ind = src.ind, P = S.part[i], F = S.finals, ser = rsIndSeries(S, ind, len);
   if (k > 0) return ser.v[pos];
   if (pos < 1) return null;
@@ -4617,7 +4767,7 @@ function rsNeedCandles(rules, baseTf) {
   rsSources(rules).forEach(s => {
     const ratio = Math.max(1, RS_TF[s.tf] / RS_TF[baseTf]), L = Math.max(1, s.len | 0 || 14), k = s.back | 0;
     let cnt = k + 3;
-    if (s.type === 'ind') cnt += s.ind === 'macd' || s.ind === 'macdsig' ? 26 * 3 + 18 : (s.ind === 'ema' || s.ind === 'rsi' || s.ind === 'atr') ? L * 3 : L;
+    if (s.type === 'ind') cnt += RS_DEF[s.ind] && RS_DEF[s.ind].need ? RS_DEF[s.ind].need(rsPar(s, RS_DEF[s.ind])) : s.ind === 'macd' || s.ind === 'macdsig' ? 26 * 3 + 18 : (s.ind === 'ema' || s.ind === 'rsi' || s.ind === 'atr') ? L * 3 : L;
     need = Math.max(need, Math.ceil((cnt + 1) * ratio + ratio));
   });
   return need;
@@ -4630,7 +4780,11 @@ function rsCtx(rules, base, baseTf) {
 function rsEvalAt(sc, ctx, i) {
   const det = (sc.rules || []).map(r => {
     const a = rsVal(r.a, i, ctx), b = rsVal(r.b, i, ctx); if (a == null || b == null) return null;
-    if (r.op === 'x>' || r.op === 'x<') { if (i < 1) return null; const a1 = rsVal(r.a, i - 1, ctx), b1 = rsVal(r.b, i - 1, ctx); if (a1 == null || b1 == null) return null; return r.op === 'x>' ? (a1 <= b1 && a > b) : (a1 >= b1 && a < b); }
+    if (r.op === 'x>' || r.op === 'x<') {   // `within` = how many recent candles the cross may have happened in (1 = this candle only)
+      if (i < 1) return null; const W = Math.max(1, Math.min(10, r.within | 0 || 1)); let any = false, known = false;
+      for (let w = 0; w < W && i - w >= 1; w++) { const j = i - w, aj = w === 0 ? a : rsVal(r.a, j, ctx), bj = w === 0 ? b : rsVal(r.b, j, ctx), a1 = rsVal(r.a, j - 1, ctx), b1 = rsVal(r.b, j - 1, ctx); if (aj == null || bj == null || a1 == null || b1 == null) continue; known = true; if (r.op === 'x>' ? (a1 <= b1 && aj > bj) : (a1 >= b1 && aj < bj)) { any = true; break; } }
+      return known ? any : null;
+    }
     return r.op === '<' ? a < b : a > b;
   });
   let ok;
@@ -4672,6 +4826,7 @@ function rsPersist() { try { localStorage.setItem(RS_KEY, JSON.stringify(rscans)
 function rP(field, tf, back) { return { type: 'price', field, tf, back: back | 0 }; }
 function rI(ind, len, tf, back, mult) { return { type: 'ind', ind, len, tf, back: back | 0, mult: mult == null ? 1 : mult }; }
 function rN(v) { return { type: 'num', value: v }; }
+function rIp(ind, len, p2, tf, back, mult) { const o = rI(ind, len, tf, back, mult); o.p2 = p2; return o; }
 function rR(a, op, b) { return { a, op, b }; }
 function rsGreen(tf, k) { return rR(rP('close', tf, k), '>', rP('open', tf, k)); }
 function rsRed(tf, k) { return rR(rP('close', tf, k), '<', rP('open', tf, k)); }
@@ -4699,6 +4854,13 @@ var RS_PRESETS = [
   { id: 'vol_dn', cat: 'bearish', name: 'Volume breakdown', desc: 'Price closes below the 20-day low on 1.5x average volume',
     rules: [rR(rP('close', '1d', 0), '<', rI('ll', 20, '1d', 0)), rR(rP('volume', '1d', 0), '>', rI('avgvol', 20, '1d', 0, 1.5))] },
   { id: 'vol_burst', cat: 'neutral', name: 'Volume burst', desc: 'The latest hourly volume is more than 3x its 20-hour average', rules: [rR(rP('volume', '1h', 0), '>', rI('avgvol', 20, '1h', 0, 3))] }
+,
+  { id: 'st_up', cat: 'bullish', name: 'Supertrend flips up', desc: 'Daily close crosses above the Supertrend (10, 3) line', rules: [rR(rP('close', '1d', 0), 'x>', rIp('st', 10, 3, '1d', 0))] },
+  { id: 'st_dn', cat: 'bearish', name: 'Supertrend flips down', desc: 'Daily close crosses below the Supertrend (10, 3) line', rules: [rR(rP('close', '1d', 0), 'x<', rIp('st', 10, 3, '1d', 0))] },
+  { id: 'trend_combo', cat: 'bullish', name: 'Trend breakout: EMA 20, Supertrend, SMA 200', desc: 'Close above EMA 20 and SMA 200, and a Supertrend cross up within the last 3 candles',
+    rules: [rR(rP('close', '1d', 0), '>', rI('ema', 20, '1d', 0)), Object.assign(rR(rP('close', '1d', 0), 'x>', rIp('st', 10, 3, '1d', 0)), { within: 3 }), rR(rP('close', '1d', 0), '>', rI('sma', 200, '1d', 0))] },
+  { id: 'adx_trend', cat: 'bullish', name: 'Strong uptrend (ADX)', desc: 'ADX above 25 and +DI crosses above -DI', rules: [rR(rI('adx', 14, '1d', 0), '>', rN(25)), rR(rI('pdi', 14, '1d', 0), 'x>', rI('mdi', 14, '1d', 0))] },
+  { id: 'bb_squeeze', cat: 'neutral', name: 'Bollinger squeeze', desc: 'Band width below 5% of the middle band', rules: [rR(rIp('bbw', 20, 2, '1d', 0), '<', rN(5))] }
 ];
 RS_PRESETS.forEach(p => { p.mode = 'all'; });
 
@@ -4708,10 +4870,10 @@ function rsSrcText(s) {
   if (s.type === 'num') return String(s.value);
   const when = (s.back | 0) === 0 ? '' : ' (' + (s.back | 0) + ' ago)', tf = RS_TF_LABEL[s.tf] || s.tf;
   if (s.type === 'price') return tf + ' ' + s.field + when;
-  const m = s.mult != null && s.mult !== '' && +s.mult !== 1 ? s.mult + '\u00d7 ' : '', hasLen = s.ind !== 'macd' && s.ind !== 'macdsig';
-  return m + RS_IND_LABEL[s.ind] + (hasLen ? ' ' + (s.len | 0) : '') + ' on ' + tf.toLowerCase() + when;
+  const m = s.mult != null && s.mult !== '' && +s.mult !== 1 ? s.mult + '\u00d7 ' : '';
+  return m + rsIndName(s) + ' on ' + tf.toLowerCase() + when;
 }
-function rsRuleText(r) { return rsSrcText(r.a) + ' ' + (RS_OPS[r.op] || r.op) + ' ' + rsSrcText(r.b); }
+function rsRuleText(r) { return rsSrcText(r.a) + ' ' + (RS_OPS[r.op] || r.op) + ' ' + rsSrcText(r.b) + ((r.op === 'x>' || r.op === 'x<') && (r.within | 0) > 1 ? ' (within the last ' + (r.within | 0) + ' candles)' : ''); }
 
 /* ---- data ---- */
 async function rsFetchBase(sym, tf, count) {
@@ -4984,7 +5146,7 @@ var RB_CHEV = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" strok
 function rbBlankRule() { return rR(rP('close', '1d', 0), '>', rI('ema', 10, '1d', 0)); }
 function rbNewDraft() { return { name: '', cat: 'neutral', vis: 'private', market: 'crypto', symbols: RS_MARKETS.crypto.symbols.slice(), mode: 'all', rules: [rbBlankRule()], alerts: null }; }
 function rbShow() {
-  rbSel = null; rbScopeOpen = false; rbAutoR = null; rbAutoState = 'idle'; rbAutoMsg = '';
+  rbAi = rbAiBlank(); rbSel = null; rbScopeOpen = false; rbAutoR = null; rbAutoState = 'idle'; rbAutoMsg = '';
   document.getElementById('rb-title').textContent = rbEditing == null ? 'New scanner' : 'Edit scanner';
   rbRender(); document.getElementById('rb-overlay').classList.add('open'); rbDirty();
 }
@@ -5002,8 +5164,8 @@ function rbSrcLabel(s) {
   const when = (s.back | 0) === 0 ? 'now' : (s.back | 0) + ' ago';
   if (s.type === 'num') return '<b>' + (s.value === '' || s.value == null ? '\u2026' : sscanEsc(String(s.value))) + '</b>';
   if (s.type === 'price') return `${RS_TF_LABEL[s.tf] || s.tf} ${s.field} <small>${when}</small>`;
-  const hasLen = s.ind !== 'macd' && s.ind !== 'macdsig', m = s.mult != null && s.mult !== '' && +s.mult !== 1 ? s.mult + '\u00d7 ' : '';
-  return `${m}${RS_IND_LABEL[s.ind]}${hasLen ? ' ' + (s.len | 0) : ''} \u00b7 ${RS_TF_LABEL[s.tf] || s.tf} <small>${when}</small>`;
+  const m = s.mult != null && s.mult !== '' && +s.mult !== 1 ? s.mult + '\u00d7 ' : '';
+  return `${m}${rsIndName(s)} \u00b7 ${RS_TF_LABEL[s.tf] || s.tf} <small>${when}</small>`;
 }
 function rbOpLabel(o) { return o === '>' || o === '<' ? o : RS_OPS[o]; }
 function rbRuleHtml(r, i) {
@@ -5021,15 +5183,14 @@ function rbStep(i, side, key, val, min, max) {
 function rbEditorHtml(i, side) {
   const r = rbDraft.rules[i], tfs = RS_MARKETS[rbDraft.market].tfs;
   const foot = `<div class="rb-efoot"><button type="button" class="btn-ghost" onclick="rbDup(${i})">Duplicate rule</button><button type="button" class="btn-ghost" onclick="rbPick(-1)">Done</button></div>`;
-  if (side === 'op') return `<div class="rb-edit"><div class="rb-lb">Compare</div><div class="rb-opts">${Object.keys(RS_OPS).map(o => rbOptChip(r.op === o, RS_OPS[o], `rbOp(${i},'${o}')`)).join('')}</div>${foot}</div>`;
-  const s = r[side], hasLen = s.ind !== 'macd' && s.ind !== 'macdsig';
+  if (side === 'op') return `<div class="rb-edit"><div class="rb-lb">Compare</div><div class="rb-opts">${Object.keys(RS_OPS).map(o => rbOptChip(r.op === o, RS_OPS[o], `rbOp(${i},'${o}')`)).join('')}</div>${r.op === 'x>' || r.op === 'x<' ? `<div class="rb-lb">Crossed within the last</div><div class="rb-step"><button type="button" aria-label="Less" onclick="rbWithin(${i},-1)">\u2212</button><span>${r.within | 0 || 1} candle${(r.within | 0) > 1 ? 's' : ''}</span><button type="button" aria-label="More" onclick="rbWithin(${i},1)">+</button></div><div class="rb-hint">Counts candles of the smallest timeframe in your rules.</div>` : ''}${foot}</div>`;
+  const s = r[side];
   let h = `<div class="rb-edit"><div class="rb-lb">${side === 'a' ? 'Look at' : 'Compare with'}</div><div class="rb-opts">${[['price', 'Price'], ['ind', 'Indicator'], ['num', 'Number']].map(([v, l]) => rbOptChip(s.type === v, l, `rbType(${i},'${side}','${v}')`)).join('')}</div>`;
   if (s.type === 'num') h += `<div class="rb-lb">Value</div><label class="rb-pre"><input type="number" step="any" value="${s.value === '' ? '' : s.value}" aria-label="Value" oninput="rbNum(${i},'${side}','value',this.value)"></label>`;
   else {
     if (s.type === 'price') h += `<div class="rb-lb">Field</div><div class="rb-opts">${Object.keys(RS_FIELDS).map(f => rbOptChip(s.field === f, f[0].toUpperCase() + f.slice(1), `rbSetF(${i},'${side}','field','${f}')`)).join('')}</div>`;
     else {
-      h += `<div class="rb-lb">Indicator</div><div class="rb-opts">${Object.keys(RS_IND_LABEL).map(x => rbOptChip(s.ind === x, RS_IND_LABEL[x], `rbSetF(${i},'${side}','ind','${x}')`)).join('')}</div>`;
-      if (hasLen) h += `<div class="rb-lb">Length</div>${rbStep(i, side, 'len', s.len | 0, 1, 500)}`;
+      h += rbIndPicker(i, side, s);
     }
     h += `<div class="rb-lb">Timeframe</div><div class="rb-opts">${tfs.map(t => rbOptChip(s.tf === t, RS_TF_LABEL[t], `rbSetF(${i},'${side}','tf','${t}')`)).join('')}</div>`;
     h += `<div class="rb-lb">Candles ago</div>${rbStep(i, side, 'back', s.back | 0, 0, 10)}`;
@@ -5037,13 +5198,30 @@ function rbEditorHtml(i, side) {
   }
   return h + foot + '</div>';
 }
+function rbIndPicker(i, side, s) {
+  const by = {}; Object.keys(RS_DEF).forEach(k => { (by[RS_DEF[k].g] = by[RS_DEF[k].g] || []).push(k); });
+  const opts = RS_GROUPS.map(g => `<optgroup label="${g}">${(by[g] || []).map(k => `<option value="${k}"${s.ind === k ? ' selected' : ''}>${RS_DEF[k].label}</option>`).join('')}</optgroup>`).join('');
+  const D = RS_DEF[s.ind] || RS_DEF.ema;
+  let h = `<div class="rb-lb">Indicator</div><select class="field-input rb-sel" aria-label="Indicator" onchange="rbSetInd(${i},'${side}',this.value)">${opts}</select>`;
+  if (D.note) h += `<div class="rb-hint">${D.note}</div>`;
+  D.par.forEach(p => { const v = s[p.k] == null || s[p.k] === '' ? p.def : s[p.k]; h += `<div class="rb-lb">${p.label}</div>` + (p.int ? rbStep(i, side, p.k, v | 0, p.min, p.max) : `<label class="rb-pre"><input type="number" step="${p.step}" min="${p.min}" max="${p.max}" value="${v}" aria-label="${p.label}" oninput="rbNum(${i},'${side}','${p.k}',this.value)"></label>`); });
+  return h;
+}
+function rbSetInd(ri, side, ind) {
+  const s = rbDraft.rules[ri][side], D = RS_DEF[ind], O = RS_DEF[s.ind]; if (!D) return;
+  const prev = s.len, hadLen = !!(O && O.par.some(p => p.k === 'len'));
+  s.ind = ind; delete s.len; delete s.p2;
+  D.par.forEach(p => { s[p.k] = p.k === 'len' && hadLen && prev != null && prev >= p.min && prev <= p.max ? prev : p.def; });
+  rbRenderRules(); rbDirty();
+}
+function rbWithin(ri, d) { const r = rbDraft.rules[ri]; r.within = Math.max(1, Math.min(10, (r.within | 0 || 1) + d)); rbRenderRules(); rbDirty(); }
 function rbRenderRules() { const el = document.getElementById('rb-rules'); if (el) el.innerHTML = rbDraft.rules.map(rbRuleHtml).join(''); }
 function rbPick(i, side) { if (i < 0 || (rbSel && rbSel.ri === i && rbSel.side === side)) rbSel = null; else rbSel = { ri: i, side }; rbRenderRules(); }
 function rbSetF(ri, side, key, val) { rbDraft.rules[ri][side][key] = val; rbRenderRules(); rbDirty(); }
-function rbStepBy(ri, side, key, d, min, max) { const s = rbDraft.rules[ri][side]; s[key] = Math.max(min, Math.min(max, (s[key] | 0) + d)); rbRenderRules(); rbDirty(); }
+function rbStepBy(ri, side, key, d, min, max) { const s = rbDraft.rules[ri][side], cur = s[key] == null || s[key] === '' ? rsDefOf(s, key) : s[key] | 0; s[key] = Math.max(min, Math.min(max, cur + d)); rbRenderRules(); rbDirty(); }
 function rbNum(ri, side, key, v) { const s = rbDraft.rules[ri][side]; s[key] = v === '' ? '' : parseFloat(v); const c = document.getElementById(`rb-c-${ri}-${side}`); if (c) c.innerHTML = rbSrcLabel(s); rbDirty(); }
 function rbType(ri, side, t) { const tf = rbDraft.rules[ri][side].tf || '1d'; rbDraft.rules[ri][side] = t === 'num' ? rN(0) : t === 'ind' ? rI('ema', 10, tf, 0) : rP('close', tf, 0); rbRenderRules(); rbDirty(); }
-function rbOp(ri, v) { rbDraft.rules[ri].op = v; rbRenderRules(); rbDirty(); }
+function rbOp(ri, v) { rbDraft.rules[ri].op = v; if (v !== 'x>' && v !== 'x<') delete rbDraft.rules[ri].within; rbRenderRules(); rbDirty(); }
 function rbAddRule() { const last = rbDraft.rules[rbDraft.rules.length - 1] || rbBlankRule(); rbDraft.rules.push(JSON.parse(JSON.stringify(last))); rbSel = { ri: rbDraft.rules.length - 1, side: 'a' }; rbRenderRules(); rbDirty(); }
 function rbDup(i) { rbDraft.rules.splice(i + 1, 0, JSON.parse(JSON.stringify(rbDraft.rules[i]))); rbSel = { ri: i + 1, side: 'a' }; rbRenderRules(); rbDirty(); }
 function rbRemoveRule(i) { rbDraft.rules.splice(i, 1); rbSel = null; rbRenderRules(); rbDirty(); }
@@ -5093,8 +5271,9 @@ function rbRender() {
   const d = rbDraft, el = document.getElementById('rb-body'); if (!el) return;
   const quick = ['gap_rally', 'soldiers', 'vol_burst'].map(id => RS_PRESETS.find(p => p.id === id)).filter(Boolean);
   el.innerHTML = `
+    ${rbAiCardHtml()}
     <div class="rb-presets"><span class="rb-dim">Start from</span>${quick.map(p => `<button type="button" class="rb-chip" onclick="rbPreset('${p.id}')">${sscanEsc(p.name.length > 22 ? p.name.split(/[,:(]/)[0] : p.name)}</button>`).join('')}<button type="button" class="rb-chip" onclick="rbShowPresets()">All ${RS_PRESETS.length} ${RB_CHEV}</button></div>
-    <input class="field-input" id="rb-name" type="text" value="${sscanEsc(d.name)}" placeholder="Scanner name" aria-label="Scanner name" oninput="rbDraft.name=this.value">
+    <input class="field-input" id="rb-name" type="text" value="${sscanEsc(d.name)}" placeholder="Scanner name" aria-label="Scanner name" oninput="rbDraft.name=this.value;rbDraft.aiName=false">
     <div id="rb-scope"></div>
     <div class="rb-sec"><span>Rules</span><select class="field-input rb-sel rb-tfall" aria-label="Set all timeframes" onchange="rbApplyTf(this.value); this.value=''"><option value="">Set all timeframes\u2026</option>${(RS_MARKETS[d.market] || RS_MARKETS.crypto).tfs.map(t => `<option value="${t}">${RS_TF_LABEL[t]}</option>`).join('')}</select></div>
     <div id="rb-rules" class="rb-rules"></div>
@@ -5103,10 +5282,126 @@ function rbRender() {
   rbRenderScope(); rbRenderRules(); rbRenderMode(); rbPaint();
 }
 
+/* ---------- AI: plain English -> scanner rules (validated, never trusted blindly) ---------- */
+var RB_REQ_KEY = 'tradepro_ind_requests_v1';
+function rbAiBlank() { return { busy: false, err: '', text: '', used: false, assumptions: [], skipped: [], built: 0 }; }
+var rbAi = rbAiBlank();
+function rsAiCatalog() {
+  return Object.keys(RS_DEF).map(k => { const D = RS_DEF[k]; return k + ' = ' + D.label + (D.par.length ? ' [' + D.par.map(p => p.k + ' ' + p.label + ' default ' + p.def + ' range ' + p.min + '-' + p.max).join('; ') + ']' : ' [no parameters]') + (D.note ? ' (' + D.note + ')' : ''); }).join('\n');
+}
+function rsAiSystem(mk) {
+  return `You turn a trader's plain-English description into a scanner for the TradePro app. Reply with ONE JSON object and nothing else (no markdown).
+JSON shape:
+{"name":"short name, max 6 words","direction":"bullish|bearish|others","mode":"all|any","symbols":["only if the user names specific ones"],
+ "rules":[{"a":SOURCE,"op":">|<|x>|x<","b":SOURCE,"within":1}],
+ "assumptions":["short notes on anything you had to assume"],
+ "skipped":[{"text":"the part of the request you could not build","reason":"why, in plain words","suggestion":null or a RULE object with the closest buildable version}]}
+SOURCE is one of:
+ {"type":"price","field":"open|high|low|close|volume","tf":"1d","back":0}
+ {"type":"ind","ind":"<key from the catalog>","len":14,"p2":3,"tf":"1d","back":0,"mult":1}  (send only the parameters that indicator has)
+ {"type":"num","value":25}
+Rules:
+- ">" means is above, "<" means is below, "x>" means crossed above, "x<" means crossed below. "within" (1-10) is how many recent candles the cross may have happened in; use 1 unless the user says recently or gives a number of candles.
+- Allowed timeframes: ${mk.tfs.join(', ')}. Daily = 1d, weekly = 1w, monthly = 1M, hourly = 1h. If the user gives no timeframe use 1d. "price" means the close.
+- back = candles ago (0 = the current candle). mult scales a value (95% of a level = 0.95).
+- A rule compares two sources. "Close above EMA 20" = close > EMA 20. "Price above 200" with no indicator named is ambiguous: use SMA 200 and say so in assumptions.
+- Use ONLY the indicator keys below. If part of the request needs something that is not available (chart patterns, news, fundamentals, Fibonacci, custom indicators), put it in "skipped" with a reason. Never approximate it silently and never invent a key.
+- If a fuzzy phrase has a sensible buildable version (for example "near the 52-week high" = close above 0.95 x highest high 252), put that rule in "suggestion" and leave it out of "rules".
+- direction is bullish if the rules look for upside, bearish for downside, otherwise others.
+- If current_rules is given, the user wants to change that scanner: return the full updated rule list.
+Indicator catalog:
+${rsAiCatalog()}`;
+}
+function rsAiSrc(o, tfs, notes) {
+  if (!o || typeof o !== 'object') return null;
+  if (o.type === 'num') { const v = parseFloat(o.value); return isFinite(v) ? rN(v) : null; }
+  const tf = o.tf == null ? (tfs.indexOf('1d') >= 0 ? '1d' : tfs[0]) : (tfs.indexOf(o.tf) >= 0 ? o.tf : null); if (!tf) return null;
+  const back = Math.max(0, Math.min(10, Math.round(+o.back || 0)));
+  if (o.type === 'price') { const f = Object.prototype.hasOwnProperty.call(RS_FIELDS, o.field) ? o.field : null; return f ? rP(f, tf, back) : null; }
+  if (o.type === 'ind') {
+    const D = RS_DEF[o.ind]; if (!D) return null;
+    const s = { type: 'ind', ind: o.ind, tf, back, mult: 1 };
+    D.par.forEach(p => { let v = parseFloat(o[p.k]); if (!isFinite(v)) v = p.def; const c = Math.max(p.min, Math.min(p.max, v)); if (c !== v) notes.push(D.label + ' ' + p.label.toLowerCase() + ' adjusted to ' + c + '.'); s[p.k] = p.int ? Math.round(c) : c; });
+    const m = parseFloat(o.mult); if (isFinite(m) && m > 0) s.mult = m;
+    return s;
+  }
+  return null;
+}
+function rsAiRule(r, tfs, notes) {
+  if (!r || typeof r !== 'object' || !Object.prototype.hasOwnProperty.call(RS_OPS, r.op)) return null;
+  const a = rsAiSrc(r.a, tfs, notes), b = rsAiSrc(r.b, tfs, notes); if (!a || !b || (a.type === 'num' && b.type === 'num')) return null;
+  const o = rR(a, r.op, b); if (r.op === 'x>' || r.op === 'x<') { const w = Math.max(1, Math.min(10, Math.round(+r.within || 1))); if (w > 1) o.within = w; }
+  return o;
+}
+function rsAiParse(txt, mk) {
+  let o = null; const m = String(txt).match(/\{[\s\S]*\}/);
+  try { o = JSON.parse(m ? m[0] : txt); } catch (e) { return { ok: false, why: 'The AI did not return a usable answer. Try rewording.' }; }
+  if (!o || typeof o !== 'object') return { ok: false, why: 'The AI did not return a usable answer. Try rewording.' };
+  const out = { ok: true, name: String(o.name || '').replace(/[<>]/g, '').slice(0, 60), cat: o.direction === 'bearish' ? 'bearish' : o.direction === 'bullish' ? 'bullish' : 'neutral', mode: o.mode === 'any' ? 'any' : 'all', rules: [], assumptions: [], skipped: [], symbols: null };
+  (Array.isArray(o.assumptions) ? o.assumptions : []).slice(0, 4).forEach(x => { if (typeof x === 'string' && x.trim()) out.assumptions.push(x.trim().slice(0, 160)); });
+  (Array.isArray(o.rules) ? o.rules : []).slice(0, 8).forEach((r, i) => { const c = rsAiRule(r, mk.tfs, out.assumptions); if (c) out.rules.push(c); else out.skipped.push({ text: 'Condition ' + (i + 1), reason: 'That one did not come out as a valid rule, so I left it out.', suggestion: null }); });
+  (Array.isArray(o.skipped) ? o.skipped : []).slice(0, 6).forEach(x => { if (!x || typeof x !== 'object') return; const sg = rsAiRule(x.suggestion, mk.tfs, out.assumptions); out.skipped.push({ text: String(x.text || 'A condition').replace(/[<>]/g, '').slice(0, 120), reason: String(x.reason || 'Not available in the rule builder yet.').replace(/[<>]/g, '').slice(0, 200), suggestion: sg }); });
+  if (Array.isArray(o.symbols)) { const ok = o.symbols.map(x => String(x).toUpperCase()).filter(x => mk.symbols.indexOf(x) >= 0); if (ok.length) out.symbols = ok.filter((x, i) => ok.indexOf(x) === i); }
+  return out;
+}
+async function rbAiRun(refine) {
+  if (rbAi.busy) return;
+  const text = (rbAi.text || '').trim(); if (!text) { rbAi.err = 'Describe the scanner first.'; rbAiPaint(); return; }
+  rbAi.busy = true; rbAi.err = ''; rbAiPaint();
+  const mk = RS_MARKETS[rbDraft.market] || RS_MARKETS.crypto, ctx = { request: text, market: mk.label, allowed_timeframes: mk.tfs };
+  if (refine && rbDraft.rules.length) { ctx.current_rules = rbDraft.rules; ctx.current_mode = rbDraft.mode; }
+  try {
+    const pv = ail.cfg.provider === 'mock' ? 'cloudflare' : ail.cfg.provider;
+    const R = rsAiParse(await ailCallModel(ctx, rsAiSystem(mk), 2000, 'Scanner request', pv), mk);
+    if (!R.ok) throw new Error(R.why);
+    if (!R.rules.length && !R.skipped.length) throw new Error('I could not find any conditions in that. Try something like "daily close above EMA 20".');
+    rbAi.used = true; rbAi.assumptions = R.assumptions; rbAi.skipped = R.skipped; rbAi.built = R.rules.length;
+    if (R.rules.length) {
+      rbDraft.rules = R.rules; rbDraft.mode = R.mode; rbSel = null;
+      if (!rbDraft.name || rbDraft.aiName) { rbDraft.name = R.name; rbDraft.aiName = true; }
+      rbDraft.cat = R.cat; rbDraft.aiCat = true;
+      if (R.symbols) { rbDraft.symbols = R.symbols; rbDraft.symbols.sort((a, b) => mk.symbols.indexOf(a) - mk.symbols.indexOf(b)); }
+      rbRender(); rbDirty();
+    }
+  } catch (e) { rbAi.err = String(e && e.message || e).replace(/^Error:\s*/, ''); }
+  rbAi.busy = false; rbAiPaint();
+}
+function rbAiAddSug(i) { const s = rbAi.skipped[i]; if (!s || !s.suggestion) return; rbDraft.rules.push(s.suggestion); rbAi.skipped.splice(i, 1); rbAi.built++; rbRenderRules(); rbAiPaint(); rbDirty(); }
+function rbAiSkip(i) { rbAi.skipped.splice(i, 1); rbAiPaint(); rbPaint(); }
+function rbAiRequest(i) {
+  const s = rbAi.skipped[i]; if (!s) return;
+  try { const a = JSON.parse(localStorage.getItem(RB_REQ_KEY) || '[]'); a.push({ text: s.text, at: Date.now() }); localStorage.setItem(RB_REQ_KEY, JSON.stringify(a.slice(-100))); } catch (e) { /* storage unavailable */ }
+  s.requested = true; rbAiPaint();
+}
+function rbAiOutHtml() {
+  const A = rbAi; let h = '';
+  if (A.busy) return '<div class="rb-ai-note">Building your scanner\u2026</div>';
+  if (A.err) h += `<div class="rb-ai-note err">${sscanEsc(A.err)}</div>`;
+  if (!A.used) return h;
+  const total = A.built + A.skipped.length;
+  if (A.built) h += `<div class="rb-ai-note"><b>Here\u2019s what I understood</b>${A.assumptions.length ? '<ul>' + A.assumptions.map(x => `<li>${sscanEsc(x)}</li>`).join('') + '</ul>' : '<div class="rb-hint" style="margin-top:3px">No assumptions needed. Check the rules below before you save.</div>'}</div>`;
+  if (A.skipped.length) {
+    h += `<div class="rb-ai-note warn"><b>Built ${A.built} of ${total} conditions</b><div class="rb-hint" style="margin-top:3px">Each skipped condition needs a decision from you.</div></div>`;
+    h += A.skipped.map((s, i) => `<div class="rb-ai-skip"><div class="rb-ai-st">${sscanEsc(s.text)}</div><div class="rb-hint">${sscanEsc(s.reason)}</div>${s.suggestion ? `<div class="rb-ai-sg">${sscanEsc(rsRuleText(s.suggestion))}</div>` : ''}<div class="rb-ai-acts">${s.suggestion ? `<button type="button" class="rb-chip" onclick="rbAiAddSug(${i})">+ Add this rule</button>` : ''}<button type="button" class="rb-chip" onclick="rbAiSkip(${i})">Skip it</button>${s.suggestion ? '' : (s.requested ? '<span class="rb-dim" style="font-size:12px">Requested</span>' : `<button type="button" class="rb-chip" onclick="rbAiRequest(${i})">Request indicator</button>`)}</div></div>`).join('');
+  }
+  return h;
+}
+function rbAiPaint() {
+  const o = document.getElementById('rb-ai-out'); if (o) o.innerHTML = rbAiOutHtml();
+  const b = document.getElementById('rb-ai-btns'); if (b) b.innerHTML = rbAiBtnsHtml();
+}
+function rbAiBtnsHtml() { const d = rbAi.busy ? ' disabled' : ''; return (rbAi.used ? `<button type="button" class="btn-ghost"${d} onclick="rbAiRun(true)">Refine</button>` : '') + `<button type="button" class="btn-primary"${d} onclick="rbAiRun(false)">${rbAi.used ? 'Rebuild' : 'Build rules'}</button>`; }
+function rbAiCardHtml() {
+  return `<div class="rb-ai"><div class="rb-ai-h"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>Describe your scanner</div>
+    <textarea class="field-input" id="rb-ai-t" rows="3" maxlength="600" placeholder="Daily close above EMA 20, crossed above Supertrend, and price above the 200 SMA" aria-label="Describe your scanner" oninput="rbAi.text=this.value">${sscanEsc(rbAi.text)}</textarea>
+    <div class="rb-ai-f"><span class="rb-hint">Rules appear below for you to check. Nothing is saved until you tap Save.</span><span class="rb-ai-b" id="rb-ai-btns">${rbAiBtnsHtml()}</span></div>
+    <div id="rb-ai-out">${rbAiOutHtml()}</div></div>`;
+}
+
 /* presets sheet */
 function rbShowPresets() {
   const grp = (cat, label) => { const ps = RS_PRESETS.filter(p => p.cat === cat); return ps.length ? `<div class="sc2-sec" style="margin:12px 0 6px"><span>${label}</span><span class="sc2-n">${ps.length}</span></div>` + ps.map(p => `<button type="button" class="rb-prow" onclick="rbPreset('${p.id}')"><span class="rb-pbar" style="background:${scCatInfo(p.cat).col}"></span><span class="rb-ptxt"><b>${sscanEsc(p.name)}</b><span>${sscanEsc(p.desc)}</span></span></button>`).join('') : ''; };
-  document.getElementById('rb-pre-body').innerHTML = grp('bullish', 'Bullish') + grp('bearish', 'Bearish') + grp('neutral', 'Neutral');
+  document.getElementById('rb-pre-body').innerHTML = grp('bullish', 'Bullish') + grp('bearish', 'Bearish') + grp('neutral', 'Others');
   document.getElementById('rb-pre-overlay').classList.add('open');
 }
 function rbHidePresets() { const e = document.getElementById('rb-pre-overlay'); if (e) e.classList.remove('open'); }
@@ -5121,7 +5416,7 @@ function rbValidate() {
     const s = r[sd];
     if (s.type !== 'num' && mkv.tfs.indexOf(s.tf) < 0) return mkv.label + ' data is daily: set every rule to Daily, Weekly or Monthly (use \u201cSet all timeframes\u201d).';
     if (s.type === 'num' && !isFinite(parseFloat(s.value))) return 'Enter a number in every Number box.';
-    if (s.type === 'ind' && s.ind !== 'macd' && s.ind !== 'macdsig' && !(s.len >= 1)) return 'Every indicator needs a length of 1 or more.';
+    if (s.type === 'ind') { const pe = rsParamErr(s); if (pe) return pe; }
     if (s.type === 'ind' && s.mult !== '' && s.mult != null && !isFinite(+s.mult)) return 'A multiplier must be a number.';
   }
   return '';
@@ -5135,7 +5430,8 @@ async function rbAutoTest() {
   catch (e) { if (sig !== rbSig()) return; rbAutoR = null; rbAutoState = 'err'; rbAutoMsg = String(e && e.message || e); }
   rbPaint();
 }
-function rbStripHtml() {
+function rbStripHtml() { const b = rbStripHtml0(), n = rbAi.skipped.length; return n && rbAutoState !== 'busy' ? b + ` <span style="color:var(--warn);font-size:12px">${n} skipped</span>` : b; }
+function rbStripHtml0() {
   if (rbAutoState === 'busy') return '<span class="rb-dim">Checking the latest candles\u2026</span>';
   if (rbAutoState === 'err') return `<span style="color:var(--red)">${sscanEsc(rbAutoMsg || 'Finish the rule to see results.')}</span>`;
   const R = rbAutoR; if (!R) return '';
@@ -5163,12 +5459,13 @@ function rbHideResults() { const e = document.getElementById('rb-res-overlay'); 
 function rbSheetRender() {
   const d = rbDraft, seg = (items, cur, fn) => `<div class="seg">${items.map(([v, l]) => `<button type="button" class="seg-btn${cur === v ? ' active' : ''}" onclick="${fn}('${v}')">${l}</button>`).join('')}</div>`;
   document.getElementById('rb-save-body').innerHTML = `
-    <label class="field-label" style="margin-top:0">Tag</label>${seg([['bullish', 'Bullish'], ['bearish', 'Bearish'], ['neutral', 'Neutral']], d.cat, 'rbSetCat')}
-    <label class="field-label">Visibility</label>${seg([['private', 'Private'], ['public', 'Public']], d.vis, 'rbSetVis')}
+    <label class="field-label" style="margin-top:0">Visibility</label>${seg([['private', 'Private'], ['public', 'Public']], d.vis, 'rbSetVis')}
     <div class="rb-hint">${d.vis === 'public' ? 'Public scanners can be seen and copied by others once accounts launch. Until then this only marks the scanner and stays on your device.' : 'Only you can see a private scanner.'}</div>
+    <label class="field-label">Direction</label>${seg([['bullish', 'Bullish'], ['bearish', 'Bearish'], ['neutral', 'Others']], d.cat, 'rbSetCat')}
+    <div class="rb-hint">${d.aiCat ? 'Suggested by AI. Tap another option to change it.' : d.cat === 'neutral' ? 'Others is for scanners with no direction, like volume spikes or squeezes.' : 'Used to group your scanners.'}</div>
     <div class="rb-alerts"><span>Alerts</span><span>Coming soon</span></div>`;
 }
-function rbSetCat(v) { rbDraft.cat = v; rbSheetRender(); }
+function rbSetCat(v) { rbDraft.cat = v; rbDraft.aiCat = false; rbSheetRender(); }
 function rbSetVis(v) { rbDraft.vis = v; rbSheetRender(); }
 function rbSave() {
   const err = rbValidate(); if (err) { rbAutoState = 'err'; rbAutoMsg = err; rbPaint(); return; }
@@ -5178,7 +5475,7 @@ function rbCommit() {
   const err = rbValidate(); if (err) return;
   const d = JSON.parse(JSON.stringify(rbDraft)), same = RS_PRESETS.find(p => JSON.stringify(p.rules) === JSON.stringify(d.rules));
   d.name = (d.name || '').trim() || (same ? same.name : scCatInfo(d.cat).label + ' scanner');
-  d.owner = SC_USER.id; d.alerts = null;
+  d.owner = SC_USER.id; d.alerts = null; delete d.aiCat; delete d.aiName;
   if (rbEditing == null) { d.id = 'r' + Date.now().toString(36); d.created = Date.now(); rscans.unshift(d); }
   else { d.id = rscans[rbEditing].id; d.created = rscans[rbEditing].created || Date.now(); rscans[rbEditing] = d; }
   delete rscanResults[d.id]; rsPersist(); rbClose();
@@ -5378,7 +5675,7 @@ function renderScLib() {
   const nCat = k => all.filter(it => okQ(it) && okScope(it) && (k === 'all' || it.cat === k)).length;
   const chip = (kind, k, label, n, dot) => `<button class="sc2-chip${(kind === 'scope' ? scLibScope : scLibCat) === k ? ' on' : ''}" onclick="scLibSet('${kind}','${k}')">${dot ? `<i class="sc2-cdot" style="background:${dot}"></i>` : ''}${label} <span class="sc2-n">${n}</span></button>`;
   const se = document.getElementById('sc2-lib-scope'); if (se) se.innerHTML = chip('scope', 'all', 'All', nScope('all')) + chip('scope', 'default', 'Default', nScope('default')) + chip('scope', 'mine', 'Mine', nScope('mine'));
-  const ce = document.getElementById('sc2-lib-cats'); if (ce) ce.innerHTML = chip('cat', 'all', 'Any tag', nCat('all')) + chip('cat', 'bullish', 'Bullish', nCat('bullish'), 'var(--green)') + chip('cat', 'bearish', 'Bearish', nCat('bearish'), 'var(--red)') + chip('cat', 'neutral', 'Neutral', nCat('neutral'), 'var(--text-muted)');
+  const ce = document.getElementById('sc2-lib-cats'); if (ce) ce.innerHTML = chip('cat', 'all', 'Any tag', nCat('all')) + chip('cat', 'bullish', 'Bullish', nCat('bullish'), 'var(--green)') + chip('cat', 'bearish', 'Bearish', nCat('bearish'), 'var(--red)') + chip('cat', 'neutral', 'Others', nCat('neutral'), 'var(--text-muted)');
   const list = all.filter(it => okQ(it) && okScope(it) && okCat(it));
   const mine = list.filter(it => it.scope === 'mine'), def = list.filter(it => it.scope === 'default');
   const sec = (title, note, items) => items.length ? `<div class="sc2-sec"><span>${title}</span><span class="sc2-n">${items.length}</span><span class="sc2-secnote">${note}</span></div><div class="sc2-list">${items.map(scLibRow).join('')}</div>` : '';
@@ -14473,19 +14770,19 @@ function ailMock(ctx) {   // deterministic stand-in for a real model: lets the w
   o.reasoning.push('Guppy short ribbon ' + (gu.short_above_long ? 'above' : 'below') + ' long ribbon', 'RSI ' + r, 'MACD histogram ' + h);
   return JSON.stringify(o);
 }
-async function ailCallModel(ctx, system, maxTok) {
+async function ailCallModel(ctx, system, maxTok, label, forceProvider) {
   system = system || AIL_SYSTEM; maxTok = maxTok || 900;
-  const P = AIL_PROVIDERS[ail.cfg.provider];
-  if (ail.cfg.provider === 'mock') return ailMock(ctx);
+  const pv = forceProvider || ail.cfg.provider, P = AIL_PROVIDERS[pv];
+  if (pv === 'mock') return ailMock(ctx);
   if (P.viaWorker) {
     if (!phReady()) throw new Error('Set your Worker URL first (Markets > Alerts > phone alerts).');
-    const r = await fetch(PH.url.replace(/\/+$/, '') + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), max_tokens: maxTok, messages: [{ role: 'system', content: system }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] }) });
+    const r = await fetch(PH.url.replace(/\/+$/, '') + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), max_tokens: maxTok, messages: [{ role: 'system', content: system }, { role: 'user', content: (label || 'Chart data') + ':\n' + JSON.stringify(ctx) }] }) });
     let j = null; try { j = await r.json(); } catch (e) { /* ignore */ }
     if (!r.ok || !j || !j.ok) throw new Error('Cloudflare AI: ' + ((j && j.error) || 'HTTP ' + r.status));
     return j.text || '';
   }
   if (!ail.cfg.key) throw new Error('Add your API key in the AI panel first.');
-  const body = { model: ail.cfg.model || P.model, temperature: 0.2, max_tokens: maxTok, messages: [{ role: 'system', content: system }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] };
+  const body = { model: ail.cfg.model || P.model, temperature: 0.2, max_tokens: maxTok, messages: [{ role: 'system', content: system }, { role: 'user', content: (label || 'Chart data') + ':\n' + JSON.stringify(ctx) }] };
   if (P.json) body.response_format = { type: 'json_object' };
   const res = await fetch(P.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ail.cfg.key }, body: JSON.stringify(body) });
   if (!res.ok) { let t = ''; try { t = (await res.text()).slice(0, 160); } catch (e) { /* ignore */ } throw new Error(res.status === 401 ? 'The API key was rejected (401).' : res.status === 429 ? 'Free-tier rate limit hit (429). Wait a minute and try again.' : 'AI service error ' + res.status + ' ' + t); }
