@@ -2793,8 +2793,8 @@ function assetChips(ids) {
 }
 
 // strategy templates that can be charted as live combined candles (see STRAT_DEFS in the live section)
-const SSCAN_STRATS = ['Straddle','Strangle','Iron butterfly','Iron condor','Bull call spread','Bear put spread'];
-const STRAT_CHART_MAP = { 'Straddle': 'straddle', 'Strangle': 'strangle', 'Bull call spread': 'bullcall', 'Bear put spread': 'bearput', 'Iron condor': 'condor', 'Iron butterfly': 'ironfly' };
+const SSCAN_STRATS = ['Straddle','Strangle','Iron butterfly','Iron condor','Bull call spread','Bear put spread','Bear call spread','Bull put spread','Call condor','Put condor','Jade lizard'];
+const STRAT_CHART_MAP = { 'Straddle': 'straddle', 'Strangle': 'strangle', 'Bull call spread': 'bullcall', 'Bear put spread': 'bearput', 'Iron condor': 'condor', 'Iron butterfly': 'ironfly', 'Bear call spread': 'bearcall', 'Bull put spread': 'bullput', 'Call condor': 'callcondor', 'Put condor': 'putcondor', 'Jade lizard': 'jadelizard' };
 function renderTemplates() {
   ['bullish','bearish','neutral'].forEach(cat => {
     const list = TEMPLATES.filter(t => t.cat === cat);
@@ -3811,7 +3811,7 @@ async function openSScanChart(i, und) {
 }
 /* ---- apply a scan straight onto the open strategy chart (uses the chart's own timeframe) ---- */
 let sscanApplied = null, sscanApplyToken = 0, sscanFromChart = false;
-const SSCAN_TYPE_NAMES = { straddle: 'Straddle', strangle: 'Strangle', ironfly: 'Iron butterfly', condor: 'Iron condor', bullcall: 'Bull call spread', bearput: 'Bear put spread' };
+const SSCAN_TYPE_NAMES = { straddle: 'Straddle', strangle: 'Strangle', ironfly: 'Iron butterfly', condor: 'Iron condor', bullcall: 'Bull call spread', bearput: 'Bear put spread', bearcall: 'Bear call spread', bullput: 'Bull put spread', callcondor: 'Call condor', putcondor: 'Put condor', jadelizard: 'Jade lizard' };
 function sscanGuppyPair() {   // chart-only merge: the Guppy-based Buy scan + the Guppy-based Sell scan, shown as one Signal option
   const g = sscans.filter(sc => sc && sc.strat !== 'Straddle' && /guppy/i.test(sc.name) && Array.isArray(sc.conds) && sc.conds.some(c => c.k === 'gmma'));
   const bull = g.find(sc => sc.side === 'Buy'), bear = g.find(sc => sc.side === 'Sell');
@@ -3844,10 +3844,10 @@ function sscanFillApply() {
   if (!sel) return;
   if (!sscanDefTried) { sscanDefTried = true; if (!sscanApplied && !sscanUserOff() && sscanGuppyPair()) { sscanApplied = '__pair'; setTimeout(() => { try { sscanApplyRefresh(); } catch (e) { /* chart not ready */ } }, 0); } }
   const onStrat = liveMode && LIVE.kind === 'strategy';
-  const pr = onStrat ? null : sscanGuppyPair(), hide = pr ? [pr.bull.name, pr.bear.name] : [];
+  const pr = sscanGuppyPair(), hide = pr ? [pr.bull.name, pr.bear.name] : [];
   sel.innerHTML = '<option value="">Off</option>' + `<option value="__stand" ${standIsApplied() ? 'selected' : ''}>★ ${STAND_NAME} (own strategy) · Sell</option>` +
     (pr ? `<option value="__pair" ${sscanApplied === '__pair' ? 'selected' : ''}>Guppy squeeze signals: Bullish + Bearish · Buy + Sell</option>` : '') +
-    sscans.filter(sc => hide.indexOf(sc.name) < 0 && !(onStrat && sc.strat === 'Guppy crossover')).map(sc => `<option value="${sscanEsc(sc.name)}" ${sc.name === sscanApplied ? 'selected' : ''}>${sscanEsc(sc.name)} · ${sc.side}</option>`).join('') +
+    sscans.filter(sc => hide.indexOf(sc.name) < 0).map(sc => `<option value="${sscanEsc(sc.name)}" ${sc.name === sscanApplied ? 'selected' : ''}>${sscanEsc(sc.name)} · ${sc.side}</option>`).join('') +
     '<option value="__new">+ New scan for this chart…</option>';
   if (!sscanApplied) sel.value = '';
 }
@@ -3875,7 +3875,7 @@ async function sscanApplyRefresh() {
   if (!sc) { sscanApplied = null; scanOverlay = null; sscanFillApply(); if (info) info.textContent = ''; draw(); return; }
   const und = onReplay ? '' : onPerp ? String(LIVE.symbol || '').replace(/USD.*$/, '') : onOpt ? String(LIVE.symbol).split('-')[1] : LIVE.strat.und, symbol = onReplay ? 'replay' : onPerp || onOpt ? LIVE.symbol : LIVE.stratSymbol;
   // perp and single-option charts: the combined-premium floor doesn't apply (it is sized for a two-leg straddle premium)
-  const mkOv = x => Object.assign({}, sscanOverlayMeta(x, und), { symbol, perp: onPerp, opt: onOpt, replay: onReplay, minPrem: onPerp || onOpt || onReplay ? 0 : x.minPrem || 0 });
+  const mkOv = x => Object.assign({}, sscanOverlayMeta(x, und), { symbol, perp: onPerp, opt: onOpt, replay: onReplay, minPrem: onPerp || onOpt || onReplay || x.strat === 'Guppy crossover' ? 0 : x.minPrem || 0 });
   scanOverlay = pair ? Object.assign(mkOv(pair.bull), { multi: [mkOv(pair.bull), mkOv(pair.bear)] }) : mkOv(sc);
   draw();   // renderChart fills the info line from the chart's own signals
 }
@@ -10598,8 +10598,16 @@ const STRAT_DEFS = {
   putfly:   { label: 'Put butterfly',   w: true, legs: (S, c, w) => [['P', c + w, 1], ['P', c, -2], ['P', c - w, 1]] },
   ironfly:  { label: 'Iron butterfly (credit)', w: true, legs: (S, c, w) => [['C', c, 1], ['P', c, 1], ['C', c + w, -1], ['P', c - w, -1]] },
   condor:   { label: 'Iron condor (credit)',    w: true, legs: (S, c, w) => [['P', c - w, 1], ['C', c + w, 1], ['P', c - 2 * w, -1], ['C', c + 2 * w, -1]] },
-  bullcall: { label: 'Bull call spread', w: true, legs: (S, c, w) => [['C', c, 1], ['C', c + w, -1]] },
-  bearput:  { label: 'Bear put spread',  w: true, legs: (S, c, w) => [['P', c, 1], ['P', c - w, -1]] },
+  bullcall: { label: 'Bull call spread (debit)', w: true, legs: (S, c, w) => [['C', c, 1], ['C', c + w, -1]] },
+  bearput:  { label: 'Bear put spread (debit)',  w: true, legs: (S, c, w) => [['P', c, 1], ['P', c - w, -1]] },
+  bearcall: { label: 'Bear call spread (credit)', w: true, legs: (S, c, w) => [['C', c, 1], ['C', c + w, -1]] },   // plotted premium = the credit you collect selling the lower call and buying the higher one
+  bullput:  { label: 'Bull put spread (credit)',  w: true, legs: (S, c, w) => [['P', c, 1], ['P', c - w, -1]] },   // plotted premium = the credit you collect selling the higher put and buying the lower one
+  callcondor: { label: 'Call condor',      w: true, legs: (S, c, w) => [['C', c - w, 1], ['C', c, -1], ['C', c + w, -1], ['C', c + 2 * w, 1]] },
+  putcondor:  { label: 'Put condor',       w: true, legs: (S, c, w) => [['P', c + w, 1], ['P', c, -1], ['P', c - w, -1], ['P', c - 2 * w, 1]] },
+  callbwb:  { label: 'Broken-wing call butterfly', w: true, legs: (S, c, w) => [['C', c, 1], ['C', c + w, -2], ['C', c + 3 * w, 1]] },
+  putbwb:   { label: 'Broken-wing put butterfly',  w: true, legs: (S, c, w) => [['P', c, 1], ['P', c - w, -2], ['P', c - 3 * w, 1]] },
+  jadelizard: { label: 'Jade lizard (credit)',         w: true, legs: (S, c, w) => [['P', c - w, 1], ['C', c + w, 1], ['C', c + 2 * w, -1]] },   // short put + short call spread: no upside risk
+  revjade:    { label: 'Reverse jade lizard (credit)', w: true, legs: (S, c, w) => [['C', c + w, 1], ['P', c - w, 1], ['P', c - 2 * w, -1]] },   // short call + short put spread: no downside risk
   custom:   { label: 'Custom (build your own)', legs: () => [] }, // legs come from the builder panel
 };
 function liveEncodeLegs(legs) { return legs.map(l => l.t + l.o + ':' + l.w).join('_'); }
@@ -10625,7 +10633,7 @@ function liveStratSymbol(type, und, exp, center, w, legs) {
 }
 function liveStratLabel(p, sym) {
   const def = STRAT_DEFS[p.type];
-  const name = p.type === 'custom' ? ((sym && LIVE.stratNames[sym]) || 'Custom ' + (p.legs ? p.legs.length : 0) + '-leg') : def.label.replace(' (credit)', '');
+  const name = p.type === 'custom' ? ((sym && LIVE.stratNames[sym]) || 'Custom ' + (p.legs ? p.legs.length : 0) + '-leg') : def.label.replace(/ \((credit|debit)\)/, '');
   return name + ' ' + p.center.toLocaleString('en-US') + (def.w ? ' ±' + p.w : '') + ' · ' + liveExpLabel(p.exp) + ' · ' + p.und;
 }
 function stratStrikes(und, exp) { // strikes listed for BOTH the call and the put
@@ -14217,7 +14225,7 @@ try { const c = JSON.parse(localStorage.getItem(AIL_KEY) || 'null'); if (c && AI
 try { if (ail.cfg.tfv !== 2) { ail.cfg.tfs = ['4h', '1h', '15m', '5m']; ail.cfg.tfv = 2; ailSaveCfg(); } } catch (e) { /* ignore */ }
 try { const j = JSON.parse(localStorage.getItem(AIL_JOURNAL) || '[]'); if (Array.isArray(j)) ail.journal = j; } catch (e) { /* ignore */ }
 function ailSaveCfg() { try { localStorage.setItem(AIL_KEY, JSON.stringify(ail.cfg)); } catch (e) { /* ignore */ } }
-function ailSaveJournal() { try { localStorage.setItem(AIL_JOURNAL, JSON.stringify(ail.journal.slice(-400))); } catch (e) { /* ignore */ } }
+function ailSaveJournal() { try { localStorage.setItem(AIL_JOURNAL, JSON.stringify(ail.journal.slice(-1500))); } catch (e) { /* ignore */ } }
 const ailEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* ---------- Context: everything the model is allowed to see (only candles up to the analysed one) ---------- */
@@ -14283,6 +14291,82 @@ const AIL_SYSTEM_MTF = 'You are a market research assistant inside a paper-tradi
   '"entry" (current price), "stop" (number), "target" (number), "horizon_candles" (integer 3-48, counted in candles of trade_tf), "patterns" (array of strings), "reasoning" (array of at most 4 short strings), "risks" (array of at most 3 short strings), ' +
   '"option_idea" (object or null: {"action": "buy_call"|"buy_put"|"sell_call"|"sell_put", "strike": a strike taken ONLY from oi_flow.chain_near_spot, "why": one short sentence}). The option idea must match the bias (long: buy_call or sell_put; short: buy_put or sell_call) and be null when bias is neutral. ' +
   'Rules: for long, stop < entry < target; for short, target < entry < stop. Keep stop and target within about 0.8 to 4 times the atr14 OF trade_tf from entry. If neutral, set entry/stop/target to the current price. Never invent data you were not given.';
+
+/* ---------- Segments: perp (BTC/ETH), options (one contract), strategy, stock. Each has its own journal and accuracy ---------- */
+const AIL_SEGS = { perp: 'Perpetual', options: 'Options', strategy: 'Strategies', stock: 'Stocks' };
+function ailSeg() { try { return liveMode ? ({ perp: 'perp', options: 'options', strategy: 'strategy', india: 'stock' }[LIVE.kind] || 'perp') : 'replay'; } catch (e) { return 'perp'; } }
+function ailSegOf(x) { return x.seg || (x.tf === '1d' && !/USD$|^[CP]-|^S~/.test(x.sym || '') ? 'stock' : '') || (/^S~/.test(x.sym || '') ? 'strategy' : '') || (/^[CP]-/.test(x.sym || '') ? 'options' : 'perp'); }
+const AIL_SYSTEM_OPT = 'You are a market research assistant inside a paper-trading simulator. You receive numeric data for ONE crypto OPTION CONTRACT: its PREMIUM candles on several timeframes ("timeframes": each with recent candles, EMAs, RSI, MACD, Guppy ribbon, candle patterns, atr14, all measured in premium points), the contract details ("contract": type, strike, expiry, hours to expiry, moneyness, delta, theta, implied volatility, bid/ask), the UNDERLYING perpetual on higher timeframes ("underlying") and "oi_flow" (perpetual OI, options OI walls and per-strike OI flows since the 17:30 IST baseline). ' +
+  'OI flow flags: LB = long build-up (OI up, premium up), SB = short build-up (OI up, premium down: writing), LU = long unwinding (OI down, premium down), SC = short covering (OI down, premium up). Call writing = resistance and bearish; put writing = support and bullish; call buying = bullish; put buying = bearish. ' +
+  'Your call is about this contract\'s PREMIUM: "long" = BUY the option (premium should rise), "short" = SELL / write it (premium should fall). Think about what moves the premium: the underlying\'s direction (via delta), time decay (theta, hours to expiry: near expiry decay is fast and gamma is high), and implied volatility. A long call or short put needs the underlying to rise; a long put or short call needs it to fall. ' +
+  'Premium candles are thin and noisy. If spreads are wide, the premium is tiny, there are few candles, or the signals conflict, answer "neutral". Use ONLY the data given. ' +
+  'Reply with a single JSON object and nothing else, with keys: "bias" ("long", "short" or "neutral"), "confidence" (integer 0-100), "trade_tf" (one of the provided contract timeframes), "alignment" (one short sentence on how the timeframes and the underlying agree), "oi_read" (one short sentence on what the OI flow says), "entry" (current premium), "stop" (premium), "target" (premium), "horizon_candles" (integer 3-48, in candles of trade_tf), "patterns" (array of strings), "reasoning" (array of at most 4 short strings), "risks" (array of at most 3 short strings). ' +
+  'Rules: for long, stop < entry < target; for short, target < entry < stop; stop must be above 0 for long. Keep stop and target within about 0.8 to 4 times the atr14 OF trade_tf from entry. If neutral, set entry/stop/target to the current premium. Never invent data you were not given.';
+async function ailAnalyzeOption() {
+  const sym = LIVE.symbol, o = liveParseOptSymbol(sym); if (!o) throw new Error('Could not read this option contract.');
+  const und = o.und + 'USD', tfs = ailSortedTfs(), map = {};
+  const [lists, uh, u15, tk] = await Promise.all([Promise.all(tfs.map(tf => ailLoadTf(sym, tf).catch(() => []))), ailLoadTf(und, '1h').catch(() => []), ailLoadTf(und, '15m').catch(() => []), liveFetchJson('/v2/tickers/' + encodeURIComponent(sym)).catch(() => null)]);
+  tfs.forEach((tf, i) => { if (lists[i].length >= 60) map[tf] = lists[i]; });
+  if (!Object.keys(map).length) throw new Error('This contract has too little premium history (needs 60+ candles on at least one timeframe). Try a longer-lived or more active contract.');
+  const ctx = ailMtfContext(map, sym, null), t = (tk && tk.result) || {}, gr = t.greeks || {}, qt = t.quotes || {};
+  let iv = liveNum(qt.mark_iv != null ? qt.mark_iv : t.mark_vol); if (iv != null && iv < 5) iv *= 100;
+  const spot = uh.length ? uh[uh.length - 1].c : liveNum(t.spot_price), hrs = (Date.parse(o.exp + 'T12:00:00Z') - Date.now()) / 3600000;
+  ctx.contract = { symbol: sym, type: o.type === 'C' ? 'call' : 'put', strike: o.strike, expiry: o.exp, hours_to_expiry: +hrs.toFixed(1), underlying_spot: spot ? Math.round(spot) : null, moneyness_pct: spot ? +((o.type === 'C' ? spot - o.strike : o.strike - spot) / spot * 100).toFixed(2) : null, premium: ctx.price, delta: liveNum(gr.delta), theta: liveNum(gr.theta), implied_vol_pct: iv == null ? null : +iv.toFixed(1), best_bid: liveNum(qt.best_bid), best_ask: liveNum(qt.best_ask), open_interest: liveNum(t.oi_contracts != null ? t.oi_contracts : t.oi) };
+  ctx.underlying = {}; [['1h', uh], ['15m', u15]].forEach(([tf, cs]) => { if (cs.length >= 60) { const c = ailContext(cs, { symbol: und, tf }); c.recent_candles_ohlc_oldest_to_newest = c.recent_candles_ohlc_oldest_to_newest.slice(-15); delete c.symbol; delete c.last_candle_index; ctx.underlying[tf] = c; } });
+  const um = {}; if (uh.length >= 60) um['1h'] = uh; else if (u15.length >= 60) um['15m'] = u15;
+  const flow = Object.keys(um).length ? await ailOiFlow(und, um).catch(() => null) : null; if (flow) { delete flow.chain_near_spot; ctx.oi_flow = flow; }
+  const raw = ail.cfg.provider === 'mock' ? ailMockMtf(ctx) : await ailCallModel(ctx, AIL_SYSTEM_OPT);
+  let j = null; try { const m = String(raw).match(/\{[\s\S]*\}/); j = JSON.parse(m ? m[0] : raw); } catch (e) { j = null; }
+  const have = ctx.timeframes_low_to_high, tt = j && have.includes(j.trade_tf) ? j.trade_tf : have[0], p = ailParse(raw, ctx.price, ctx.timeframes[tt].atr14);
+  if (p.ok && p.call.bias === 'long' && !(p.call.stop > 0)) { p.call.bias = 'neutral'; p.call.note = 'The stop was not above zero, so this was treated as neutral.'; }
+  return { p, raw, tt, align: j && j.alignment ? String(j.alignment).slice(0, 160) : '', oiRead: j && j.oi_read ? String(j.oi_read).slice(0, 200) : '', opt: null, last: map[tt][map[tt].length - 1], tfs: have, contract: { type: o.type, strike: o.strike, exp: o.exp, delta: ctx.contract.delta, iv: ctx.contract.implied_vol_pct } };
+}
+
+/* ---------- Strategies: one call on a multi-leg structure's COMBINED premium (straddle, strangle, condor, spreads, custom) ---------- */
+const AIL_STRAT_KIND = { straddle: 'long volatility, debit: Buy profits from a big move or rising volatility, Sell profits from calm markets and time decay', strangle: 'long volatility, debit (cheaper than a straddle, needs a bigger move)', callfly: 'range pin, debit: profits if price ends near the middle strike', putfly: 'range pin, debit: profits if price ends near the middle strike', ironfly: 'credit, short volatility: the plotted premium is the credit, so Sell (collect it) is the usual trade and profits from a calm market', condor: 'credit, short volatility: the plotted premium is the credit, so Sell (collect it) is the usual trade and profits from a range-bound market', bullcall: 'bullish debit spread: premium rises when the underlying rises; Selling this same chart is a bear call credit spread', bearput: 'bearish debit spread: premium rises when the underlying falls; Selling this same chart is a bull put credit spread', bearcall: 'credit, bearish: the plotted premium is the credit received for selling the lower call and buying the higher one; Sell (collect it) is the usual trade and profits if the underlying stays below the lower strike', bullput: 'credit, bullish: the plotted premium is the credit received for selling the higher put and buying the lower one; Sell (collect it) is the usual trade and profits if the underlying stays above the higher strike', callcondor: 'range pin, debit: four calls, profits if the underlying ends between the two middle strikes', putcondor: 'range pin, debit: four puts, profits if the underlying ends between the two middle strikes', callbwb: 'skewed butterfly (debit or small credit): profits near the middle strike, wider wing on the upside', putbwb: 'skewed butterfly (debit or small credit): profits near the middle strike, wider wing on the downside', jadelizard: 'credit, neutral-to-bullish: short put plus a short call spread, no upside risk beyond the credit; the plotted premium is the credit, so Sell is the usual trade', revjade: 'credit, neutral-to-bearish: short call plus a short put spread, no downside risk beyond the credit; the plotted premium is the credit, so Sell is the usual trade', custom: 'custom multi-leg structure: judge it from the legs listed' };
+const AIL_SYSTEM_STRAT = 'You are a market research assistant inside a paper-trading simulator. You receive numeric data for ONE multi-leg options STRATEGY on a crypto underlying: the strategy\'s COMBINED premium candles on several timeframes ("timeframes": recent candles, EMAs, RSI, MACD, Guppy ribbon, candle patterns, atr14, all in premium points), the structure ("strategy": name, what it is, each leg with weight and price, net premium, net delta, net theta, hours to expiry), the UNDERLYING perpetual on higher timeframes ("underlying") and "oi_flow" (perpetual OI, options OI walls and per-strike OI flows since the 17:30 IST baseline). ' +
+  'OI flow flags: LB = long build-up, SB = short build-up (writing), LU = long unwinding, SC = short covering. Call writing = resistance and bearish; put writing = support and bullish. ' +
+  'Your call is about the combined PREMIUM: "long" = BUY the structure (you profit if its premium rises), "short" = SELL it (you profit if its premium falls; for credit structures this means keeping the credit). Think about what moves this structure\'s premium: the underlying\'s movement (net delta and the structure\'s shape), changes in volatility, and time decay (net theta, hours to expiry; decay and gamma accelerate close to expiry). A pinned or range-bound market favours selling premium; a breakout, rising volatility or event risk favours buying it. ' +
+  'Premium candles of combined legs are noisy and their highs and lows are estimates. If the premium is tiny, there are few candles, or the signals conflict, answer "neutral". Use ONLY the data given. ' +
+  'Reply with a single JSON object and nothing else, with keys: "bias" ("long", "short" or "neutral"), "confidence" (integer 0-100), "trade_tf" (one of the provided timeframes), "alignment" (one short sentence on how the timeframes and the underlying agree), "oi_read" (one short sentence on what the OI flow says), "entry" (current combined premium), "stop" (premium), "target" (premium), "horizon_candles" (integer 3-48, in candles of trade_tf), "patterns" (array of strings), "reasoning" (array of at most 4 short strings), "risks" (array of at most 3 short strings). ' +
+  'Rules: for long, stop < entry < target; for short, target < entry < stop. Keep stop and target within about 0.8 to 4 times the atr14 OF trade_tf from entry. If neutral, set entry/stop/target to the current premium. Never invent data you were not given.';
+function ailCombo(legs, series) {   // same formula as the chart's combined premium (open/close exact, wicks estimated from the legs' ranges)
+  const times = new Set(); series.forEach(s => s.forEach(c => times.add(c.t))); const out = [];
+  Array.from(times).sort().forEach(t => {
+    let o = 0, c = 0, ub = 0, lb = 0, v = 0, ok = true;
+    for (let i = 0; i < legs.length; i++) { const k = liveLegAt(series[i], t); if (!k) { ok = false; break; } const w = legs[i].w; o += w * k.o; c += w * k.c; v += Math.abs(w) * (k.v || 0); ub += w > 0 ? w * k.h : w * k.l; lb += w > 0 ? w * k.l : w * k.h; }
+    if (!ok) return; const top = Math.max(o, c), bot = Math.min(o, c), one = legs.length === 1;
+    out.push({ t, o, h: one ? ub : top + 0.5 * Math.max(0, ub - top), l: one ? lb : bot - 0.5 * Math.max(0, bot - lb), c, v });
+  });
+  return out;
+}
+async function ailUnderlyingCtx(und) {   // underlying perpetual on 1h/15m + OI flow, shared by the options and strategy reads
+  const [uh, u15] = await Promise.all([ailLoadTf(und, '1h').catch(() => []), ailLoadTf(und, '15m').catch(() => [])]), out = { underlying: {} };
+  [['1h', uh], ['15m', u15]].forEach(([tf, cs]) => { if (cs.length >= 60) { const c = ailContext(cs, { symbol: und, tf }); c.recent_candles_ohlc_oldest_to_newest = c.recent_candles_ohlc_oldest_to_newest.slice(-15); delete c.symbol; delete c.last_candle_index; out.underlying[tf] = c; } });
+  const um = {}; if (uh.length >= 60) um['1h'] = uh; else if (u15.length >= 60) um['15m'] = u15;
+  const flow = Object.keys(um).length ? await ailOiFlow(und, um).catch(() => null) : null; if (flow) { delete flow.chain_near_spot; out.oi_flow = flow; }
+  out.spot = uh.length ? uh[uh.length - 1].c : (u15.length ? u15[u15.length - 1].c : null);
+  return out;
+}
+async function ailAnalyzeStrategy() {
+  const sym = LIVE.symbol, p = liveParseStratSymbol(sym); if (!p) throw new Error('Could not read this strategy.');
+  const legs = liveStratLegs(p); if (!legs || !legs.length) throw new Error('The strategy legs are not loaded yet. Let the chart finish loading, then try again.');
+  const tfs = ailSortedTfs(), und = p.und + 'USD', map = {};
+  const [perTf, tks, U] = await Promise.all([Promise.all(tfs.map(tf => Promise.all(legs.map(l => ailLoadTf(l.symbol, tf).catch(() => []))))), Promise.all(legs.map(l => liveFetchJson('/v2/tickers/' + encodeURIComponent(l.symbol)).catch(() => null))), ailUnderlyingCtx(und)]);
+  tfs.forEach((tf, i) => { const c = ailCombo(legs, perTf[i]); if (c.length >= 60) map[tf] = c; });
+  if (!Object.keys(map).length) throw new Error('This strategy has too little combined premium history (needs 60+ candles on at least one timeframe). Try a longer-lived expiry or a more liquid strike set.');
+  const ctx = ailMtfContext(map, sym, null), hrs = (Date.parse(p.exp + 'T12:00:00Z') - Date.now()) / 3600000; let nd = 0, nt = 0, haveG = false;
+  const legInfo = legs.map((l, i) => { const t = (tks[i] && tks[i].result) || {}, g = t.greeks || {}, d = liveNum(g.delta), th = liveNum(g.theta); if (d != null) { nd += l.w * d; haveG = true; } if (th != null) nt += l.w * th; let iv = liveNum((t.quotes || {}).mark_iv); if (iv != null && iv < 5) iv *= 100; return { type: l.type === 'C' ? 'call' : 'put', strike: l.strike, weight: l.w, price: liveNum(t.mark_price), iv_pct: iv == null ? null : +iv.toFixed(1) }; });
+  ctx.strategy = { name: liveStratLabel(p, sym), kind: AIL_STRAT_KIND[p.type] || '', legs: legInfo, net_premium: ctx.price, net_delta: haveG ? +nd.toFixed(3) : null, net_theta: haveG ? +nt.toFixed(1) : null, hours_to_expiry: +hrs.toFixed(1), underlying_spot: U.spot ? Math.round(U.spot) : null };
+  ctx.underlying = U.underlying; if (U.oi_flow) ctx.oi_flow = U.oi_flow;
+  const raw = ail.cfg.provider === 'mock' ? ailMockMtf(ctx) : await ailCallModel(ctx, AIL_SYSTEM_STRAT);
+  let j = null; try { const m = String(raw).match(/\{[\s\S]*\}/); j = JSON.parse(m ? m[0] : raw); } catch (e) { j = null; }
+  const have = ctx.timeframes_low_to_high, tt = j && have.includes(j.trade_tf) ? j.trade_tf : have[0], pr = ailParse(raw, ctx.price, ctx.timeframes[tt].atr14);
+  if (pr.ok && pr.call.bias !== 'neutral' && !(ctx.price > 0 && pr.call.stop > 0 && pr.call.target > 0)) { pr.call.bias = 'neutral'; pr.call.stop = pr.call.target = pr.call.entry; }   // a combined premium at or below zero cannot be traded with a stop and target
+  return { p: pr, raw, tt, align: j && j.alignment ? String(j.alignment).slice(0, 160) : '', oiRead: j && j.oi_read ? String(j.oi_read).slice(0, 200) : '', last: map[tt][map[tt].length - 1], tfs: have, legs: legs.map(l => ({ symbol: l.symbol, w: l.w, type: l.type, strike: l.strike })), contract: { label: liveStratLabel(p, sym), type: p.type, exp: p.exp } };
+}
+const ailShortSym = x => (x.contract && x.contract.label) || x.sym;
+
 function ailMtfOk() { try { return liveMode && /^[A-Z0-9]{2,14}$/.test(LIVE.symbol || '') && ail.cfg.tfs.length >= 2; } catch (e) { return false; } }
 function ailSortedTfs() { return ail.cfg.tfs.slice().sort((a, b) => AIL_TFS.indexOf(a) - AIL_TFS.indexOf(b)); }
 async function ailLoadTf(sym, tf) {
@@ -14389,19 +14473,19 @@ function ailMock(ctx) {   // deterministic stand-in for a real model: lets the w
   o.reasoning.push('Guppy short ribbon ' + (gu.short_above_long ? 'above' : 'below') + ' long ribbon', 'RSI ' + r, 'MACD histogram ' + h);
   return JSON.stringify(o);
 }
-async function ailCallModel(ctx, system) {
-  system = system || AIL_SYSTEM;
+async function ailCallModel(ctx, system, maxTok) {
+  system = system || AIL_SYSTEM; maxTok = maxTok || 900;
   const P = AIL_PROVIDERS[ail.cfg.provider];
   if (ail.cfg.provider === 'mock') return ailMock(ctx);
   if (P.viaWorker) {
     if (!phReady()) throw new Error('Set your Worker URL first (Markets > Alerts > phone alerts).');
-    const r = await fetch(PH.url.replace(/\/+$/, '') + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), messages: [{ role: 'system', content: system }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] }) });
+    const r = await fetch(PH.url.replace(/\/+$/, '') + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), max_tokens: maxTok, messages: [{ role: 'system', content: system }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] }) });
     let j = null; try { j = await r.json(); } catch (e) { /* ignore */ }
     if (!r.ok || !j || !j.ok) throw new Error('Cloudflare AI: ' + ((j && j.error) || 'HTTP ' + r.status));
     return j.text || '';
   }
   if (!ail.cfg.key) throw new Error('Add your API key in the AI panel first.');
-  const body = { model: ail.cfg.model || P.model, temperature: 0.2, max_tokens: 900, messages: [{ role: 'system', content: system }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] };
+  const body = { model: ail.cfg.model || P.model, temperature: 0.2, max_tokens: maxTok, messages: [{ role: 'system', content: system }, { role: 'user', content: 'Chart data:\n' + JSON.stringify(ctx) }] };
   if (P.json) body.response_format = { type: 'json_object' };
   const res = await fetch(P.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ail.cfg.key }, body: JSON.stringify(body) });
   if (!res.ok) { let t = ''; try { t = (await res.text()).slice(0, 160); } catch (e) { /* ignore */ } throw new Error(res.status === 401 ? 'The API key was rejected (401).' : res.status === 429 ? 'Free-tier rate limit hit (429). Wait a minute and try again.' : 'AI service error ' + res.status + ' ' + t); }
@@ -14469,13 +14553,34 @@ async function ailAnalyzeNow() {
   if (all.length < 60) { ail.msg = 'Need at least 60 candles on the chart. Load more history first.'; ailRender(); return; }
   ail.busy = true; ail.msg = 'Asking the AI…'; ailRender();
   try {
-    if (ail.cfg.tfs.length >= 2 && !ailMtfOk()) throw new Error('Multi-timeframe needs the live chart on a plain symbol like BTCUSD. Clear the timeframe picks to analyse this chart only.');
+    if (ailSeg() === 'strategy' && liveParseStratSymbol(LIVE.symbol)) {
+      ail.msg = 'Reading the combined premium, the underlying and OI flow…'; ailRender();
+      const m = await ailAnalyzeStrategy();
+      if (!m.p.ok) { ail.msg = m.p.why; ail.last = { raw: String(m.raw).slice(0, 400) }; }
+      else {
+        const c = m.p.call, rec = Object.assign({ id: Date.now(), ts: Date.now(), seg: 'strategy', sym: LIVE.symbol, tf: m.tt, t: m.last.t, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, mtf: m.tfs, align: m.align, oiRead: m.oiRead, contract: m.contract, legs: m.legs, status: c.bias === 'neutral' ? 'neutral' : 'open' }, c);
+        ail.journal.push(rec); ailSaveJournal(); ail.last = rec; ail.msg = '';
+        if (ailEligible(rec)) ailPush(rec).then(ok => { if (ok) ailSaveJournal(); ailDock(true); });
+      }
+      ail.busy = false; ailRender(); ailDock(true); return;
+    }
+    if (ailSeg() === 'options' && liveParseOptSymbol(LIVE.symbol)) {
+      ail.msg = 'Reading the contract, the underlying and OI flow…'; ailRender();
+      const m = await ailAnalyzeOption();
+      if (!m.p.ok) { ail.msg = m.p.why; ail.last = { raw: String(m.raw).slice(0, 400) }; }
+      else {
+        const c = m.p.call, rec = Object.assign({ id: Date.now(), ts: Date.now(), seg: 'options', sym: LIVE.symbol, tf: m.tt, t: m.last.t, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, mtf: m.tfs, align: m.align, oiRead: m.oiRead, contract: m.contract, status: c.bias === 'neutral' ? 'neutral' : 'open' }, c);
+        ail.journal.push(rec); ailSaveJournal(); ail.last = rec; ail.msg = '';
+        if (ailEligible(rec)) ailPush(rec).then(ok => { if (ok) ailSaveJournal(); ailDock(true); });
+      }
+      ail.busy = false; ailRender(); ailDock(true); return;
+    }
     if (ailMtfOk()) {
       ail.msg = 'Reading ' + ailSortedTfs().join(' + ') + '…'; ailRender();
       const m = await ailAnalyzeMtf();
       if (!m.p.ok) { ail.msg = m.p.why; ail.last = { raw: String(m.raw).slice(0, 400) }; }
       else {
-        const c = m.p.call, rec = Object.assign({ id: Date.now(), ts: Date.now(), sym: LIVE.symbol, tf: m.tt, t: m.last.t, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, mtf: m.tfs, align: m.align, oiRead: m.oiRead, opt: m.opt, status: c.bias === 'neutral' ? 'neutral' : 'open' }, c);
+        const c = m.p.call, rec = Object.assign({ id: Date.now(), ts: Date.now(), sym: LIVE.symbol, seg: 'perp', tf: m.tt, t: m.last.t, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, mtf: m.tfs, align: m.align, oiRead: m.oiRead, opt: m.opt, status: c.bias === 'neutral' ? 'neutral' : 'open' }, c);
         ail.journal.push(rec); ailSaveJournal(); ail.last = rec; ail.msg = '';
         if (ailEligible(rec)) ailPush(rec).then(ok => { if (ok) ailSaveJournal(); ailDock(true); });
       }
@@ -14484,7 +14589,7 @@ async function ailAnalyzeNow() {
     const ctx = ailContext(all, { symbol: ailSym(), tf: ailTf(), oi: ailOiSummary() }), raw = await ailCallModel(ctx), p = ailParse(raw, ctx.price, ctx.atr14);
     if (!p.ok) { ail.msg = p.why; ail.last = { raw: String(raw).slice(0, 400) }; }
     else {
-      const c = p.call, last = all[all.length - 1], rec = Object.assign({ id: Date.now(), ts: Date.now(), sym: ailSym(), tf: ailTf(), t: last.t, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, status: c.bias === 'neutral' ? 'neutral' : 'open' }, c);
+      const c = p.call, last = all[all.length - 1], rec = Object.assign({ id: Date.now(), ts: Date.now(), seg: ailSeg(), sym: ailSym(), tf: ailTf(), t: last.t, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, status: c.bias === 'neutral' ? 'neutral' : 'open' }, c);
       ail.journal.push(rec); ailSaveJournal(); ail.last = rec; ail.msg = '';
       if (ailEligible(rec)) ailPush(rec).then(ok => { if (ok) { ailSaveJournal(); } ailDock(true); });
     }
@@ -14521,15 +14626,22 @@ function ailSetKey(v) { ail.cfg.key = v.trim(); ailSaveCfg(); }
 
 /* ---------- Server tracking: the Worker scores live calls against real candles even when this page is closed ---------- */
 const AIL_SRV_TF = ['5m', '15m', '30m', '1h', '4h'];
-function ailEligible(x) { return !x.bt && (x.bias === 'long' || x.bias === 'short') && x.status === 'open' && /^[A-Z0-9]{2,14}$/.test(x.sym || '') && AIL_SRV_TF.includes(x.tf) && typeof phReady === 'function' && phReady(); }
-async function ailPush(x) {
-  const t = liveTimeToSec(x.t); if (t == null) return false;
-  try {
-    const j = await phCall('/aicall', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), call: { id: x.id, sym: x.sym, tf: x.tf, t, bias: x.bias, entry: x.entry, stop: x.stop, target: x.target, hz: x.hz, conf: x.confidence } }) });
-    if (j && j.ok) { x.srv = true; return true; }
-  } catch (e) { /* offline or old Worker: the call is still tracked locally while the app is open */ }
-  return false;
+function ailOptAlive(s) { const o = liveParseOptSymbol(s); return !!o && Date.parse(o.exp + 'T12:00:00Z') > Date.now(); }
+function ailEligible(x) { if (!x.bt && ailSegOf(x) === 'strategy') return (x.bias === 'long' || x.bias === 'short') && x.status === 'open' && AIL_SRV_TF.includes(x.tf) && /^S~/.test(x.sym || '') && Array.isArray(x.legs) && x.legs.length > 0 && x.legs.length <= 6 && ailOptAlive(x.legs[0].symbol) && typeof phReady === 'function' && phReady();
+  if (!x.bt && ailSegOf(x) === 'stock') return (x.bias === 'long' || x.bias === 'short') && x.status === 'open' && x.tf === '1d' && /^[A-Z0-9&_-]{1,20}$/.test(x.sym || '') && typeof phReady === 'function' && phReady(); return !x.bt && (x.bias === 'long' || x.bias === 'short') && x.status === 'open' && (/^[A-Z0-9]{2,14}$/.test(x.sym || '') || (/^[CP]-[A-Z0-9]+-\d+(?:\.\d+)?-\d{6}$/.test(x.sym || '') && ailOptAlive(x.sym))) && AIL_SRV_TF.includes(x.tf) && typeof phReady === 'function' && phReady(); }
+function ailCallBody(x) { const t = liveTimeToSec(x.t); return t == null ? null : { id: x.id, seg: ['stock', 'strategy'].includes(ailSegOf(x)) ? ailSegOf(x) : '', legs: ailSegOf(x) === 'strategy' && x.legs ? x.legs.map(l => ({ s: l.symbol, w: l.w })) : undefined, sym: x.sym, tf: x.tf, t, bias: x.bias, entry: x.entry, stop: x.stop, target: x.target, hz: x.hz, conf: x.confidence }; }
+async function ailPushMany(list) {
+  let any = false;
+  for (let i = 0; i < list.length; i += 40) {
+    const chunk = list.slice(i, i + 40).map(x => [x, ailCallBody(x)]).filter(p => p[1]); if (!chunk.length) continue;
+    try {
+      const j = await phCall('/aicall', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: phToken(), calls: chunk.map(p => p[1]) }) });
+      if (j && j.ok) { const ok = new Set(j.accepted || []); chunk.forEach(p => { if (ok.has(p[0].id)) { p[0].srv = true; any = true; } }); }
+    } catch (e) { /* offline or old Worker: the calls are still tracked locally while the app is open */ }
+  }
+  return any;
 }
+const ailPush = async x => (await ailPushMany([x])) && !!x.srv;
 async function ailSync() {
   if (ailSync.busy || typeof phReady !== 'function' || !phReady()) return; ailSync.busy = true;
   try {
@@ -14542,7 +14654,7 @@ async function ailSync() {
         if (d) { Object.assign(x, { status: d.status, r: d.r, bars: d.bars, exit: d.exit }); ch = true; }
         else if (x.srv && !open.has(x.id)) x.srv = false;   // the Worker lost it: send it again below
       });
-      for (const x of ail.journal) if (ailEligible(x) && !x.srv && await ailPush(x)) ch = true;
+      { const todo = ail.journal.filter(x => ailEligible(x) && !x.srv); if (todo.length && await ailPushMany(todo)) ch = true; }
       if (ch) { ailSaveJournal(); ailRender(); }
       ailDock(true);
     }
@@ -14557,13 +14669,13 @@ function ailDockToggle() { try { localStorage.setItem(AIL_DOCK, ailDockOpen() ? 
 function ailDock(force) {
   const anchor = document.getElementById('replay-nodata'); if (!anchor || !anchor.parentNode) return;
   let el = document.getElementById('ail-dock'); if (!el) { el = document.createElement('div'); el.id = 'ail-dock'; anchor.parentNode.insertBefore(el, anchor); }
-  const sym = ailSym(), tf = ailTf(), mine = ail.journal.filter(x => !x.bt && x.sym === sym), c = mine[mine.length - 1] || null, open = ailDockOpen();
-  const sig = [open, sym, tf, ail.cfg.tfs.join(), ail.busy, c && c.id, c && c.status, c && c.r, mine.length, ail.msg].join('|');
+  const sym = ailSym(), tf = ailTf(), seg = ailSeg(), segAll = ail.journal.filter(x => !x.bt && ailSegOf(x) === seg), mine = segAll.filter(x => x.sym === sym), c = mine[mine.length - 1] || segAll[segAll.length - 1] || null, open = ailDockOpen();
+  const sig = [open, sym, tf, c && c.sym, ail.cfg.tfs.join(), ail.busy, c && c.id, c && c.status, c && c.r, mine.length, ail.msg].join('|');
   if (!force && sig === ailDockSig) return; ailDockSig = sig;
-  const st = ailStats(mine), cls = c ? (c.bias === 'long' ? 'b-long' : c.bias === 'short' ? 'b-short' : 'b-neutral') : 'b-neutral', fp = v => v == null ? '–' : ailEsc(String(v));
+  const st = ailStats(segAll), cls = c ? (c.bias === 'long' ? 'b-long' : c.bias === 'short' ? 'b-short' : 'b-neutral') : 'b-neutral', fp = v => v == null ? '–' : ailEsc(String(v));
   const stat = !c ? '' : c.status === 'open' ? 'tracking' : c.status === 'neutral' ? 'no trade' : c.status === 'win' ? 'WIN +' + c.r + 'R' : c.status === 'loss' ? 'LOSS −1R' : 'timed out ' + (c.r >= 0 ? '+' : '') + c.r + 'R';
   const trade = c && c.bias !== 'neutral';
-  const head = `<button class="ail-bar" onclick="ailDockToggle()" aria-expanded="${open}"><b>AI</b>${c ? `<span class="${cls}">${c.bias.toUpperCase()}</span><span class="ail-cf">${c.confidence}%</span>` : '<span class="ail-cf">no call yet</span>'}${trade ? `<span class="ail-px">${fp(c.entry)} → ${fp(c.target)}</span>` : ''}${c ? `<i class="ail-res ${c.status}">${stat}</i>` : ''}<span class="ail-car">${open ? '▴' : '▾'}</span></button>`;
+  const head = `<button class="ail-bar" onclick="ailDockToggle()" aria-expanded="${open}"><b>AI</b>${c && c.sym !== sym ? `<span class="ail-cf">${ailEsc((() => { const s = ailShortSym(c); return s.length > 18 ? s.slice(0, 18) + '…' : s; })())}</span>` : ''}${c ? `<span class="${cls}">${c.bias.toUpperCase()}</span><span class="ail-cf">${c.confidence}%</span>` : '<span class="ail-cf">no call yet</span>'}${trade ? `<span class="ail-px">${fp(c.entry)} → ${fp(c.target)}</span>` : ''}${c ? `<i class="ail-res ${c.status}">${stat}</i>` : ''}<span class="ail-car">${open ? '▴' : '▾'}</span></button>`;
   if (!open) { el.className = 'min'; el.innerHTML = head; return; }
   el.className = 'open';
   const note = (k, v) => v ? `<div class="ail-dk-p"><b>${k}</b> ${ailEsc(v)}</div>` : '';
@@ -14573,7 +14685,7 @@ function ailDock(force) {
     (c && c.patterns && c.patterns.length ? note('Signals', c.patterns.join(' · ')) : '') + (c && c.srv && c.status === 'open' ? note('', 'Tracked on your Worker even with the app closed') : '') +
     (st.scored ? note('Live record', st.wins + 'W · ' + st.losses + 'L' + (st.open ? ' · ' + st.open + ' open' : '')) : '') +
     (ail.msg ? `<div class="ail-dk-p warn">${ailEsc(ail.msg)}</div>` : '') +
-    ailTfChips() + `<div class="ail-dk-a"><button class="pri" onclick="ailAnalyzeNow()" ${ail.busy ? 'disabled' : ''}>${ail.busy ? 'Thinking…' : 'Analyze'}</button><button onclick="ailOpen()">Lab</button></div></div>`;
+    ailTfChips() + `<div class="ail-dk-a"><button class="pri" onclick="ailAnalyzeNow()" ${ail.busy ? 'disabled' : ''}>${ail.busy ? 'Thinking…' : 'Analyze'}</button><button onclick="ailOpen()">Lab</button>${seg === 'stock' ? '<button onclick="aisOpen()">Stocks</button>' : ''}</div></div>`;
 }
 (function () {
   const css = document.createElement('style');
@@ -14594,6 +14706,151 @@ function ailDock(force) {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) ailSync(); });
 })();
 
+
+/* ================= Stock ideas: end-of-day Nifty 500 screen (rules) + AI trade plans, journaled and scored on later daily candles ================= */
+const AIS_KEY = 'tradepro_ai_stocks_v1';
+const AIS = { n: 10, tab: 'long', busy: false, msg: '', prog: '', res: null, cache: {} };
+try { const r = JSON.parse(localStorage.getItem(AIS_KEY) || 'null'); if (r && r.long && r.short) AIS.res = r; } catch (e) { /* ignore */ }
+function aisSave() { try { localStorage.setItem(AIS_KEY, JSON.stringify(AIS.res)); } catch (e) { /* ignore */ } }
+const aisEsc = ailEsc, aisFmt = v => v == null || !isFinite(v) ? '–' : (Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-IN') : (+v).toFixed(2));
+async function aisLoad(syms, onProg) {
+  const got = {}; let i = 0, done = 0;
+  const worker = async () => { while (i < syms.length) { const s = syms[i++]; try { got[s] = AIS.cache[s] || (AIS.cache[s] = await indiaCandles(s, '1d')); } catch (e) { /* skip this stock */ } done++; onProg(done, syms.length); } };
+  await Promise.all([1, 2, 3, 4, 5, 6, 7, 8].map(worker));
+  return got;
+}
+function aisFeatures(cs, nf) {   // everything the screen and the AI are allowed to see for one stock
+  const n = cs.length; if (n < 130) return null;
+  const cl = cs.map(x => x.c), L = cs[n - 1], P = cs[n - 2], at = (a, k) => a[a.length - 1 - (k || 0)];
+  const e20 = at(emaSeries(cl, 20)), e50 = at(emaSeries(cl, 50)), e200 = n >= 210 ? at(emaSeries(cl, 200)) : null, rsi = at(rsiSeries(cl, 14)), mac = macdSeries(cs, 12, 26, 9), atr = at(atrSeriesGeneric(cs, 14));
+  const g = gmmaSeries(cs), av = (arrs, i) => { const v = arrs.map(a => a[i]); return v.some(x => x == null) ? null : v.reduce((s, x) => s + x, 0) / v.length; };
+  const sa = av(g.short, n - 1), la = av(g.long, n - 1), sa5 = av(g.short, n - 6), la5 = av(g.long, n - 6);
+  if ([e20, e50, rsi, atr, sa, la, sa5, la5].some(v => v == null || !isFinite(v))) return null;
+  const prev = cs.slice(-21, -1), hh20 = Math.max(...prev.map(x => x.h)), ll20 = Math.min(...prev.map(x => x.l)), y = cs.slice(-250), hi52 = Math.max(...y.map(x => x.h)), lo52 = Math.min(...y.map(x => x.l));
+  const ret = k => n > k ? (L.c / cs[n - 1 - k].c - 1) * 100 : null, vols = cs.slice(-21, -1).map(x => x.v || 0), vavg = vols.reduce((s, x) => s + x, 0) / 20;
+  return { c: L.c, chg: (L.c / P.c - 1) * 100, e20, e50, e200, rsi, hist: at(mac.hist), histPrev: at(mac.hist, 1), atr, atrPct: atr / L.c * 100, sa, la, widen: (sa - la) / L.c - (sa5 - la5) / cs[n - 6].c, hh20, ll20, hi52, lo52, r1w: ret(5), r1m: ret(21), r3m: ret(63), rs1m: ret(21) - nf.r1m, rs3m: ret(63) - nf.r3m, vs: vavg > 0 ? (L.v || 0) / vavg : null, asOf: L.t };
+}
+function aisScore(f) {   // transparent points: trend, Guppy, momentum, breakout, 52-week position, relative strength vs Nifty, volume
+  const T = [], B = [], S = [], bull = { p: 0, t: T }, bear = { p: 0, t: B }; void S;
+  const add = (o, pts, tag) => { o.p += pts; if (tag) o.t.push(tag); };
+  if (f.c > f.e20) add(bull, 8); else add(bear, 8); if (f.e20 > f.e50) add(bull, 7, 'EMA20 above EMA50'); else add(bear, 7, 'EMA20 below EMA50');
+  if (f.e200 != null) { if (f.e50 > f.e200) add(bull, 7, 'above the 200-day trend'); else add(bear, 7, 'below the 200-day trend'); }
+  if (f.sa > f.la) { add(bull, 10, 'Guppy bullish'); if (f.widen > 0) add(bull, 5, 'Guppy widening'); } else { add(bear, 10, 'Guppy bearish'); if (f.widen < 0) add(bear, 5, 'Guppy widening down'); }
+  if (f.rsi >= 55 && f.rsi <= 72) add(bull, 10, 'RSI ' + Math.round(f.rsi)); else if (f.rsi > 72 && f.rsi <= 80) add(bull, 4, 'RSI hot ' + Math.round(f.rsi)); else if (f.rsi > 80) bull.p -= 8;
+  if (f.rsi <= 45 && f.rsi >= 28) add(bear, 10, 'RSI ' + Math.round(f.rsi)); else if (f.rsi < 28 && f.rsi >= 20) add(bear, 4, 'RSI weak ' + Math.round(f.rsi)); else if (f.rsi < 20) bear.p -= 8;
+  if (f.hist > 0) { add(bull, 5, 'MACD positive'); if (f.hist > f.histPrev) add(bull, 5); } else { add(bear, 5, 'MACD negative'); if (f.hist < f.histPrev) add(bear, 5); }
+  if (f.c > f.hh20) add(bull, 12, '20-day breakout'); else if (f.c > f.e20 && f.c >= f.hh20 * 0.985) add(bull, 6, 'near 20-day high');
+  if (f.c < f.ll20) add(bear, 12, '20-day breakdown'); else if (f.c < f.e20 && f.c <= f.ll20 * 1.015) add(bear, 6, 'near 20-day low');
+  if (f.c >= f.hi52 * 0.95) add(bull, 6, 'near 52-week high'); if (f.c <= f.lo52 * 1.05) add(bear, 6, 'near 52-week low');
+  if (f.rs3m > 0) add(bull, 6, 'beating Nifty (3m)'); else add(bear, 6, 'lagging Nifty (3m)'); if (f.rs1m > 0) add(bull, 5); else add(bear, 5);
+  if (f.vs != null) { if (f.vs >= 1.5 && f.chg > 0) add(bull, 8, 'volume surge ×' + f.vs.toFixed(1)); else if (f.vs >= 1.2 && f.chg > 0) add(bull, 4); if (f.vs >= 1.5 && f.chg < 0) add(bear, 8, 'volume surge ×' + f.vs.toFixed(1)); else if (f.vs >= 1.2 && f.chg < 0) add(bear, 4); }
+  const norm = o => Math.max(0, Math.min(100, Math.round(o.p * 100 / 94)));
+  return { bull: norm(bull), bear: norm(bear), bt: bull.t, st: bear.t };
+}
+const AIS_SYSTEM = side => 'You are an equity research assistant inside a paper-trading simulator. You receive JSON for candidate Indian (NSE) stocks that passed a rules screen for a ' + side.toUpperCase() + ' swing setup. Data is END OF DAY. Per stock: "sym", "sec" (sector), "c" (last close), "score" (screen score 0-100), "r1w" "r1m" "r3m" (% returns), "rs3m" (3-month return minus Nifty), "rsi", "atr" (daily average true range in rupees), "e20" "e50" "e200" (EMAs), "hh20" "ll20" (20-day high/low), "vs" (volume vs 20-day average), "tags" (why it screened). ' +
+  'Choose the best stocks for a ' + side + ' swing trade over the next 3-20 trading days and plan each one. Prefer clean trends with confirmation, avoid names that look exhausted (very extended from the EMAs, RSI extreme) and avoid more than 3 from one sector. You may return fewer than requested if the rest are weak. Use ONLY the data given. ' +
+  'Reply with a single JSON object and nothing else: {"picks":[{"sym":"...","confidence":0-100,"entry":number (use "c"),"stop":number,"target":number,"horizon_days":3-20,"reason":"max 18 words","risk":"max 10 words"}]} ordered best first. ' +
+  (side === 'bullish' ? 'Rules: stop < entry < target.' : 'Rules: target < entry < stop.') + ' Keep the stop within about 1 to 3 times atr of entry and the target within about 1.5 to 4 times atr. Never invent data you were not given.';
+function aisRulePlan(f, bias) { const a = f.atr, long = bias === 'long'; return { entry: +f.c.toFixed(2), stop: +(long ? f.c - 2 * a : f.c + 2 * a).toFixed(2), target: +(long ? f.c + 3 * a : f.c - 3 * a).toFixed(2), hz: 10 }; }
+function aisParse(txt, cand, bias, n) {
+  let o = null; try { const m = String(txt).match(/\{[\s\S]*\}/); o = JSON.parse(m ? m[0] : txt); } catch (e) { return null; }
+  const list = o && Array.isArray(o.picks) ? o.picks : null; if (!list) return null; const out = [], seen = new Set(), long = bias === 'long';
+  for (const p of list) {
+    const c = cand.find(x => x.sym === String(p.sym || '').toUpperCase()); if (!c || seen.has(c.sym)) continue;
+    const st = +p.stop, tg = +p.target, risk = Math.abs(c.f.c - st), okSide = long ? (st < c.f.c && tg > c.f.c) : (st > c.f.c && tg < c.f.c);
+    if (!(okSide && risk >= c.f.atr * 0.5 && risk <= c.f.atr * 4)) continue;
+    seen.add(c.sym); out.push({ sym: c.sym, bias, conf: Math.max(0, Math.min(100, Math.round(+p.confidence || 0))), entry: +c.f.c.toFixed(2), stop: +st.toFixed(2), target: +tg.toFixed(2), hz: Math.max(3, Math.min(20, Math.round(+p.horizon_days || 10))), reason: String(p.reason || '').slice(0, 140), risk: String(p.risk || '').slice(0, 80), plan: 'ai' });
+    if (out.length >= n) break;
+  }
+  return out;
+}
+async function aisRun() {
+  if (AIS.busy) return; AIS.busy = true; AIS.msg = ''; AIS.prog = 'Loading the stock list…'; aisRender();
+  try {
+    await indiaListReady; const snap = await inxLoad(false).then(() => INX.snap).catch(() => null);
+    let uni = (snap && snap.stocks ? snap.stocks.filter(s => isFinite(s.turnover)).sort((a, b) => b.turnover - a.turnover).slice(0, 220).map(s => ({ sym: s.sym, name: s.name || s.sym, sec: inxSec(s.sector || '') })) : INDIA_STOCKS.slice(0, 120).map(s => ({ sym: s, name: (INDIA_META[s] && INDIA_META[s].name) || s, sec: (INDIA_META[s] && inxSec(INDIA_META[s].sector)) || '' })));
+    if (!uni.length) throw new Error('No stock list found. Has the daily data job run yet?');
+    const got = await aisLoad(['NIFTY'].concat(uni.map(u => u.sym)), (d, t) => { AIS.prog = 'Reading daily candles ' + d + ' / ' + t; const e = document.getElementById('ais-prog'); if (e) e.textContent = AIS.prog; });
+    const nc = got.NIFTY; if (!nc || nc.length < 70) throw new Error('Nifty data is not available yet. Has the daily data job run yet?');
+    const nf = { r1m: (nc[nc.length - 1].c / nc[nc.length - 22].c - 1) * 100, r3m: (nc[nc.length - 1].c / nc[nc.length - 64].c - 1) * 100 };
+    const cand = []; uni.forEach(u => { const cs = got[u.sym]; if (!cs) return; const f = aisFeatures(cs, nf); if (!f || f.c < 20) return; const s = aisScore(f); cand.push(Object.assign({}, u, { f, s })); });
+    if (cand.length < 20) throw new Error('Only ' + cand.length + ' stocks had enough history. Check the data files.');
+    const asOf = cand.map(c => c.f.asOf).sort().pop(), pool = Math.min(30, AIS.n + 8);
+    const top = key => cand.filter(c => c.s[key] >= 45).sort((a, b) => b.s[key] - a.s[key] || b.f.rs3m - a.f.rs3m).slice(0, pool);
+    const bullC = top('bull'), bearC = top('bear'), res = { asOf, at: Date.now(), n: AIS.n, screened: cand.length, source: 'rules', prov: ail.cfg.provider, long: [], short: [] };
+    const pack = (c, key, tags) => ({ sym: c.sym, sec: c.sec, c: aisFmt(c.f.c), score: c.s[key], r1w: +c.f.r1w.toFixed(1), r1m: +c.f.r1m.toFixed(1), r3m: +c.f.r3m.toFixed(1), rs3m: +c.f.rs3m.toFixed(1), rsi: Math.round(c.f.rsi), atr: +c.f.atr.toFixed(2), e20: +c.f.e20.toFixed(1), e50: +c.f.e50.toFixed(1), e200: c.f.e200 == null ? null : +c.f.e200.toFixed(1), hh20: +c.f.hh20.toFixed(1), ll20: +c.f.ll20.toFixed(1), vs: c.f.vs == null ? null : +c.f.vs.toFixed(1), tags: tags.slice(0, 5) });
+    const meta = c => ({ name: c.name, sec: c.sec });
+    let aiOk = 0;
+    for (const [bias, C, key, tg] of [['long', bullC, 'bull', 'bt'], ['short', bearC, 'bear', 'st']]) {
+      let picks = null;
+      if (ail.cfg.provider !== 'mock' && C.length) {
+        AIS.prog = 'Asking the AI for the ' + (bias === 'long' ? 'bullish' : 'bearish') + ' list…'; aisRender();
+        try { const raw = await ailCallModel({ requested: AIS.n, candidates: C.map(c => pack(c, key, c.s[tg])) }, AIS_SYSTEM(bias === 'long' ? 'bullish' : 'bearish'), 2200); picks = aisParse(raw, C, bias, AIS.n); if (picks && picks.length) aiOk++; } catch (e) { AIS.msg = (e && e.message) || String(e); }
+        const P = AIL_PROVIDERS[ail.cfg.provider]; if (P && P.delay && bias === 'long') await new Promise(r => setTimeout(r, P.delay));
+      }
+      if (!picks || !picks.length) picks = C.slice(0, AIS.n).map(c => { const pl = aisRulePlan(c.f, bias); return { sym: c.sym, bias, conf: c.s[key], entry: pl.entry, stop: pl.stop, target: pl.target, hz: pl.hz, reason: c.s[tg].slice(0, 3).join(', '), risk: '', plan: 'rules' }; });
+      res[bias] = picks.map((p, i) => Object.assign({ rank: i + 1 }, p, meta(C.find(c => c.sym === p.sym) || {}), { score: (C.find(c => c.sym === p.sym) || { s: {} }).s[key], tags: ((C.find(c => c.sym === p.sym) || { s: {} }).s[tg] || []).slice(0, 5), atr: (C.find(c => c.sym === p.sym) || { f: {} }).f.atr }));
+    }
+    res.source = aiOk ? 'ai' : 'rules';
+    AIS.res = res; aisSave(); aisJournal(res); AIS.prog = '';
+    if (!aiOk && ail.cfg.provider !== 'mock' && !AIS.msg) AIS.msg = 'The AI reply could not be used, so these plans are rule-based (2 × ATR stop, 3 × ATR target).';
+  } catch (e) { AIS.msg = (e && e.message) || String(e); AIS.prog = ''; }
+  AIS.busy = false; aisRender();
+}
+function aisJournal(res) {   // every pick becomes a tracked call (once per stock, per side, per as-of day)
+  const made = [];
+  ['long', 'short'].forEach(side => (res[side] || []).forEach(p => {
+    if (ail.journal.some(x => !x.bt && ailSegOf(x) === 'stock' && x.sym === p.sym && x.t === res.asOf && x.bias === side)) return;
+    const rec = { id: Date.now() * 100 + made.length, ts: Date.now(), seg: 'stock', sym: p.sym, tf: '1d', t: res.asOf, prov: ail.cfg.provider, model: ail.cfg.model, bt: false, bias: side, confidence: p.conf, entry: p.entry, stop: p.stop, target: p.target, hz: p.hz, patterns: (p.tags || []).slice(0, 4), reasoning: [p.reason], risks: p.risk ? [p.risk] : [], plan: p.plan, rank: p.rank, status: 'open' };
+    ail.journal.push(rec); made.push(rec);
+  }));
+  if (made.length) { ailSaveJournal(); if (phReady()) ailPushMany(made.filter(ailEligible)).then(() => { ailSaveJournal(); aisRender(); }); }
+}
+async function aisResolveOpen() {   // score open stock calls against the daily candles that arrived since (the Worker does the same in the background)
+  const open = ail.journal.filter(x => !x.bt && ailSegOf(x) === 'stock' && x.status === 'open'); if (!open.length) return;
+  const syms = [...new Set(open.map(x => x.sym))].slice(0, 80); const got = await aisLoad(syms, () => {}); let ch = false;
+  open.forEach(x => { const cs = got[x.sym]; if (!cs) return; const fwd = cs.filter(c => c.t > x.t); if (!fwd.length) return; const s = ailScore(x, fwd); if (s.status !== 'open') { Object.assign(x, s); ch = true; } });
+  if (ch) { ailSaveJournal(); ailRender(); }
+}
+function aisOpen() {
+  let el = document.getElementById('ais-bg'); if (!el) { el = document.createElement('div'); el.id = 'ais-bg'; el.onclick = e => { if (e.target === el) aisClose(); }; document.body.appendChild(el); }
+  el.classList.add('open'); aisRender(); aisResolveOpen().then(aisRender).catch(() => {}); ailSync();
+}
+function aisClose() { const el = document.getElementById('ais-bg'); if (el) el.classList.remove('open'); }
+function aisGo(sym) { aisClose(); ailClose(); try { openIndiaChart(sym); } catch (e) { /* ignore */ } }
+function aisSetN(n) { AIS.n = n; aisRender(); }
+function aisTab(t) { AIS.tab = t; aisRender(); }
+function aisRender() {
+  const el = document.getElementById('ais-bg'); if (!el || !el.classList.contains('open')) return;
+  const R = AIS.res, list = R ? R[AIS.tab === 'long' ? 'long' : 'short'] : [], jr = {};
+  ail.journal.filter(x => !x.bt && ailSegOf(x) === 'stock').forEach(x => { jr[x.sym + '|' + x.t + '|' + x.bias] = x; });
+  const bias = AIS.tab === 'long' ? 'long' : 'short';
+  const card = p => { const j = R && jr[p.sym + '|' + R.asOf + '|' + bias], st = j ? (j.status === 'open' ? 'tracking' : j.status === 'win' ? 'WIN +' + j.r + 'R' : j.status === 'loss' ? 'LOSS −1R' : 'timed out ' + (j.r >= 0 ? '+' : '') + j.r + 'R') : '';
+    return `<div class="ais-card" onclick="aisGo('${aisEsc(p.sym).replace(/'/g, '')}')"><div class="ais-top"><span class="ais-rk">${p.rank}</span><b>${aisEsc(p.sym)}</b><span class="ais-nm">${aisEsc(p.name && p.name !== p.sym ? p.name : '')}</span><span class="ais-cf ${bias === 'long' ? 'b-long' : 'b-short'}">${p.conf}%</span></div>
+      <div class="ais-sub">${aisEsc(p.sec || '')}${p.plan === 'rules' ? ' · rule-based plan' : ''}${st ? ` · <i class="ail-res ${j.status}">${st}</i>` : ''}</div>
+      <div class="ail-dk-g"><div><b>${aisFmt(p.entry)}</b><span>entry (close)</span></div><div><b>${aisFmt(p.stop)}</b><span>stop</span></div><div><b>${aisFmt(p.target)}</b><span>target</span></div><div><b>${p.hz}d</b><span>time limit</span></div></div>
+      ${p.reason ? `<div class="ail-dk-p">${aisEsc(p.reason)}</div>` : ''}${p.risk ? `<div class="ail-dk-p"><b>Risk:</b> ${aisEsc(p.risk)}</div>` : ''}${p.tags && p.tags.length ? `<div class="ail-tags">${p.tags.map(t => `<span>${aisEsc(t)}</span>`).join('')}</div>` : ''}</div>`; };
+  const when = R ? new Date(R.at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  el.innerHTML = `<div class="ail-sheet" role="dialog" aria-label="Stock ideas"><div class="ail-top"><b>Stock ideas</b><span class="ail-sub">Nifty 500 · end of day · research only</span><button onclick="aisClose()" aria-label="Close">✕</button></div>
+    <div class="ail-card"><div class="ail-h">Top ${AIS.n} bullish and bearish swing ideas</div><div class="ais-row"><div class="ail-chips"><button class="${AIS.n === 10 ? 'on' : ''}" onclick="aisSetN(10)">Top 10</button><button class="${AIS.n === 20 ? 'on' : ''}" onclick="aisSetN(20)">Top 20</button></div><button class="ais-go" ${AIS.busy ? 'disabled' : ''} onclick="aisRun()">${AIS.busy ? 'Working…' : (R ? 'Refresh ideas' : 'Get ideas')}</button></div>
+      <div class="ail-note" id="ais-prog">${aisEsc(AIS.prog)}</div>${AIS.msg ? `<div class="ail-msg">${aisEsc(AIS.msg)}</div>` : ''}
+      <div class="ail-note">Step 1: rules rank about 200 liquid stocks on trend, Guppy, momentum, breakouts, strength vs Nifty and volume. Step 2: the AI (${aisEsc((AIL_PROVIDERS[ail.cfg.provider] || {}).label || ail.cfg.provider)}) picks from the shortlist and plans each trade. Every pick is tracked and scored on the next daily candles.</div>
+      ${R ? `<div class="ail-note">Data as of <b>${aisEsc(R.asOf)}</b> close · ${R.screened} stocks screened · plans by ${R.source === 'ai' ? 'AI' : 'rules'} · run ${aisEsc(when)}</div>` : ''}</div>
+    ${R ? `<div class="ais-tabs"><button class="${AIS.tab === 'long' ? 'on' : ''}" onclick="aisTab('long')">Bullish (${R.long.length})</button><button class="${AIS.tab === 'short' ? 'on' : ''}" onclick="aisTab('short')">Bearish (${R.short.length})</button></div>
+    ${list.length ? list.map(card).join('') : '<div class="ail-card"><div class="ail-note">No stock passed the screen for this side today.</div></div>'}` : ''}
+    <div class="ail-note foot">These are screening results for research, not advice. Stops and targets are ideas on end-of-day data; gaps can jump past a stop. Tap a stock to open its chart. Results are scored in AI Lab under "Live calls · Stocks".</div></div>`;
+}
+(function () {
+  const css = document.createElement('style');
+  css.textContent = `#ais-bg{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6);align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto}#ais-bg.open{display:flex}
+#ais-bg .ail-sheet{width:100%;max-width:560px;margin:auto;display:flex;flex-direction:column;gap:10px}
+.ais-row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}.ais-go{border:0;background:var(--accent,#14C2B0);color:#04201c;border-radius:8px;padding:8px 14px;font-weight:800;font-size:12.5px;cursor:pointer}.ais-go[disabled]{opacity:.55;cursor:default}
+.ais-tabs{display:flex;gap:6px}.ais-tabs button{flex:1;border:1px solid var(--border);background:var(--surface-2);color:var(--text-muted);border-radius:9px;padding:9px 0;font-weight:800;font-size:12.5px;cursor:pointer}.ais-tabs button.on{background:var(--accent,#14C2B0);border-color:transparent;color:#04201c}
+.ais-card{border:1px solid var(--border);background:var(--surface-2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.ais-top{display:flex;align-items:baseline;gap:8px}.ais-top b{font-size:14px}.ais-rk{color:var(--text-faint);font-family:var(--mono);font-size:11px;min-width:18px}.ais-nm{color:var(--text-muted);font-size:11px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ais-cf{font-family:var(--mono);font-weight:800;font-size:13px}.ais-sub{font-size:10.5px;color:var(--text-faint)}`;
+  document.head.appendChild(css);
+})();
+
 /* ---------- UI ---------- */
 function ailOpen() { let el = document.getElementById('ail-bg'); if (!el) { el = document.createElement('div'); el.id = 'ail-bg'; el.onclick = e => { if (e.target === el) ailClose(); }; document.body.appendChild(el); } el.classList.add('open'); ailResolveOpen(); ailRender(); ailSync(); }
 function ailClose() { const el = document.getElementById('ail-bg'); if (el) el.classList.remove('open'); }
@@ -14608,7 +14865,7 @@ function ailRender() {
       <div><b>${s.avgR == null ? '–' : (s.avgR >= 0 ? '+' : '') + s.avgR.toFixed(2) + 'R'}</b><span>avg result per trade</span></div></div>` +
       (s.baseN ? `<div class="ail-note">Coin-flip baseline with the same stops and targets: win rate <b>${ailPct(s.baseWin)}</b>, avg <b>${(s.baseR >= 0 ? '+' : '') + s.baseR.toFixed(2)}R</b> (${s.baseN} calls). The AI is only adding value if it beats this.</div>` : '') +
       (s.scored < 30 && s.scored ? `<div class="ail-note warn">Only ${s.scored} scored trades. Results this small are mostly luck, so aim for 50+ before drawing conclusions.</div>` : '') : `<div class="ail-note">${note}</div>`) + `</div>`;
-  const rows = ail.journal.slice(-14).reverse().map(x => `<tr><td>${ailEsc(x.sym)} ${ailEsc(x.tf)}${x.bt ? ' <i>hist</i>' : ''}${x.mtf ? ' <i>MTF</i>' : ''}</td><td class="b-${x.bias}">${x.bias}</td><td>${x.confidence}</td><td>${x.status === 'neutral' ? '–' : ailEsc(x.status)}</td><td>${x.r == null ? '–' : (x.r > 0 ? '+' : '') + x.r + 'R'}</td></tr>`).join('');
+  const rows = ail.journal.slice(-14).reverse().map(x => `<tr><td>${ailEsc(ailShortSym(x))} ${ailEsc(x.tf)}${x.bt ? ' <i>hist</i>' : ''}${x.mtf ? ' <i>MTF</i>' : ''}</td><td class="b-${x.bias}">${x.bias}</td><td>${x.confidence}</td><td>${x.status === 'neutral' ? '–' : ailEsc(x.status)}</td><td>${x.r == null ? '–' : (x.r > 0 ? '+' : '') + x.r + 'R'}</td></tr>`).join('');
   const l = ail.last;
   const lastCard = l && l.bias ? `<div class="ail-card"><div class="ail-h">Latest idea <span class="b-${l.bias}">${l.bias.toUpperCase()}</span> · confidence ${l.confidence}</div>` +
     (l.bias === 'neutral' ? '<div class="ail-note">No clear edge right now.</div>' : `<div class="ail-grid"><div><b>${ailEsc(l.entry)}</b><span>entry (price now)</span></div><div><b>${ailEsc(l.stop)}</b><span>stop</span></div><div><b>${ailEsc(l.target)}</b><span>target</span></div><div><b>${l.hz}</b><span>candles to play out</span></div></div>`) +
@@ -14626,6 +14883,7 @@ function ailRender() {
       ${P.needsKey ? `<label>Model<input id="ail-model" value="${ailEsc(ail.cfg.model)}" onchange="ailSetModel(this.value)"></label><label>Your API key (kept only in this browser)<input id="ail-key" type="password" autocomplete="off" value="${ailEsc(ail.cfg.key)}" onchange="ailSetKey(this.value)" placeholder="paste free key"></label>` : '<div class="ail-note">Mock mode uses simple Guppy + RSI + MACD rules instead of a real AI. It is only for checking that everything works.</div>'}
     </div>
     <div class="ail-card"><div class="ail-h">Timeframes to read together</div>${ailTfChips()}<div class="ail-note">By default the AI reads 4h + 1h + 15m + 5m together with perpetual and options open-interest flow (long/short build-up, unwinding, covering, walls) and gives one trade. Pick 2 to 4 to change it, or none to analyse only the chart you are on (live chart needed). It runs only when you ask.</div></div>
+    <div class="ail-card"><div class="ail-h">Stock ideas</div><div class="ail-note">Ranks the Nifty 500 and gives you the top 10 or 20 bullish and bearish swing ideas (end of day).</div><button class="ais-go" onclick="aisOpen()">Open stock ideas</button></div>
     <div class="ail-actions"><button class="primary" ${ail.busy ? 'disabled' : ''} onclick="ailAnalyzeNow()">Analyze this chart now</button>
       <button ${ail.busy ? 'disabled' : ''} onclick="ailResearchRun(+document.getElementById('ail-n').value)">Research run on history</button>
       <input id="ail-n" type="number" min="3" max="60" value="20" title="How many past moments to test"><span class="ail-sub">points</span>
@@ -14633,7 +14891,7 @@ function ailRender() {
     ${ail.msg ? `<div class="ail-msg">${ailEsc(ail.msg)}</div>` : ''}
     ${lastCard}
     ${statBlock('Research run results (past data, scored instantly)', sB, 'Run a research run to test the AI on past candles. It only sees candles up to each test point, then is scored on what came next.')}
-    ${statBlock('Live calls (scored as new candles arrive)', sL, 'Use "Analyze this chart now" on the live chart. Each idea is tracked and scored automatically.')}
+    ${Object.keys(AIL_SEGS).filter(k => live.some(x => ailSegOf(x) === k)).map(k => statBlock('Live calls · ' + AIL_SEGS[k], ailStats(live.filter(x => ailSegOf(x) === k)), '')).join('') || statBlock('Live calls (scored as new candles arrive)', sL, 'Use "Analyze this chart now" on the live chart. Each idea is tracked and scored automatically.')}
     ${rows ? `<div class="ail-card"><div class="ail-h">Recent calls</div><table><tr><th>Chart</th><th>Call</th><th>Conf.</th><th>Result</th><th>R</th></tr>${rows}</table><button class="ail-link" onclick="ailClear()">Clear journal</button></div>` : ''}
     <div class="ail-note foot">R = profit in units of the risk taken (stop distance). Entry is the close of the analysed candle. If stop and target both fall inside one candle it counts as a loss. Language models are not reliable forecasters, so judge this by the numbers above, not by how convincing the reasoning sounds.</div>
   </div>`;

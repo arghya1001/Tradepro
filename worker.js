@@ -120,33 +120,43 @@ async function ai(req, env) {
   if (!env.AI) return json(env, { ok: false, error: 'Workers AI binding "AI" is not set on this Worker' }, 501);
   const b = await body(req);
   if (!TOKEN_RE.test(b.token || '') || !(await getDev(env, b.token))) return json(env, { ok: false, error: 'open Markets > Alerts once so this device is registered' }, 403);
-  const msgs = (Array.isArray(b.messages) ? b.messages : []).slice(0, 4).map(m => ({ role: m && m.role === 'system' ? 'system' : 'user', content: String((m && m.content) || '').slice(0, 20000) }));
+  const msgs = (Array.isArray(b.messages) ? b.messages : []).slice(0, 4).map(m => ({ role: m && m.role === 'system' ? 'system' : 'user', content: String((m && m.content) || '').slice(0, 24000) }));
   if (!msgs.length) return json(env, { ok: false, error: 'no messages' }, 400);
   const day = new Date().toISOString().slice(0, 10), k = 'aiq:' + b.token + ':' + day, used = +((await env.TP.get(k)) || 0);
   if (used >= AI_DAILY) return json(env, { ok: false, error: 'daily AI limit reached' }, 429);
   await env.TP.put(k, String(used + 1), { expirationTtl: 172800 });
   try {
-    const r = await env.AI.run(AI_MODEL, { messages: msgs, temperature: 0.2, max_tokens: 900 });
+    const r = await env.AI.run(AI_MODEL, { messages: msgs, temperature: 0.2, max_tokens: Math.max(200, Math.min(3500, Math.round(num(b.max_tokens) || 900))) });
     const t = r && r.response;
     return json(env, { ok: true, text: typeof t === 'string' ? t : JSON.stringify(t || '') });
   } catch (e) { return json(env, { ok: false, error: 'AI error: ' + String(e).slice(0, 120) }, 502); }
 }
 
 /* ---------- AI call tracking: scores the app's AI trade ideas against real candles, even when the app is closed ---------- */
-const MAX_AI_OPEN = 40, MAX_AI_DONE = 100;
+const MAX_AI_OPEN = 150, MAX_AI_DONE = 300, STOCK_BASE = 'https://raw.githubusercontent.com/arghya1001/Tradepro/data/';
+function aiOk(c) {
+  c = c || {}; const id = num(c.id), t = num(c.t), entry = num(c.entry), stop = num(c.stop), target = num(c.target), hz = Math.round(num(c.hz) || 0);
+  const bias = c.bias === 'short' ? 'short' : c.bias === 'long' ? 'long' : null, sym = String(c.sym || ''), tf = String(c.tf || ''), stock = c.seg === 'stock', strat = c.seg === 'strategy'; let legs;
+  if (id == null || t == null || entry == null || stop == null || target == null || !bias || hz < 3 || hz > 48) return null;
+  if (strat) {
+    legs = (Array.isArray(c.legs) ? c.legs.slice(0, 6) : []).map(l => ({ s: String((l && l.s) || ''), w: num(l && l.w) }));
+    if (!TFS[tf] || !/^S~[a-z]+~[A-Z0-9]+~\d{6}~[\d.]+~\d+(~[CP0-9:_.\-]+)?$/.test(sym) || !legs.length || legs.some(l => !parseOpt(l.s) || l.w == null || l.w === 0 || Math.abs(l.w) > 10) || !(Date.parse(parseOpt(legs[0].s).exp + 'T12:00:00Z') > Date.now())) return null;
+  } else if (stock) { if (tf !== '1d' || !/^[A-Z0-9&_-]{1,20}$/.test(sym) || hz > 30) return null; }
+  else if (!TFS[tf] || !(/^[A-Z0-9]{2,14}$/.test(sym) || (parseOpt(sym) && Date.parse(parseOpt(sym).exp + 'T12:00:00Z') > Date.now()))) return null;
+  if (bias === 'long' ? !(stop < entry && target > entry) : !(stop > entry && target < entry)) return null;
+  return { id, sym, tf, t, bias, entry, stop, target, hz, conf: Math.round(num(c.conf) || 0), seg: stock ? 'stock' : strat ? 'strategy' : '', legs, at: Date.now() };
+}
 async function aiCall(req, env) {
   const b = await body(req); if (!TOKEN_RE.test(b.token || '')) return json(env, { ok: false, error: 'bad token' }, 400);
-  const c = b.call || {}, id = num(c.id), t = num(c.t), entry = num(c.entry), stop = num(c.stop), target = num(c.target), hz = Math.round(num(c.hz) || 0);
-  const bias = c.bias === 'short' ? 'short' : c.bias === 'long' ? 'long' : null, sym = String(c.sym || ''), tf = String(c.tf || '');
-  if (id == null || t == null || entry == null || stop == null || target == null || !bias || !TFS[tf] || !/^[A-Z0-9]{2,14}$/.test(sym) || hz < 3 || hz > 48) return json(env, { ok: false, error: 'bad call' }, 400);
-  if (bias === 'long' ? !(stop < entry && target > entry) : !(stop > entry && target < entry)) return json(env, { ok: false, error: 'stop/target on wrong side' }, 400);
+  const list = (Array.isArray(b.calls) ? b.calls.slice(0, 60) : [b.call]).map(aiOk).filter(Boolean);
+  if (!list.length) return json(env, { ok: false, error: 'bad call' }, 400);
   const d = (await getDev(env, b.token)) || newDev();
   if (!(await register(env, b.token))) return json(env, { ok: false, error: 'device limit' }, 429);
   d.aicalls = d.aicalls || []; d.aidone = d.aidone || [];
-  if (!d.aicalls.some(x => x.id === id) && !d.aidone.some(x => x.id === id)) d.aicalls.push({ id, sym, tf, t, bias, entry, stop, target, hz, conf: Math.round(num(c.conf) || 0), at: Date.now() });
+  list.forEach(c => { if (!d.aicalls.some(x => x.id === c.id) && !d.aidone.some(x => x.id === c.id)) d.aicalls.push(c); });
   d.aicalls = d.aicalls.slice(-MAX_AI_OPEN);
   await putDev(env, b.token, d);
-  return json(env, { ok: true, open: d.aicalls.length });
+  return json(env, { ok: true, open: d.aicalls.length, accepted: list.map(c => c.id) });
 }
 async function aiState(url, env) {
   const t = url.searchParams.get('token') || ''; if (!TOKEN_RE.test(t)) return json(env, { ok: false, error: 'bad token' }, 400);
@@ -162,19 +172,53 @@ function aiScore(c, fwd) {   // same rules as the app's AI Lab scorer: stop and 
   if (fwd.length >= c.hz) { const px = fwd[c.hz - 1].c, r = (long ? px - c.entry : c.entry - px) / risk; return { status: 'expired', r: +r.toFixed(2), bars: c.hz, exit: px }; }
   return { status: 'open' };
 }
+const istParts = now => { const d = new Date(now + 19800000), iso = d.toISOString(); return { date: iso.slice(0, 10), hour: d.getUTCHours(), mins: d.getUTCHours() * 60 + d.getUTCMinutes() }; };
+async function stockCandles(sym, cache) {   // daily candles from your GitHub data branch (same files the app uses)
+  const k = 'stk|' + sym; if (cache.has(k)) return cache.get(k);
+  let out = [];
+  try {
+    const r = await fetch(STOCK_BASE + String(sym).toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_1d.json?v=' + Math.floor(Date.now() / 600000));
+    if (r.ok) { const j = await r.json(); if (Array.isArray(j)) out = j.map(x => ({ t: Date.parse(String(x.t).slice(0, 10) + 'T00:00:00Z') / 1000, o: num(x.o), h: num(x.h), l: num(x.l), c: num(x.c) })).filter(x => isFinite(x.t) && x.h != null && x.l != null && x.c != null).sort((a, b) => a.t - b.t); }
+  } catch (e) { /* retry next hour */ }
+  cache.set(k, out); return out;
+}
+async function comboCandles(c, nowSec, cache) {   // the strategy's net premium: sum of weight x leg price, same formula as the chart
+  const k = 'combo|' + c.id + '|' + c.tf; if (cache.has(k)) return cache.get(k);
+  const series = await Promise.all(c.legs.map(l => fetchCandles(l.s, c.tf, nowSec, cache, null)));
+  let out = [];
+  if (series.every(s => s.length)) {
+    const times = [...new Set(series.flatMap(s => s.map(x => x.t)))].sort((x, y) => x - y), at = (arr, t) => { for (let i = arr.length - 1; i >= 0; i--) { const q = arr[i]; if (q.t === t) return q; if (q.t < t) return { t, o: q.c, h: q.c, l: q.c, c: q.c }; } return null; };
+    for (const t of times) {
+      let o = 0, cl = 0, ub = 0, lb = 0, ok = true;
+      for (let i = 0; i < c.legs.length; i++) { const q = at(series[i], t); if (!q) { ok = false; break; } const wt = c.legs[i].w; o += wt * q.o; cl += wt * q.c; ub += wt > 0 ? wt * q.h : wt * q.l; lb += wt > 0 ? wt * q.l : wt * q.h; }
+      if (!ok) continue; const top = Math.max(o, cl), bot = Math.min(o, cl), one = c.legs.length === 1;
+      out.push({ t, o, c: cl, h: one ? ub : top + 0.5 * Math.max(0, ub - top), l: one ? lb : bot - 0.5 * Math.max(0, bot - lb) });
+    }
+  }
+  cache.set(k, out); return out;
+}
 async function trackAI(env) {
-  const idx = JSON.parse((await env.TP.get('idx')) || '[]'), now = Date.now(), nowSec = Math.floor(now / 1000), cache = new Map(); let scored = 0;
+  const idx = JSON.parse((await env.TP.get('idx')) || '[]'), now = Date.now(), nowSec = Math.floor(now / 1000), cache = new Map(), ist = istParts(now), hk = ist.date + 'T' + ist.hour; let scored = 0;
   for (const t of idx) {
     const d = await getDev(env, t); if (!d || !(d.aicalls || []).length) continue;
-    const keep = []; let dirty = false; d.aidone = d.aidone || [];
+    const keep = []; let dirty = false; d.aidone = d.aidone || []; const stockLines = [];
     for (const c of d.aicalls) {
-      const secs = TFS[c.tf], cs = await fetchCandles(c.sym, c.tf, nowSec, cache, null), fwd = cs.filter(x => x.t > c.t);
-      if (!cs.length) { if (now - c.at < 5 * 86400000) keep.push(c); else dirty = true; continue; }   // exchange unreachable: try again next minute, give up after 5 days
-      const s = aiScore(c, fwd);
-      if (s.status === 'open') { if (now - c.at < (c.hz + 4) * secs * 1000 + 3 * 86400000) keep.push(c); else dirty = true; continue; }
+      const stock = c.seg === 'stock', secs = stock ? 86400 : TFS[c.tf]; let cs;
+      if (stock) {
+        if (ist.mins < 16 * 60 || c.chk === hk) { keep.push(c); continue; }   // stock files update after the 15:30 IST close: look once an hour from 16:00
+        cs = await stockCandles(c.sym, cache); c.chk = hk; dirty = true;
+      } else cs = c.legs ? await comboCandles(c, nowSec, cache) : await fetchCandles(c.sym, c.tf, nowSec, cache, null);
+      const fwd = cs.filter(x => x.t > c.t), maxAge = stock ? (c.hz + 10) * 86400000 + 7 * 86400000 : (c.hz + 4) * secs * 1000 + 3 * 86400000;
+      if (!cs.length) { if (now - c.at < 5 * 86400000) keep.push(c); else dirty = true; continue; }   // data unreachable: try again later, give up after 5 days
+      const po = stock ? null : (c.legs && c.legs.length ? parseOpt(c.legs[0].s) : parseOpt(c.sym)), past = po && now > Date.parse(po.exp + 'T12:00:00Z') + 3600000;   // an option stops trading at expiry
+      if (past && fwd.length < c.hz && !fwd.length) { dirty = true; continue; }
+      const s = aiScore(past && fwd.length < c.hz ? Object.assign({}, c, { hz: fwd.length }) : c, fwd);
+      if (s.status === 'open') { if (now - c.at < maxAge) keep.push(c); else dirty = true; continue; }
       d.aidone.push({ id: c.id, status: s.status, r: s.r, bars: s.bars, exit: s.exit, at: now }); scored++; dirty = true;
-      if (d.chat) await tgSend(env, d.chat, '🤖 AI call result: ' + c.sym.replace(/USD$/, '') + ' ' + c.tf + ' ' + c.bias.toUpperCase() + ' → ' + (s.status === 'win' ? 'WIN ' : s.status === 'loss' ? 'LOSS ' : 'TIMED OUT ') + (s.r >= 0 ? '+' : '') + s.r + 'R after ' + s.bars + ' candles');
+      const line = c.sym.replace(/USD$/, '') + ' ' + c.tf + ' ' + c.bias.toUpperCase() + ' → ' + (s.status === 'win' ? 'WIN ' : s.status === 'loss' ? 'LOSS ' : 'TIMED OUT ') + (s.r >= 0 ? '+' : '') + s.r + 'R after ' + s.bars + (stock ? ' days' : ' candles');
+      if (stock) stockLines.push(line); else if (d.chat) await tgSend(env, d.chat, '🤖 AI call result: ' + line);
     }
+    if (stockLines.length && d.chat) await tgSend(env, d.chat, '🤖 AI stock calls resolved (' + stockLines.length + '):\n' + stockLines.slice(0, 25).join('\n'));
     if (dirty) { d.aicalls = keep; d.aidone = d.aidone.slice(-MAX_AI_DONE); await putDev(env, t, d); }
   }
   return scored;
