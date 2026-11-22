@@ -8345,6 +8345,7 @@ function paramSummary(inst) {
 
 function renderIndicatorChips() {
   const el = document.getElementById('ind-chips');
+  if (activeIndicators.some(i => !INDICATOR_DEFS[i.key])) activeIndicators = activeIndicators.filter(i => INDICATOR_DEFS[i.key]);
   el.innerHTML = activeIndicators.map(inst => {
     const def = INDICATOR_DEFS[inst.key];
     const displayName = def.type === 'signal' ? (inst.params.name || 'Signal') : def.name;
@@ -8568,6 +8569,7 @@ function candleTimerTick() {
 setInterval(() => { if (!document.hidden) candleTimerTick(); }, 1000);
 
 function renderChart(forceEnd) {
+  if (activeIndicators.some(i => !INDICATOR_DEFS[i.key])) activeIndicators = activeIndicators.filter(i => INDICATOR_DEFS[i.key]);   // drop saved indicators this version no longer has (e.g. the removed Delta)
   if (chartTouchLock) { chartRenderDeferred = true; return; }
   const scrollEl = document.getElementById('chart-scroll');
   const axisEl = document.getElementById('price-axis');
