@@ -6842,7 +6842,7 @@ const INDICATOR_DEFS = {
   walls: { name: 'Walls', full: 'Big resting orders (live)', type: 'overlay', editableColor: false,
     params: [{ key:'minSize', label:'Min size (contracts)', default:5000 }], calc: () => ({}) },
   bigtrades: { name: 'Big trades', full: 'Big executed trades (live)', type: 'overlay', editableColor: false,
-    params: [{ key:'minSize', label:'Min size (contracts)', default:2000 }], calc: () => ({}) },
+    params: [{ key:'minSize', label:'Min size (contracts)', default:500 }], calc: () => ({}) },
   volume: { name: 'Volume', full: 'Volume', type: 'volume', editableColor: false, params: [], calc: () => ({}) },
   confluence: { name: 'SSL+AEFP', full: 'SSL Channel + Adaptive Ehlers Confluence', type: 'overlay', editableColor: false,
     // A combined indicator ported from two Pine Script indicators: the SSL Channel Pro trend-flip
@@ -8855,7 +8855,7 @@ function renderChart(forceEnd) {
     } else if (inst.key === 'walls') {
       flowBack += flowWallsSvg(+inst.params.minSize || 5000, yAt, yMin, yMax, scrollEl.scrollLeft || 0, Math.max(60, (scrollEl.clientWidth || 340) * 0.3));
     } else if (inst.key === 'bigtrades') {
-      overlays += flowTradesSvg(+inst.params.minSize || 2000, dispCS, dispN, xAt, yAt, yMin, yMax);
+      overlays += flowTradesSvg(+inst.params.minSize || 500, dispCS, dispN, xAt, yAt, yMin, yMax, scrollEl.scrollLeft || 0);
     } else if (inst.key === 'gmma') {
       // Short-term ribbon shaded from the person's chosen short-term color, long-term ribbon
       // from their long-term color — distinct hues by default (green vs. orange), and each
@@ -11706,18 +11706,21 @@ function flowWallsSvg(minSize, yAt, yMin, yMax, x0, maxLen) {
   let out = '', biggest = 0;
   const walls = [];
   [[bk.bids, 'var(--green)'], [bk.asks, 'var(--red)']].forEach(([arr, col]) => {
-    const m = med(arr);
-    arr.forEach(([p, s]) => { if (p >= yMin && p <= yMax && s >= minSize && s >= 2.5 * m) { walls.push([p, s, col]); if (s > biggest) biggest = s; } });
+    const m = med(arr), side = [];
+    arr.forEach(([p, s]) => { if (p >= yMin && p <= yMax && s >= minSize && s >= 2.5 * m) side.push([p, s, col]); });
+    side.sort((a, b) => b[1] - a[1]).slice(0, 4).forEach(w => { walls.push(w); if (w[1] > biggest) biggest = w[1]; }); // only the 4 biggest per side, so a thick book doesn't paint the whole chart
   });
-  walls.forEach(([p, s, col]) => {
-    const len = Math.max(8, maxLen * s / biggest), y = yAt(p), big = s >= 2 * minSize;
-    out += `<rect x="${x0.toFixed(1)}" y="${(y - 3).toFixed(1)}" width="${len.toFixed(1)}" height="6" rx="2" fill="${col}" opacity="${big ? 0.5 : 0.3}"/>`;
-    if (big) out += `<text x="${(x0 + 4).toFixed(1)}" y="${(y - 6).toFixed(1)}" font-size="11" fill="var(--text-faint)">${flowFmt(s)}</text>`;
+  const labelled = [], lineLen = maxLen / 0.3 * 0.82, fp = p => p >= 1000 ? Math.round(p).toLocaleString('en-US') : p.toFixed(2);
+  walls.sort((a, b) => b[1] - a[1]).forEach(([p, s, col]) => {
+    const len = Math.max(8, maxLen * s / biggest), y = yAt(p);
+    out += `<line x1="${x0.toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x0 + lineLen).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${col}" stroke-width="1" stroke-dasharray="3,4" opacity="0.35"/>`;
+    out += `<rect x="${x0.toFixed(1)}" y="${(y - 3).toFixed(1)}" width="${len.toFixed(1)}" height="6" rx="2" fill="${col}" opacity="0.5"/>`;
+    if (!labelled.some(ly => Math.abs(ly - y) < 14)) { labelled.push(y); out += `<text x="${(x0 + len + 4).toFixed(1)}" y="${(y + 4).toFixed(1)}" font-size="11" font-weight="600" fill="${col}">${fp(p)} \u00b7 ${flowFmt(s)}</text>`; }
   });
   return out;
 }
 // Executed volume per candle / price level / side, drawn as bubbles when the total reaches the minimum size.
-function flowTradesSvg(minSize, candles, n, xAt, yAt, yMin, yMax) {
+function flowTradesSvg(minSize, candles, n, xAt, yAt, yMin, yMax, x0) {
   const secs = LIVE_RES[LIVE.res];
   if (!liveMode || !secs || secs > 86400 || FLOW.sym !== LIVE.symbol || !n) return '';
   const idx = new Map();
@@ -11729,14 +11732,17 @@ function flowTradesSvg(minSize, candles, n, xAt, yAt, yMin, yMax) {
     const kk = i + '|' + bk + '|' + side, a = FLOW.agg[k], o = tot[kk] || (tot[kk] = [i, side, 0, 0]);
     o[2] += a[0]; o[3] += a[1];
   }
-  let out = '';
+  let out = '', shown = 0, biggestG = 0;
   Object.values(tot).forEach(([i, side, size, pxs]) => {
+    if (size > biggestG) biggestG = size;
     if (size < minSize) return;
     const p = pxs / size;
     if (p < yMin || p > yMax) return;
     const r = Math.min(13, 4 + 3 * Math.sqrt(size / minSize)), col = side === 'b' ? 'var(--green)' : 'var(--red)';
-    out += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p).toFixed(1)}" r="${r.toFixed(1)}" fill="${col}" fill-opacity="0.4" stroke="${col}" stroke-width="1"><title>${side === 'b' ? 'Buyers' : 'Sellers'} ${flowFmt(size)} contracts</title></circle>`;
+    shown++;
+    out += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p).toFixed(1)}" r="${r.toFixed(1)}" fill="${col}" fill-opacity="0.4" stroke="${col}" stroke-width="1"><title>${side === 'b' ? 'Buyers' : 'Sellers'} ${flowFmt(size)} contracts</title></circle><text x="${(xAt(i) + r + 2).toFixed(1)}" y="${(yAt(p) + 4).toFixed(1)}" font-size="11" fill="${col}">${flowFmt(size)}</text>`;
   });
+  out += `<text x="${((x0 || 0) + 6).toFixed(1)}" y="${(yAt(yMax) + 18).toFixed(1)}" font-size="11" fill="var(--text-faint)">Big trades: ${FLOW.nTrades} trades seen \u00b7 biggest group ${flowFmt(biggestG)} \u00b7 showing ${shown}</text>`;
   return out;
 }
 
