@@ -6820,14 +6820,16 @@ const INDICATOR_DEFS = {
   gmma: { name: 'GMMA', full: 'Guppy Multiple Moving Average', type: 'overlay', editableColor: false,
     params: [],
     calc: (candles) => gmmaSeries(candles) },
-  htf_ma: { name: 'HTF MA', full: 'Higher TimeFrame MA', type: 'overlay',
+  htf_ma: { name: 'HTF MA', full: 'HTF MA Ribbon (chart timeframe + higher timeframe)', type: 'overlay', secondaryLabel: 'Line 2 color (higher timeframe)',
     params: [
-      { key:'len', label:'MA length', default:8 },
-      { key:'maType', label:'MA type', default:'SMA', type:'select', options:['SMA','EMA','WMA','DEMA','TEMA'] },
-      { key:'tfMult', label:'Timeframe ×', default:1 },
-      { key:'tfUnit', label:'Timeframe unit', default:'Days', type:'select', options:['Minutes','Hours','Days','Weeks'] },
+      { key:'len', label:'MA length', default:20 },
+      { key:'maType', label:'MA type', default:'EMA', type:'select', options:['SMA','EMA','WMA','DEMA','TEMA'] },
+      { key:'tfMult', label:'Line 2 timeframe ×', default:15 },
+      { key:'tfUnit', label:'Line 2 timeframe unit', default:'Minutes', type:'select', options:['Minutes','Hours','Days','Weeks'] },
+      { key:'flatPct', label:'Flat if slope under (% / 3 bars)', default:0.02, step:0.01 },
+      { key:'fillOpacity', label:'Ribbon fill opacity (%)', default:35, step:5 },
     ],
-    calc: (candles, p) => ({ line: htfMaSeries(candles, p.maType, p.len, p.tfMult, p.tfUnit) }) },
+    calc: (candles, p) => htfRibbonSeries(candles, p.maType, p.len, p.tfMult, p.tfUnit, p.flatPct) },
   ichimoku: { name: 'Ichimoku', full: 'Ichimoku Cloud', type: 'overlay', editableColor: false,
     params: [
       { key:'tenkanPeriod', label:'Tenkan', default:9 },
@@ -7356,6 +7358,58 @@ function detectBarSeconds(candles) {
   gaps.sort((a, b) => a - b);
   return gaps[Math.floor(gaps.length / 2)];
 }
+function htfMaOf(values, maType, len) {
+  switch (maType) {
+    case 'EMA': return emaSeries(values, len);
+    case 'WMA': return wmaSeries(values, len);
+    case 'DEMA': return demaSeries(values, len);
+    case 'TEMA': return temaSeries(values, len);
+    default: return smaSeries(values, len);
+  }
+}
+function htfRibbonSeries(candles, maType, len, tfMult, tfUnit, flatPct) {
+  // Line 1 = the MA on the chart's own bars. Line 2 = the same MA on real higher-timeframe closes (candles are
+  // grouped into buckets by timestamp). No look-ahead: on each bar, line 2 uses the COMPLETED higher-timeframe
+  // closes plus the current bar's close as the forming one. State per bar: 1 = close above both lines and the
+  // ribbon rising, -1 = close below both and falling, 0 = flat or mixed.
+  const n = candles.length, L = Math.max(1, Math.round(len));
+  const closes = candles.map(c => c.c);
+  const line = htfMaOf(closes, maType, L);
+  const barSec = detectBarSeconds(candles);
+  const targetSec = (+tfMult || 1) * (HTF_SECONDS_PER_UNIT[tfUnit] || 60);
+  const ts = candles.map(c => new Date(c.t).getTime() / 1000);
+  const okTs = ts.every(t => isFinite(t));
+  let line2 = new Array(n).fill(null);
+  if (!okTs || targetSec <= barSec * 1.01) {
+    line2 = line.slice();   // higher timeframe is not above the chart's own: both lines coincide
+  } else {
+    const bucketOf = new Array(n), lastClose = [];
+    let prevKey = null, b = -1;
+    for (let i = 0; i < n; i++) {
+      const key = Math.floor(ts[i] / targetSec);
+      if (key !== prevKey) { b++; prevKey = key; }
+      bucketOf[i] = b; lastClose[b] = closes[i];
+    }
+    const W = Math.max(L * 6, L + 5);
+    for (let i = 0; i < n; i++) {
+      const bi = bucketOf[i], from = Math.max(0, bi - W + 1);
+      const arr = lastClose.slice(from, bi); arr.push(closes[i]);
+      if (arr.length < L) continue;
+      const m = htfMaOf(arr, maType, L);
+      line2[i] = m[m.length - 1];
+    }
+  }
+  const thr = (flatPct == null || isNaN(flatPct) ? 0.02 : flatPct) / 100;
+  const state = new Array(n).fill(0);
+  for (let i = 3; i < n; i++) {
+    if (line[i] == null || line2[i] == null || line[i-3] == null || line2[i-3] == null) continue;
+    const mid = (line[i] + line2[i]) / 2, mid0 = (line[i-3] + line2[i-3]) / 2;
+    const slope = mid0 ? (mid - mid0) / mid0 : 0;
+    if (closes[i] > Math.max(line[i], line2[i]) && slope > thr) state[i] = 1;
+    else if (closes[i] < Math.min(line[i], line2[i]) && slope < -thr) state[i] = -1;
+  }
+  return { line, line2, state };
+}
 function htfMaSeries(candles, maType, len, tfMult, tfUnit) {
   // Ported from the "Higher TimeFrame Smooth Moving Averages" Pine Script (EsIstTurnt,
   // MPL-2.0): rather than fetching real higher-timeframe candles, it approximates the HTF
@@ -7827,6 +7881,7 @@ function addIndicator(key) {
   def.params.forEach(p => { params[p.key] = p.default; });
   const inst = { id: 'ind' + (indicatorSeq++), key, params, color: IND_COLORS[activeIndicators.length % IND_COLORS.length], width: 1.5, opacity: 100, lineStyle: 'solid' };
   if (def.secondaryLabel) inst.secondaryColor = key === 'rsi' ? DRAW_INK() : '#D9A441';
+  if (key === 'htf_ma') { inst.color = '#378ADD'; inst.secondaryColor = '#EF9F27'; inst.htfBullColor = '#2EBD85'; inst.htfBearColor = '#F6465D'; inst.htfFlatColor = '#888780'; }
   if (key === 'gmma') {
     inst.gmmaShortColor = '#009956'; // base hue each ribbon is shaded from, lightest (period 3) to this (period 15)
     inst.gmmaLongColor = '#FF5723';  // base hue for the long-term ribbon, lightest (period 30) to this (period 60)
@@ -8225,7 +8280,7 @@ function openCustomColorEditor(instId, field) {
   if (String(instId).startsWith('draw:')) { const d = drawings[+instId.slice(5)]; if (!d) return; colorPickerHSV = hexToHsv(d.color || '#2962FF'); customColorEditorFor = { instId, field }; refreshDrawingSettingsPopup(); return; }
   const inst = activeIndicators.find(i => i.id === instId);
   if (!inst) return;
-  const startHex = field === 'secondary' ? (inst.secondaryColor || '#D9A441') : field === 'primary' ? inst.color : (inst[field] || '#2962FF');
+  const startHex = field === 'secondary' ? (inst.secondaryColor || '#D9A441') : field === 'primary' ? inst.color : (inst[field] || HTF_FIELD_DEFAULTS[field] || '#2962FF');
   colorPickerHSV = hexToHsv(startHex);
   customColorEditorFor = { instId, field };
   refreshIndicatorSettings(instId);
@@ -8342,8 +8397,9 @@ function customColorEditorHtml() {
     </div>
   `;
 }
+const HTF_FIELD_DEFAULTS = { htfBullColor: '#2EBD85', htfBearColor: '#F6465D', htfFlatColor: '#888780' };
 function colorFieldHtml(inst, field, label) {
-  const current = field === 'secondary' ? (inst.secondaryColor || '#D9A441') : field === 'primary' ? inst.color : (inst[field] || '#2962FF');
+  const current = field === 'secondary' ? (inst.secondaryColor || '#D9A441') : field === 'primary' ? inst.color : (inst[field] || HTF_FIELD_DEFAULTS[field] || '#2962FF');
   const isGridOpen = colorGridOpenFor && colorGridOpenFor.instId === inst.id && colorGridOpenFor.field === field;
   const isCustomOpen = customColorEditorFor && customColorEditorFor.instId === inst.id && customColorEditorFor.field === field;
   const row = `
@@ -8372,6 +8428,7 @@ function paramSummary(inst) {
   }
   if (!def.params.length) return '';
   if (inst.key === 'rsi') { rsiEnsure(inst); return ' ' + inst.params.period + (inst.params.smoothType !== 'None' ? ',' + inst.params.smoothType + ',' + inst.params.smoothLen : ''); }
+  if (inst.key === 'htf_ma') return ' ' + inst.params.maType + ' ' + inst.params.len + ' · ' + inst.params.tfMult + String(inst.params.tfUnit || 'Minutes').charAt(0).toLowerCase();
   return ' ' + def.params.map(p => inst.params[p.key]).join(',');
 }
 
@@ -8449,7 +8506,7 @@ function openIndicatorSettings(e, id) {
     ` : `
       <div class="ind-settings-row">
         <label>${p.label}</label>
-        <input type="number" value="${inst.params[p.key]}" step="${p.key==='mult'?'0.1':'1'}"
+        <input type="number" value="${inst.params[p.key]}" step="${p.step || (p.key==='mult'?'0.1':'1')}"
           onchange="updateIndicatorParam('${inst.id}','${p.key}',this.value); refreshIndicatorSettings('${inst.id}')">
       </div>
     `).join('')}
@@ -8458,7 +8515,7 @@ function openIndicatorSettings(e, id) {
   const isGmma = inst.key === 'gmma';
   const colorEditable = def.editableColor !== false;
   const colorRow = isGmma ? (colorFieldHtml(inst, 'gmmaShortColor', 'Short-term color') + colorFieldHtml(inst, 'gmmaLongColor', 'Long-term color'))
-    : colorEditable ? colorFieldHtml(inst, 'primary', 'Color') : `
+    : colorEditable ? colorFieldHtml(inst, 'primary', inst.key === 'htf_ma' ? 'Line 1 color (chart timeframe)' : 'Color') : `
     <div class="ind-settings-row">
       <label>Color</label>
       <span style="font-size:11.5px;color:var(--text-faint)">Trend-colored (up/down)</span>
@@ -8504,7 +8561,7 @@ function openIndicatorSettings(e, id) {
     </div>
   `;
 
-  const secondaryColorRow = isGmma ? gmmaTogglesHtml(inst) : def.secondaryLabel ? colorFieldHtml(inst, 'secondary', def.secondaryLabel) : '';
+  const secondaryColorRow = isGmma ? gmmaTogglesHtml(inst) : inst.key === 'htf_ma' ? (colorFieldHtml(inst, 'secondary', def.secondaryLabel) + colorFieldHtml(inst, 'htfBullColor', 'Ribbon: bullish') + colorFieldHtml(inst, 'htfBearColor', 'Ribbon: bearish') + colorFieldHtml(inst, 'htfFlatColor', 'Ribbon: flat / mixed')) : def.secondaryLabel ? colorFieldHtml(inst, 'secondary', def.secondaryLabel) : '';
 
   const stdHtml = `
     <div class="ind-settings-head">
@@ -8798,6 +8855,23 @@ function renderChart(forceEnd) {
       overlays += seriesPath(result.line, yAt, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
     } else if (inst.key === 'supertrend') {
       overlays += segmentedPath(result.line, result.trendUp, yAt, 'var(--green)', 'var(--red)', inst.width);
+    } else if (inst.key === 'htf_ma') {
+      // Ribbon: fill between the two lines, coloured by state (bullish / bearish / flat), then both lines on top.
+      const fillOp = Math.max(0, Math.min(100, +inst.params.fillOpacity >= 0 ? +inst.params.fillOpacity : 35)) / 100;
+      const stCol = { 1: inst.htfBullColor || '#2EBD85', '-1': inst.htfBearColor || '#F6465D', 0: inst.htfFlatColor || '#888780' };
+      let runTop = [], runBot = [], runState = null;
+      const flushRun = () => {
+        if (runTop.length > 1) overlays += `<polygon points="${runTop.concat(runBot.slice().reverse()).map(q => q[0].toFixed(2) + ',' + q[1].toFixed(2)).join(' ')}" fill="${stCol[runState]}" opacity="${fillOp}"/>`;
+        runTop = []; runBot = []; runState = null;
+      };
+      for (let i = Math.max(1, drawLo); i < Math.min(dispN, drawHi + 2); i++) {
+        if (result.line[i] == null || result.line2[i] == null || result.line[i-1] == null || result.line2[i-1] == null) { flushRun(); continue; }
+        if (runState !== result.state[i]) { flushRun(); runState = result.state[i]; runTop = [[xAt(i-1), yAt(result.line[i-1])]]; runBot = [[xAt(i-1), yAt(result.line2[i-1])]]; }
+        runTop.push([xAt(i), yAt(result.line[i])]); runBot.push([xAt(i), yAt(result.line2[i])]);
+      }
+      flushRun();
+      overlays += seriesPath(result.line, yAt, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
+      overlays += seriesPath(result.line2, yAt, inst.secondaryColor || '#EF9F27', dashForStyle(inst.lineStyle), inst.width, inst.opacity);
     } else if (inst.key === 'chandelier') {
       // Green long-exit stop below price while in an uptrend, red short-exit stop above price in a downtrend.
       // Segments are only drawn within one trend, so the line breaks (no vertical jump) when the stop flips.
