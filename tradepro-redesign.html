@@ -6774,6 +6774,9 @@ const INDICATOR_DEFS = {
   supertrend: { name: 'Supertrend', full: 'Supertrend', type: 'overlay', editableColor: false,
     params: [{ key:'period', label:'ATR period', default:10 }, { key:'mult', label:'Multiplier', default:3 }],
     calc: (candles, p) => supertrendSeries(candles, p.period, p.mult) },
+  chandelier: { name: 'Chandelier', full: 'Chandelier Exit (ATR trailing stop)', type: 'overlay', editableColor: false,
+    params: [{ key:'period', label:'ATR period', default:22 }, { key:'mult', label:'ATR multiplier', default:3 }, { key:'src', label:'Highest / lowest of', type:'select', options:['High/Low','Close'], default:'High/Low' }],
+    calc: (candles, p) => chandelierSeries(candles, p.period, p.mult, p.src === 'Close') },
   rsi: { name: 'RSI', full: 'RSI', type: 'oscillator', renderKind: 'rsi', secondaryLabel: 'Smoothed MA',
     params: [{ key:'period', label:'Length', default:14 }, { key:'smoothType', label:'Smoothing Line', type:'select', options:['None','SMA','EMA','WMA'], default:'SMA' }, { key:'smoothLen', label:'Smoothing Length', default:20 }],
     calc: (candles, p) => {
@@ -7213,6 +7216,35 @@ function stochasticSeries(candles, kPeriod, dPeriod, smoothK) {
   const k = smaSeriesNullable(rawK, smoothK);
   const d = smaSeriesNullable(k, dPeriod);
   return { k, d };
+}
+function chandelierSeries(candles, period, mult, useClose) {
+  // Chandelier Exit (LeBeau / Elder): long stop = highest high (or close) over `period` bars minus mult x ATR,
+  // short stop = lowest low (or close) plus mult x ATR. Each stop only ratchets in the trade's favour, and the
+  // direction flips when the close crosses the opposite stop.
+  const n = candles.length, per = Math.max(1, Math.round(period));
+  const atr = atrSeriesGeneric(candles, per);
+  const longStop = new Array(n).fill(null), shortStop = new Array(n).fill(null), dir = new Array(n).fill(null);
+  const buy = new Array(n).fill(false), sell = new Array(n).fill(false);
+  for (let i = per - 1; i < n; i++) {
+    if (atr[i] == null) continue;
+    let hh = -Infinity, ll = Infinity;
+    for (let j = i - per + 1; j <= i; j++) {
+      const hi = useClose ? candles[j].c : candles[j].h, lo = useClose ? candles[j].c : candles[j].l;
+      if (hi > hh) hh = hi;
+      if (lo < ll) ll = lo;
+    }
+    let ls = hh - mult * atr[i], ss = ll + mult * atr[i];
+    const pl = i > 0 ? longStop[i-1] : null, ps = i > 0 ? shortStop[i-1] : null, pc = i > 0 ? candles[i-1].c : null;
+    if (pl != null && pc > pl) ls = Math.max(ls, pl);
+    if (ps != null && pc < ps) ss = Math.min(ss, ps);
+    longStop[i] = ls; shortStop[i] = ss;
+    let d = (i > 0 && dir[i-1] != null) ? dir[i-1] : 1;
+    if (ps != null && candles[i].c > ps) d = 1;
+    else if (pl != null && candles[i].c < pl) d = -1;
+    dir[i] = d;
+    if (i > 0 && dir[i-1] != null) { if (d === 1 && dir[i-1] === -1) buy[i] = true; if (d === -1 && dir[i-1] === 1) sell[i] = true; }
+  }
+  return { longStop, shortStop, dir, buy, sell };
 }
 function supertrendSeries(candles, period, mult) {
   const n = candles.length;
@@ -8766,6 +8798,29 @@ function renderChart(forceEnd) {
       overlays += seriesPath(result.line, yAt, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
     } else if (inst.key === 'supertrend') {
       overlays += segmentedPath(result.line, result.trendUp, yAt, 'var(--green)', 'var(--red)', inst.width);
+    } else if (inst.key === 'chandelier') {
+      // Green long-exit stop below price while in an uptrend, red short-exit stop above price in a downtrend.
+      // Segments are only drawn within one trend, so the line breaks (no vertical jump) when the stop flips.
+      const chOp = (inst.opacity == null ? 100 : inst.opacity) / 100;
+      for (let i = Math.max(1, drawLo); i < Math.min(dispN, drawHi + 2); i++) {
+        if (result.dir[i] == null || result.dir[i] !== result.dir[i-1]) continue;
+        const arr = result.dir[i] === 1 ? result.longStop : result.shortStop;
+        if (arr[i] == null || arr[i-1] == null) continue;
+        overlays += `<line x1="${xAt(i-1).toFixed(2)}" y1="${yAt(arr[i-1]).toFixed(2)}" x2="${xAt(i).toFixed(2)}" y2="${yAt(arr[i]).toFixed(2)}" stroke="${result.dir[i] === 1 ? 'var(--green)' : 'var(--red)'}" stroke-width="${inst.width || 1.5}" opacity="${chOp}"/>`;
+      }
+      for (let i = Math.max(0, drawLo); i < Math.min(dispN, drawHi + 1); i++) {
+        const c = dispCS[i], x = xAt(i);
+        if (result.buy[i]) {
+          const y = clampY(yAt(c.l) + 14);
+          signalMarkers += `<path d="M${x.toFixed(2)},${(y-7).toFixed(2)} L${(x-6).toFixed(2)},${(y+5).toFixed(2)} L${(x+6).toFixed(2)},${(y+5).toFixed(2)} Z" fill="#2EBD85"/>`;
+          signalMarkers += `<text x="${x.toFixed(2)}" y="${(y+17).toFixed(2)}" font-size="9" text-anchor="middle" fill="#2EBD85" font-family="var(--mono)">Buy</text>`;
+        }
+        if (result.sell[i]) {
+          const y = clampY(yAt(c.h) - 14);
+          signalMarkers += `<path d="M${x.toFixed(2)},${(y+7).toFixed(2)} L${(x-6).toFixed(2)},${(y-5).toFixed(2)} L${(x+6).toFixed(2)},${(y-5).toFixed(2)} Z" fill="#F6465D"/>`;
+          signalMarkers += `<text x="${x.toFixed(2)}" y="${(y-11).toFixed(2)}" font-size="9" text-anchor="middle" fill="#F6465D" font-family="var(--mono)">Sell</text>`;
+        }
+      }
     } else if (inst.key === 'confluence') {
       // SSL channel band (high/low MA), shaded per contiguous trend segment — bull runs
       // tinted green, bear runs tinted red — at a much higher opacity than a single flat
