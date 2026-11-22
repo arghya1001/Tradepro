@@ -6154,7 +6154,6 @@ function fmtT(t) {
 // replay it was being recomputed over the whole history on every single step. Cache by signature.
 const _indCache = new Map();
 function indCalc(key, def, candles, params) {
-  if (key === 'delta') return def.calc(candles, params);
   const n = candles.length, f = candles[0], l = candles[n - 1];
   const sig = key + '|' + JSON.stringify(params) + '|' + n + '|' + (f && f.t) + '|' + (l && (l.t + ':' + l.o + ':' + l.h + ':' + l.l + ':' + l.c + ':' + l.v));
   let r = _indCache.get(sig);
@@ -6840,8 +6839,10 @@ const INDICATOR_DEFS = {
       buyMarkers: signalSeries(candles, p.bullConditions || []),
       sellMarkers: signalSeries(candles, p.bearConditions || []),
     }) },
-  delta: { name: 'Delta', full: 'Order flow delta (live)', type: 'oscillator', renderKind: 'delta', params: [],
-    calc: (candles) => flowCalc(candles) },
+  walls: { name: 'Walls', full: 'Big resting orders (live)', type: 'overlay', editableColor: false,
+    params: [{ key:'minSize', label:'Min size (contracts)', default:5000 }], calc: () => ({}) },
+  bigtrades: { name: 'Big trades', full: 'Big executed trades (live)', type: 'overlay', editableColor: false,
+    params: [{ key:'minSize', label:'Min size (contracts)', default:2000 }], calc: () => ({}) },
   volume: { name: 'Volume', full: 'Volume', type: 'volume', editableColor: false, params: [], calc: () => ({}) },
   confluence: { name: 'SSL+AEFP', full: 'SSL Channel + Adaptive Ehlers Confluence', type: 'overlay', editableColor: false,
     // A combined indicator ported from two Pine Script indicators: the SSL Channel Pro trend-flip
@@ -7794,7 +7795,6 @@ function addIndicator(key) {
   def.params.forEach(p => { params[p.key] = p.default; });
   const inst = { id: 'ind' + (indicatorSeq++), key, params, color: IND_COLORS[activeIndicators.length % IND_COLORS.length], width: 1.5, opacity: 100, lineStyle: 'solid' };
   if (def.secondaryLabel) inst.secondaryColor = key === 'rsi' ? DRAW_INK() : '#D9A441';
-  if (key === 'delta') inst.paneH = window.innerWidth <= 700 ? 170 : 130;
   if (key === 'gmma') {
     inst.gmmaShortColor = '#009956'; // base hue each ribbon is shaded from, lightest (period 3) to this (period 15)
     inst.gmmaLongColor = '#FF5723';  // base hue for the long-term ribbon, lightest (period 30) to this (period 60)
@@ -8748,7 +8748,7 @@ function renderChart(forceEnd) {
     return out;
   }
 
-  let overlays = '', oscSvg = '', oscTagsHtml = '', signalMarkers = '';
+  let overlays = '', flowBack = '', oscSvg = '', oscTagsHtml = '', signalMarkers = '';
   overlayInstances.forEach(inst => {
     const def = INDICATOR_DEFS[inst.key];
     const result = inst.key === 'confluence' ? confluenceCalc : indCalc(inst.key, def, dispCS, inst.params);
@@ -8850,6 +8850,10 @@ function renderChart(forceEnd) {
           signalMarkers += `<path d="M${x.toFixed(2)},${(y+7).toFixed(2)} L${(x-6).toFixed(2)},${(y-5).toFixed(2)} L${(x+6).toFixed(2)},${(y-5).toFixed(2)} Z" fill="#F6465D"/>`;
         }
       }
+    } else if (inst.key === 'walls') {
+      flowBack += flowWallsSvg(+inst.params.minSize || 5000, yAt, yMin, yMax, scrollEl.scrollLeft || 0, Math.max(60, (scrollEl.clientWidth || 340) * 0.3));
+    } else if (inst.key === 'bigtrades') {
+      overlays += flowTradesSvg(+inst.params.minSize || 2000, dispCS, dispN, xAt, yAt, yMin, yMax);
     } else if (inst.key === 'gmma') {
       // Short-term ribbon shaded from the person's chosen short-term color, long-term ribbon
       // from their long-term color — distinct hues by default (green vs. orange), and each
@@ -8974,7 +8978,7 @@ function renderChart(forceEnd) {
     const result = indCalc(inst.key, def, dispCS, inst.params);
     const top = BASE_H - PAD + OSC_GAP + oscInstances.slice(0, pi).reduce((t, i) => t + oscHOf(i) + OSC_GAP, 0);
     const bottom = top + oscHOf(inst);
-    const tagStart = oscTagsHtml.length, vzr = inst.key !== 'delta' && inst.vr && inst.vr.hi > inst.vr.lo ? inst.vr : null;
+    const tagStart = oscTagsHtml.length, vzr = inst.vr && inst.vr.hi > inst.vr.lo ? inst.vr : null;
     // value -> y for this pane. Default range per indicator kind; inst.vr (set by dragging the pane's scale strip) overrides it.
     const mkY = (dlo, dhi) => { const lo = vzr ? vzr.lo : dlo, hi = vzr ? vzr.hi : dhi; paneRange[inst.id] = { lo, hi, dlo, dhi, top, bottom, zoomed: !!vzr, kind: def.renderKind }; return v => bottom - ((v - lo) / ((hi - lo) || 1)) * (bottom - top); };
     oscSvg += `<clipPath id="oscclip-${inst.id}"><rect x="0" y="${top.toFixed(1)}" width="${W}" height="${(bottom - top).toFixed(1)}"/></clipPath><g clip-path="url(#oscclip-${inst.id})">`;
@@ -8998,40 +9002,6 @@ function renderChart(forceEnd) {
       oscSvg += seriesPath(result.signal, oY, inst.secondaryColor || '#D9A441', null, inst.width, inst.opacity);
       const lastM = result.macd[dispN-1];
       if (lastM != null) oscTagsHtml += `<div class="price-tag" style="top:${oY(lastM).toFixed(0)}px; background:${inst.color}; color:var(--on-accent); border:none;">${lastM.toFixed(1)}</div>`;
-    } else if (def.renderKind === 'delta') {
-      // Order flow: bars = buy minus sell volume per candle, line = cumulative (own scale), marks = absorption / divergence.
-      const dv = result.delta, cv = result.cum, mk = result.marks;
-      let mxD = 0, cmin = Infinity, cmax = -Infinity, haveD = false;
-      for (let i = 0; i < dispN; i++) {
-        if (dv[i] != null) { haveD = true; mxD = Math.max(mxD, Math.abs(dv[i])); }
-        if (cv[i] != null) { cmin = Math.min(cmin, cv[i]); cmax = Math.max(cmax, cv[i]); }
-      }
-      const oY = mkY(-(mxD * 1.15 || 1), mxD * 1.15 || 1), zeroY = oY(0);
-      oscSvg += `<line x1="0" y1="${zeroY.toFixed(1)}" x2="${W}" y2="${zeroY.toFixed(1)}" stroke="var(--text-faint)" stroke-width="1" stroke-dasharray="3,3"/>`;
-      const cY = v => bottom - 8 - ((v - cmin) / ((cmax - cmin) || 1)) * ((bottom - top) - 16);
-      for (let i = 0; i < dispN; i++) {
-        if (dv[i] == null) continue;
-        const x = xAt(i), hy = oY(dv[i]);
-        oscSvg += `<rect x="${(x-bodyW/2).toFixed(2)}" y="${Math.min(hy,zeroY).toFixed(2)}" width="${bodyW.toFixed(2)}" height="${Math.max(1, Math.abs(hy-zeroY)).toFixed(2)}" fill="${dv[i]>=0?'var(--green)':'var(--red)'}" opacity="0.6"/>`;
-      }
-      oscSvg += seriesPath(cv, cY, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
-      for (let i = 0; i < dispN; i++) {
-        if (!mk[i]) continue;
-        const x = xAt(i);
-        if (mk[i] === 'A') oscSvg += `<rect x="${(x-3.5).toFixed(1)}" y="${(top + 5).toFixed(1)}" width="7" height="7" fill="#7F77DD"/>`;
-        else oscSvg += `<circle cx="${x.toFixed(1)}" cy="${cY(cv[i]).toFixed(1)}" r="4" fill="#EF9F27" stroke="var(--surface-2)" stroke-width="1"/>`;
-      }
-      const note = !liveMode ? 'Delta needs the Live · Delta chart' : (LIVE.kind !== 'perp' && LIVE.kind !== 'options') ? 'Delta works on single Delta contracts' : !haveD ? (FLOW.nTrades ? 'Building the first candle…' : 'Waiting for live trades… delta builds from now on') : '';
-      if (note) oscSvg += `<text x="${(W/2).toFixed(0)}" y="${((top+bottom)/2).toFixed(0)}" text-anchor="middle" font-size="12" fill="var(--text-faint)">${note}</text>`;
-      if (FLOW.book && liveMode) {
-        const tot = FLOW.book.bid + FLOW.book.ask, bp = Math.round(100 * FLOW.book.bid / tot);
-        oscSvg += `<rect x="6" y="${(bottom - 14).toFixed(1)}" width="90" height="6" rx="2" fill="var(--red)" opacity="0.55"/><rect x="6" y="${(bottom - 14).toFixed(1)}" width="${(90 * bp / 100).toFixed(1)}" height="6" rx="2" fill="var(--green)" opacity="0.75"/><text x="102" y="${(bottom - 8).toFixed(1)}" font-size="10" fill="var(--text-faint)">Bids ${bp}% · Asks ${100 - bp}%</text>`;
-      }
-      const nHave = dv.reduce((t, v, i) => t + (i < dispN && v != null ? 1 : 0), 0);
-      if (haveD && nHave < 3) oscSvg += `<text x="6" y="${(top + 14).toFixed(0)}" font-size="11" fill="var(--text-faint)">Only ${nHave} candle${nHave > 1 ? 's' : ''} recorded so far \u2013 bars build up as candles close</text>`;
-      let lastI = -1;
-      for (let i = dispN - 1; i >= 0; i--) if (dv[i] != null) { lastI = i; break; }
-      if (lastI >= 0) oscTagsHtml += `<div class="price-tag" style="top:${oY(dv[lastI]).toFixed(0)}px; background:${dv[lastI] >= 0 ? 'var(--green)' : 'var(--red)'}; color:var(--on-accent); border:none;">${Math.round(dv[lastI])}</div>`;
     } else if (def.renderKind === 'stoch') {
       const oY = mkY(0, 100);
       [20, 50, 80].forEach(v => {
@@ -9386,7 +9356,7 @@ function renderChart(forceEnd) {
   const wasAtEdge = (prevScrollWidth - clientWidth - prevScrollLeft) < 30;
 
   scrollEl.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-    ${gridLines}${volBars}${bars}${overlays}${signalMarkers}${oscSvg}${priceLines}${drawingsLayer}${xAxis}
+    ${gridLines}${volBars}${flowBack}${bars}${overlays}${signalMarkers}${oscSvg}${priceLines}${drawingsLayer}${xAxis}
   </svg>`;
   axisEl.style.height = H + 'px';
   axisEl.innerHTML = priceScaleLabels + axisTags + oscTagsHtml;
@@ -9931,7 +9901,6 @@ function oscReadoutHtml(idx) {
       const f = v => v == null || !isFinite(v) ? '\u2013' : (Math.abs(v) < 1 ? v.toFixed(3) : v.toFixed(1)), c = (col, v) => `<b style="color:${col}">${f(v)}</b>`;
       let vals;
       if (def.renderKind === 'macd') vals = c(inst.color, r.macd[idx]) + ' ' + c(sec, r.signal[idx]) + ' ' + f(r.hist[idx]);
-      else if (def.renderKind === 'delta') vals = c(r.delta[idx] != null && r.delta[idx] < 0 ? 'var(--red)' : 'var(--green)', r.delta[idx]) + ' ' + c(inst.color, r.cum[idx]);
       else if (def.renderKind === 'stoch') vals = c(inst.color, r.k[idx]) + ' ' + c(sec, r.d[idx]);
       else if (def.renderKind === 'atr') vals = c(inst.color, r.line[idx]);
       else vals = c(inst.color, r.line[idx]) + (r.smooth ? ' ' + c(sec, r.smooth[idx]) : '');
@@ -11629,57 +11598,65 @@ function liveScheduleRender() {
 }
 
 /* ============================================================
-   Order flow (delta) — live only. Delta Exchange sends every trade with the
-   side that was the aggressor (taker). Buy-taker volume minus sell-taker
-   volume = delta. Trades are bucketed per minute (so any timeframe can be
-   built from them) and kept in this browser for 3 days; there is no
-   historical tick data, so delta exists only for the time TradePro was open.
+   Big orders (live only), from Delta's public WebSocket:
+   - Walls: large RESTING orders in the order book (l2_orderbook). They can be pulled any time.
+   - Big trades: large EXECUTED volume (all_trades), grouped per candle, price level and side.
+   Executed volume is kept in this browser for 3 days; there is no historical tick data, so
+   nothing exists for the time TradePro was closed. Walls are a live snapshot only.
    ============================================================ */
-const FLOW = { sym: null, m: {}, lastTs: 0, book: null, subSock: null, subSym: null, subAt: 0, nTrades: 0, renderT: null, saveT: null, openT: null };
-function flowKey(sym) { return 'tp_flow_' + sym; }
+const FLOW = { sym: null, agg: {}, lastTs: 0, book: null, subSock: null, subSym: null, has: { t: false, b: false }, subAt: 0, nTrades: 0, renderT: null, saveT: null, openT: null };
+function flowKey(sym) { return 'tp_bigorders_' + sym; }
+function flowStep(p) { return 5 * Math.pow(10, Math.floor(Math.log10(Math.max(p, 1e-9))) - 3); }
 function flowLoad(sym) {
-  FLOW.sym = sym; FLOW.m = {}; FLOW.lastTs = 0; FLOW.book = null; FLOW.nTrades = 0;
+  FLOW.sym = sym; FLOW.agg = {}; FLOW.lastTs = 0; FLOW.book = null; FLOW.nTrades = 0;
   try {
     const j = JSON.parse(localStorage.getItem(flowKey(sym)) || 'null');
-    if (j && j.m) {
+    if (j && j.a) {
       const cut = Math.floor(Date.now() / 60000) - 4320;
-      for (const k in j.m) if (+k >= cut) FLOW.m[k] = j.m[k];
+      for (const k in j.a) if (+k.split('|')[0] >= cut) FLOW.agg[k] = j.a[k];
       FLOW.lastTs = +j.lastTs || 0;
     }
-  } catch (e) { /* storage unavailable — delta just won't survive a reload */ }
+  } catch (e) { /* storage unavailable — big trades just won't survive a reload */ }
 }
 function flowSave() {
-  try { if (FLOW.sym) localStorage.setItem(flowKey(FLOW.sym), JSON.stringify({ m: FLOW.m, lastTs: FLOW.lastTs })); } catch (e) { /* ignore */ }
+  try {
+    if (!FLOW.sym) return;
+    const keys = Object.keys(FLOW.agg);
+    if (keys.length > 8000) { keys.sort((a, b) => a.split('|')[0] - b.split('|')[0]).slice(0, keys.length - 8000).forEach(k => delete FLOW.agg[k]); }
+    localStorage.setItem(flowKey(FLOW.sym), JSON.stringify({ a: FLOW.agg, lastTs: FLOW.lastTs }));
+  } catch (e) { /* ignore */ }
 }
-function flowActive() {
-  return liveMode && (LIVE.kind === 'perp' || LIVE.kind === 'options') && activeIndicators.some(i => i.key === 'delta');
+function flowWant() {
+  const live = liveMode && (LIVE.kind === 'perp' || LIVE.kind === 'options');
+  return { t: !!live && activeIndicators.some(i => i.key === 'bigtrades'), b: !!live && activeIndicators.some(i => i.key === 'walls') };
 }
-function flowChannels(sym) { return [{ name: 'all_trades', symbols: [sym] }, { name: 'l2_orderbook', symbols: [sym] }]; }
 function flowOnOpen(gen) {
   clearTimeout(FLOW.openT);
-  FLOW.openT = setTimeout(() => { if (gen === LIVE.gen) flowSync(true); }, 1500); // after the candle subscription has settled
+  FLOW.openT = setTimeout(() => { if (gen === LIVE.gen) flowSync(); }, 1500); // after the candle subscription has settled
 }
-function flowSync(fromOpen) {
+function flowSync() {
   const ws = LIVE.socket;
   if (!ws || ws.readyState !== 1) return;
-  const want = flowActive(), sym = LIVE.symbol;
+  const w = flowWant(), sym = LIVE.symbol;
+  if (FLOW.subSock !== ws || FLOW.subSym !== sym) { FLOW.subSock = ws; FLOW.subSym = sym; FLOW.has = { t: false, b: false }; }
+  if ((w.t || w.b) && FLOW.sym !== sym) flowLoad(sym);
+  const add = [], del = [];
+  [['t', 'all_trades'], ['b', 'l2_orderbook']].forEach(([k, name]) => {
+    if (w[k] && !FLOW.has[k]) { add.push({ name, symbols: [sym] }); FLOW.has[k] = true; }
+    else if (!w[k] && FLOW.has[k]) { del.push({ name, symbols: [sym] }); FLOW.has[k] = false; }
+  });
   try {
-    if (want && (FLOW.subSock !== ws || FLOW.subSym !== sym)) {
-      if (FLOW.sym !== sym) flowLoad(sym);
-      ws.send(JSON.stringify({ type: 'subscribe', payload: { channels: flowChannels(sym) } }));
-      FLOW.subSock = ws; FLOW.subSym = sym; FLOW.subAt = Date.now();
-      clearInterval(FLOW.saveT); FLOW.saveT = setInterval(flowSave, 20000);
-    } else if (!want && FLOW.subSock === ws) {
-      ws.send(JSON.stringify({ type: 'unsubscribe', payload: { channels: flowChannels(FLOW.subSym) } }));
-      FLOW.subSock = null; FLOW.subSym = null; FLOW.book = null;
-      clearInterval(FLOW.saveT); FLOW.saveT = null; flowSave();
-    }
+    if (add.length) { ws.send(JSON.stringify({ type: 'subscribe', payload: { channels: add } })); FLOW.subAt = Date.now(); }
+    if (del.length) ws.send(JSON.stringify({ type: 'unsubscribe', payload: { channels: del } }));
   } catch (e) { /* socket closed mid-send — onclose handles it */ }
+  if (!w.b) FLOW.book = null;
+  if (w.t && !FLOW.saveT) FLOW.saveT = setInterval(flowSave, 20000);
+  if (!w.t && FLOW.saveT) { clearInterval(FLOW.saveT); FLOW.saveT = null; flowSave(); }
 }
-function flowIsRecentSubError() { return FLOW.subSock && Date.now() - FLOW.subAt < 3000; } // a rejected order-flow subscription must not push the chart into polling
+function flowIsRecentSubError() { return FLOW.subAt && Date.now() - FLOW.subAt < 3000; } // a rejected subscription here must not push the chart into polling
 function flowAddTrade(tr, snapshot) {
-  const size = +tr.size;
-  if (!(size > 0)) return;
+  const size = +tr.size, px = +tr.price;
+  if (!(size > 0) || !(px > 0)) return;
   let buy;
   if (tr.buyer_role === 'taker') buy = true;
   else if (tr.seller_role === 'taker') buy = false;
@@ -11689,69 +11666,75 @@ function flowAddTrade(tr, snapshot) {
   if (sec == null) sec = Math.floor(Date.now() / 1000);
   if (snapshot && sec <= FLOW.lastTs) return; // already counted before a reconnect
   if (sec > FLOW.lastTs) FLOW.lastTs = sec;
-  const k = Math.floor(sec / 60), b = FLOW.m[k] || (FLOW.m[k] = [0, 0]);
-  b[buy ? 0 : 1] += size;
+  const key = Math.floor(sec / 60) + '|' + Math.round(px / flowStep(px)) + '|' + (buy ? 'b' : 's');
+  const a = FLOW.agg[key] || (FLOW.agg[key] = [0, 0]);
+  a[0] += size; a[1] += size * px;
   FLOW.nTrades++;
 }
 function flowScheduleRender() {
   if (FLOW.renderT) return;
-  FLOW.renderT = setTimeout(() => { FLOW.renderT = null; if (liveMode && flowActive()) renderChart(false); }, 1000);
+  FLOW.renderT = setTimeout(() => { FLOW.renderT = null; if (liveMode) renderChart(false); }, 1000);
 }
 function flowHandleWs(m) {
   const t = m.type;
   if (t === 'all_trades' || t === 'all_trades_snapshot') {
-    if (!flowActive() || (m.symbol && m.symbol !== FLOW.sym)) return true;
+    if (!FLOW.has.t || (m.symbol && m.symbol !== FLOW.sym)) return true;
     if (t === 'all_trades') flowAddTrade(m, false);
     else if (Array.isArray(m.trades)) m.trades.slice().sort((a, b) => liveEpochSeconds(a.timestamp) - liveEpochSeconds(b.timestamp)).forEach(x => flowAddTrade(x, true));
     flowScheduleRender();
     return true;
   }
   if (t === 'l2_orderbook') {
-    if (!flowActive() || (m.symbol && m.symbol !== FLOW.sym)) return true;
-    const sum = (arr, asc) => (Array.isArray(arr) ? arr.slice().sort((a, b) => asc ? a.limit_price - b.limit_price : b.limit_price - a.limit_price).slice(0, 10).reduce((x, r) => x + (+r.size || 0), 0) : 0);
-    const bid = sum(m.buy, false), ask = sum(m.sell, true);
-    if (bid + ask > 0) FLOW.book = { bid, ask };
+    if (!FLOW.has.b || (m.symbol && m.symbol !== FLOW.sym)) return true;
+    const lv = arr => Array.isArray(arr) ? arr.map(r => [+r.limit_price, +r.size]).filter(r => r[0] > 0 && r[1] > 0) : [];
+    const bids = lv(m.buy).sort((a, b) => b[0] - a[0]).slice(0, 80), asks = lv(m.sell).sort((a, b) => a[0] - b[0]).slice(0, 80);
+    if (bids.length || asks.length) FLOW.book = { bids, asks };
     flowScheduleRender();
     return true;
   }
   return false;
 }
-// Per-candle delta, cumulative delta, and two marks (absorption, divergence) from the recorded trades.
-function flowCalc(candles) {
-  const n = candles.length, delta = new Array(n).fill(null), cum = new Array(n).fill(null), marks = new Array(n).fill(null);
-  const out = { delta, cum, marks, buy: new Array(n).fill(null), sell: new Array(n).fill(null) };
+function flowFmt(v) { return v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'k' : String(Math.round(v)); }
+// Resting walls, drawn from the left edge of the visible chart, behind the candles. A level counts as a wall when it is at least
+// the minimum size AND clearly bigger than the typical level next to it.
+function flowWallsSvg(minSize, yAt, yMin, yMax, x0, maxLen) {
+  const bk = FLOW.book;
+  if (!bk || !liveMode) return '';
+  const med = a => { const s = a.map(r => r[1]).sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+  let out = '', biggest = 0;
+  const walls = [];
+  [[bk.bids, 'var(--green)'], [bk.asks, 'var(--red)']].forEach(([arr, col]) => {
+    const m = med(arr);
+    arr.forEach(([p, s]) => { if (p >= yMin && p <= yMax && s >= minSize && s >= 2.5 * m) { walls.push([p, s, col]); if (s > biggest) biggest = s; } });
+  });
+  walls.forEach(([p, s, col]) => {
+    const len = Math.max(8, maxLen * s / biggest), y = yAt(p), big = s >= 2 * minSize;
+    out += `<rect x="${x0.toFixed(1)}" y="${(y - 3).toFixed(1)}" width="${len.toFixed(1)}" height="6" rx="2" fill="${col}" opacity="${big ? 0.5 : 0.3}"/>`;
+    if (big) out += `<text x="${(x0 + 4).toFixed(1)}" y="${(y - 6).toFixed(1)}" font-size="11" fill="var(--text-faint)">${flowFmt(s)}</text>`;
+  });
+  return out;
+}
+// Executed volume per candle / price level / side, drawn as bubbles when the total reaches the minimum size.
+function flowTradesSvg(minSize, candles, n, xAt, yAt, yMin, yMax) {
   const secs = LIVE_RES[LIVE.res];
-  if (!n || !liveMode || !secs || secs > 86400 || FLOW.sym !== LIVE.symbol) return out;
+  if (!liveMode || !secs || secs > 86400 || FLOW.sym !== LIVE.symbol || !n) return '';
   const idx = new Map();
-  for (let i = 0; i < n; i++) { const t = candles[i] && candles[i].t; const s = typeof t === 'string' ? liveTimeToSec(t) : null; if (s != null) idx.set(s, i); }
-  for (const k in FLOW.m) {
-    const i = idx.get(Math.floor(+k * 60 / secs) * secs);
+  for (let i = Math.max(0, n - 800); i < n; i++) { const t = candles[i] && candles[i].t; const s = typeof t === 'string' ? liveTimeToSec(t) : null; if (s != null) idx.set(s, i); }
+  const tot = {};
+  for (const k in FLOW.agg) {
+    const [mn, bk, side] = k.split('|'), i = idx.get(Math.floor(+mn * 60 / secs) * secs);
     if (i == null) continue;
-    out.buy[i] = (out.buy[i] || 0) + FLOW.m[k][0];
-    out.sell[i] = (out.sell[i] || 0) + FLOW.m[k][1];
+    const kk = i + '|' + bk + '|' + side, a = FLOW.agg[k], o = tot[kk] || (tot[kk] = [i, side, 0, 0]);
+    o[2] += a[0]; o[3] += a[1];
   }
-  let run = 0, started = false;
-  for (let i = 0; i < n; i++) {
-    if (out.buy[i] == null) continue;
-    delta[i] = out.buy[i] - out.sell[i];
-    run += delta[i]; started = true; cum[i] = run;
-  }
-  if (!started) return out;
-  const have = []; // indices that have data, in order
-  for (let i = 0; i < n; i++) if (delta[i] != null) have.push(i);
-  for (let h = 0; h < have.length; h++) {
-    const i = have[h], prev = have.slice(Math.max(0, h - 12), h);
-    if (prev.length >= 8) {
-      const c = candles[i].c;
-      const maxC = Math.max(...prev.map(j => candles[j].c)), minC = Math.min(...prev.map(j => candles[j].c));
-      const maxD = Math.max(...prev.map(j => cum[j])), minD = Math.min(...prev.map(j => cum[j]));
-      const avgAbs = prev.reduce((t, j) => t + Math.abs(delta[j]), 0) / prev.length;
-      const avgRng = prev.reduce((t, j) => t + (candles[j].h - candles[j].l), 0) / prev.length;
-      if (c > maxC && cum[i] < maxD) marks[i] = 'DB';        // price higher high, cumulative delta lower
-      else if (c < minC && cum[i] > minD) marks[i] = 'DU';   // price lower low, cumulative delta higher
-      else if (avgAbs > 0 && Math.abs(delta[i]) >= 2 * avgAbs && (candles[i].h - candles[i].l) <= 0.7 * avgRng) marks[i] = 'A'; // heavy one-sided volume, small range
-    }
-  }
+  let out = '';
+  Object.values(tot).forEach(([i, side, size, pxs]) => {
+    if (size < minSize) return;
+    const p = pxs / size;
+    if (p < yMin || p > yMax) return;
+    const r = Math.min(13, 4 + 3 * Math.sqrt(size / minSize)), col = side === 'b' ? 'var(--green)' : 'var(--red)';
+    out += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p).toFixed(1)}" r="${r.toFixed(1)}" fill="${col}" fill-opacity="0.4" stroke="${col}" stroke-width="1"><title>${side === 'b' ? 'Buyers' : 'Sellers'} ${flowFmt(size)} contracts</title></circle>`;
+  });
   return out;
 }
 
