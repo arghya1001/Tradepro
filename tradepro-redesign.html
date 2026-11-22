@@ -7794,6 +7794,7 @@ function addIndicator(key) {
   def.params.forEach(p => { params[p.key] = p.default; });
   const inst = { id: 'ind' + (indicatorSeq++), key, params, color: IND_COLORS[activeIndicators.length % IND_COLORS.length], width: 1.5, opacity: 100, lineStyle: 'solid' };
   if (def.secondaryLabel) inst.secondaryColor = key === 'rsi' ? DRAW_INK() : '#D9A441';
+  if (key === 'delta') inst.paneH = window.innerWidth <= 700 ? 170 : 130;
   if (key === 'gmma') {
     inst.gmmaShortColor = '#009956'; // base hue each ribbon is shaded from, lightest (period 3) to this (period 15)
     inst.gmmaLongColor = '#FF5723';  // base hue for the long-term ribbon, lightest (period 30) to this (period 60)
@@ -8973,7 +8974,7 @@ function renderChart(forceEnd) {
     const result = indCalc(inst.key, def, dispCS, inst.params);
     const top = BASE_H - PAD + OSC_GAP + oscInstances.slice(0, pi).reduce((t, i) => t + oscHOf(i) + OSC_GAP, 0);
     const bottom = top + oscHOf(inst);
-    const tagStart = oscTagsHtml.length, vzr = inst.vr && inst.vr.hi > inst.vr.lo ? inst.vr : null;
+    const tagStart = oscTagsHtml.length, vzr = inst.key !== 'delta' && inst.vr && inst.vr.hi > inst.vr.lo ? inst.vr : null;
     // value -> y for this pane. Default range per indicator kind; inst.vr (set by dragging the pane's scale strip) overrides it.
     const mkY = (dlo, dhi) => { const lo = vzr ? vzr.lo : dlo, hi = vzr ? vzr.hi : dhi; paneRange[inst.id] = { lo, hi, dlo, dhi, top, bottom, zoomed: !!vzr, kind: def.renderKind }; return v => bottom - ((v - lo) / ((hi - lo) || 1)) * (bottom - top); };
     oscSvg += `<clipPath id="oscclip-${inst.id}"><rect x="0" y="${top.toFixed(1)}" width="${W}" height="${(bottom - top).toFixed(1)}"/></clipPath><g clip-path="url(#oscclip-${inst.id})">`;
@@ -9026,6 +9027,8 @@ function renderChart(forceEnd) {
         const tot = FLOW.book.bid + FLOW.book.ask, bp = Math.round(100 * FLOW.book.bid / tot);
         oscSvg += `<rect x="6" y="${(bottom - 14).toFixed(1)}" width="90" height="6" rx="2" fill="var(--red)" opacity="0.55"/><rect x="6" y="${(bottom - 14).toFixed(1)}" width="${(90 * bp / 100).toFixed(1)}" height="6" rx="2" fill="var(--green)" opacity="0.75"/><text x="102" y="${(bottom - 8).toFixed(1)}" font-size="10" fill="var(--text-faint)">Bids ${bp}% · Asks ${100 - bp}%</text>`;
       }
+      const nHave = dv.reduce((t, v, i) => t + (i < dispN && v != null ? 1 : 0), 0);
+      if (haveD && nHave < 3) oscSvg += `<text x="6" y="${(top + 14).toFixed(0)}" font-size="11" fill="var(--text-faint)">Only ${nHave} candle${nHave > 1 ? 's' : ''} recorded so far \u2013 bars build up as candles close</text>`;
       let lastI = -1;
       for (let i = dispN - 1; i >= 0; i--) if (dv[i] != null) { lastI = i; break; }
       if (lastI >= 0) oscTagsHtml += `<div class="price-tag" style="top:${oY(dv[lastI]).toFixed(0)}px; background:${dv[lastI] >= 0 ? 'var(--green)' : 'var(--red)'}; color:var(--on-accent); border:none;">${Math.round(dv[lastI])}</div>`;
