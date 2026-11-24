@@ -2634,6 +2634,9 @@
       <div id="sscan-conds"></div>
       <button type="button" class="btn-ghost" onclick="sscanAddCond()">+ Add condition</button>
       <button type="button" class="btn-ghost" onclick="sscanAddGuppy()">+ Guppy condition</button>
+      <button type="button" class="btn-ghost" onclick="sscanAddEang()">+ EMA angle condition</button>
+      <button type="button" class="btn-ghost" onclick="sscanPresetEang('Sell')" title="Short EMAs 3,5,8,10,12,15 all slope down 40° to 70° and close below EMA 15. Exit when the EMAs flatten or the close goes back above EMA 15">★ Bearish EMA angle 40°–70° preset</button>
+      <button type="button" class="btn-ghost" onclick="sscanPresetEang('Buy')" title="Mirror image: EMAs all slope up 40° to 70° and close above EMA 15">★ Bullish EMA angle 40°–70° preset</button>
       <button type="button" class="btn-ghost" onclick="sscanAddSqueeze()">+ EMA squeeze condition</button>
       <button type="button" class="btn-ghost" onclick="sscanPresetSqueeze()" title="Ribbon squeezed then broken down + Guppy short EMAs below long EMAs + close below Supertrend (10,2), first signal only">★ Squeeze + Guppy + Supertrend preset</button>
       <button type="button" class="btn-ghost" onclick="sscanPresetGuppy()" title="Short EMAs 10,12,15 below long EMAs 30,35,40 + close below Supertrend (10,2), first signal only">★ Bearish Guppy + Supertrend preset</button>
@@ -3196,6 +3199,16 @@ try {
     localStorage.setItem('tradepro_squeeze_seq_v1', '1');
   }
 } catch (e) { /* storage unavailable */ }
+// One-time: ready-made EMA angle scan on the BTC straddle, so it can be applied to the chart straight away (name avoids "Guppy" so the Guppy pair never picks it up).
+try {
+  if (!localStorage.getItem('tradepro_seed_eangle_v1')) {
+    const nm = 'EMA angle 40°–70°: short straddle (BTC)';
+    if (!sscans.some(x => x && x.name === nm)) sscans.push({ name:nm, strat:'Straddle', side:'Sell', und:'BTC', tf:'5m', fresh:true, minPrem:600, sl:{ on:false, n:4, buf:2, mode:'fixed' },
+      conds:[{ op:'below', k:'eang', s:[3,5,8,10,12,15], lo:40, hi:70, n:5, f:10, x:15 }] });
+    persistSScans();
+    localStorage.setItem('tradepro_seed_eangle_v1', '1');
+  }
+} catch (e) { /* storage unavailable */ }
 // One-time: ATM straddle versions of the squeeze sequence scan (Sell = premium breaks down, Buy = premium breaks out). Names avoid the word "Guppy" so the chart's Guppy pair never picks them up.
 try {
   if (!localStorage.getItem('tradepro_seed_straddle_seq_v1')) {
@@ -3222,8 +3235,8 @@ const sscanEsc = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').rep
 const sscanTime = sec => (typeof liveMode !== 'undefined' && liveMode && LIVE.kind === 'india' && sec % 86400 === 0) ? new Date(sec * 1000).toISOString().slice(0, 10) : new Date(sec * 1000 + 19800000).toISOString().slice(5, 16).replace('T', ' ') + ' IST';
 let scanOverlay = null, scanOverlayTimer = null;   // activation markers drawn on the combined-strategy chart
 const sscanFmt = v => v == null ? '–' : v.toLocaleString('en-US', { maximumFractionDigits: v >= 100 ? 1 : 4 });
-function sscanRefLabel(c) { if (c.k === 'gsq') return 'EMA squeeze → ' + (c.op === 'below' ? 'breakdown' : 'breakout'); if (c.k === 'gmma') return `Guppy ${(c.s || SSCAN_GMMA.s).join(',')} vs ${(c.l || SSCAN_GMMA.l).join(',')}`; return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
-function sscanSummary(sc) { if (sscanIsSeq(sc.conds)) { const q = sc.conds.find(c => c.k === 'gsq'), dn = q.op === 'below'; return `EMA squeeze (ribbon ≤ ${q.a || SSCAN_SQ.a}×ATR in ≥ ${q.m || SSCAN_SQ.m} of last ${q.n || SSCAN_SQ.n} bars) → Guppy ${dn ? 'bearish' : 'bullish'} crossover + Supertrend ${dn ? 'down' : 'up'} flip within ${q.w || SSCAN_SQ.w} bars → close ${dn ? 'below' : 'above'} the ribbon · one entry per squeeze · exit when Supertrend flips back` + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); } return sc.conds.map(c => c.k === 'gsq' ? `EMA squeeze (ribbon ≤ ${c.a || SSCAN_SQ.a}×ATR in ≥ ${c.m || SSCAN_SQ.m} of last ${c.n || SSCAN_SQ.n} bars) then close ${c.op === 'below' ? 'below the ribbon' : 'above the ribbon'}` : c.k === 'gmma' ? `Guppy short EMAs (${(c.s || SSCAN_GMMA.s).join(',')}) ${c.op === 'below' ? 'below' : 'above'} long EMAs (${(c.l || SSCAN_GMMA.l).join(',')})${c.mode === 'all' ? ' — all lines' : ''}` : 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · ') + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); }
+function sscanRefLabel(c) { if (c.k === 'eang') return `EMA angle ${c.op === 'below' ? 'down' : 'up'} ${c.lo || SSCAN_EANG.lo}°–${c.hi || SSCAN_EANG.hi}°`; if (c.k === 'gsq') return 'EMA squeeze → ' + (c.op === 'below' ? 'breakdown' : 'breakout'); if (c.k === 'gmma') return `Guppy ${(c.s || SSCAN_GMMA.s).join(',')} vs ${(c.l || SSCAN_GMMA.l).join(',')}`; return c.k === 'st' ? `Supertrend (${c.p}, ${c.m})` : (c.k === 'ema' ? 'EMA ' : 'SMA ') + c.p; }
+function sscanSummary(sc) { if (sscanIsSeq(sc.conds)) { const q = sc.conds.find(c => c.k === 'gsq'), dn = q.op === 'below'; return `EMA squeeze (ribbon ≤ ${q.a || SSCAN_SQ.a}×ATR in ≥ ${q.m || SSCAN_SQ.m} of last ${q.n || SSCAN_SQ.n} bars) → Guppy ${dn ? 'bearish' : 'bullish'} crossover + Supertrend ${dn ? 'down' : 'up'} flip within ${q.w || SSCAN_SQ.w} bars → close ${dn ? 'below' : 'above'} the ribbon · one entry per squeeze · exit when Supertrend flips back` + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); } return sc.conds.map(c => c.k === 'gsq' ? `EMA squeeze (ribbon ≤ ${c.a || SSCAN_SQ.a}×ATR in ≥ ${c.m || SSCAN_SQ.m} of last ${c.n || SSCAN_SQ.n} bars) then close ${c.op === 'below' ? 'below the ribbon' : 'above the ribbon'}` : c.k === 'gmma' ? `Guppy short EMAs (${(c.s || SSCAN_GMMA.s).join(',')}) ${c.op === 'below' ? 'below' : 'above'} long EMAs (${(c.l || SSCAN_GMMA.l).join(',')})${c.mode === 'all' ? ' — all lines' : ''}` : c.k === 'eang' ? `EMAs (${(c.s || SSCAN_EANG.s).join(',')}) all slope ${c.op === 'below' ? 'down' : 'up'} ${c.lo || SSCAN_EANG.lo}°–${c.hi || SSCAN_EANG.hi}° over ${c.n || SSCAN_EANG.n} candles and close ${c.op} EMA ${c.x || SSCAN_EANG.x} · exit when the EMAs flatten (under ${c.f != null ? c.f : SSCAN_EANG.f}°) or the close crosses back over EMA ${c.x || SSCAN_EANG.x}` : 'Close ' + c.op + ' ' + sscanRefLabel(c)).join(' · ') + (sc.minPrem > 0 ? ' · Premium ≥ ' + sc.minPrem : '') + (sc.sl && sc.sl.on ? ` · SL ${sc.side === 'Sell' ? 'high' : 'low'} of ${sc.sl.n} candles${sc.sl.buf ? ' ' + (sc.side === 'Sell' ? '+' : '−') + sc.sl.buf + '%' : ''}${sc.sl.mode === 'trail' ? ' (trailing)' : ''}` : ''); }
 
 function renderSScans() {
   const el = document.getElementById('sscan-list');
@@ -3303,7 +3316,7 @@ function sscanSlChange() {
 }
 function sscanGmmaList(i, key, v) { const a = String(v).split(/[ ,]+/).map(x => parseInt(x, 10)).filter(x => x >= 1 && x <= 500); if (a.length) sscanDraft.conds[i][key] = a; }
 function renderSScanConds() {
-  document.getElementById('sscan-conds').innerHTML = sscanDraft.conds.map((c, i) => c.k === 'gsq' ? `
+  document.getElementById('sscan-conds').innerHTML = sscanDraft.conds.map((c, i) => c.k === 'eang' ? sscanEangHtml(c, i) : c.k === 'gsq' ? `
     <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px">
       <span style="font-size:13px; color:var(--text-muted)">EMA squeeze, then</span>
       <select class="field-input" style="width:118px" onchange="sscanDraft.conds[${i}].op=this.value">
@@ -3626,12 +3639,57 @@ function sscanSqueezeLine(candles, c) {
     return { w: w[i], cnt, n, m, a, lo: lo[i], hi: hi[i], la: la[i], ctx, dn: ctx && cd.c < lo[i], up: ctx && cd.c > hi[i] };
   });
 }
-function sscanCmp(c, px, v, below, isExit) {   // is this condition true? (below=true: bearish / close under the line)
+
+/* EMA angle condition. Angle of each EMA over the last n candles, measured against the average candle move (mean |close change|, last 14):
+   45 deg = the EMA moved one average candle per candle. It is scale-free, so the same range works on any price level or timeframe.
+   Bearish (op 'below'): ALL short EMAs slope down by lo..hi degrees AND the close is below the slow reference EMA (default 15).
+   Exit: the EMAs flatten (average angle under f degrees) OR the close crosses back over the reference EMA. */
+const SSCAN_EANG = { s: [3, 5, 8, 10, 12, 15], lo: 40, hi: 70, n: 5, f: 10, x: 15 };
+function sscanAngleLine(candles, c) {
+  const closes = candles.map(x => x.c), per = c.s && c.s.length ? c.s : SSCAN_EANG.s;
+  const lo = c.lo > 0 ? c.lo : SSCAN_EANG.lo, hi = c.hi > 0 ? c.hi : SSCAN_EANG.hi, n = c.n >= 1 ? c.n : SSCAN_EANG.n, f = c.f >= 0 ? c.f : SSCAN_EANG.f, xp = c.x >= 1 ? c.x : SSCAN_EANG.x;
+  const E = per.map(p => emaSeries(closes, p)), X = emaSeries(closes, xp), maxP = Math.max(xp, ...per);
+  const ad = closes.map((v, i) => i ? Math.abs(v - closes[i - 1]) : 0);
+  return candles.map((cd, i) => {
+    if (i < maxP * 3 + n) return null;   // let the slowest EMA settle first
+    let sc = 0; for (let k = i - 13; k <= i; k++) sc += ad[k]; sc /= 14;
+    if (!(sc > 0) || X[i] == null) return null;
+    const ang = E.map(a => (a[i] == null || a[i - n] == null) ? null : Math.atan((a[i] - a[i - n]) / (n * sc)) * 180 / Math.PI);
+    if (ang.some(v => v == null || !isFinite(v))) return null;
+    const avg = ang.reduce((t, v) => t + v, 0) / ang.length;
+    return { ang, avg, lo, hi, f, n, ref: X[i], xp, dn: ang.every(v => v <= -lo && v >= -hi) && cd.c < X[i], up: ang.every(v => v >= lo && v <= hi) && cd.c > X[i], flat: Math.abs(avg) < f };
+  });
+}
+function sscanEangHtml(c, i) {
+  const inp = (k, w, t, mn, step) => `<input class="field-input" style="width:${w}px" type="number" min="${mn}" ${step ? 'step="' + step + '"' : ''} value="${c[k] != null ? c[k] : SSCAN_EANG[k]}" title="${t}" oninput="sscanDraft.conds[${i}].${k}=Math.max(${mn},parseFloat(this.value)||${SSCAN_EANG[k]})">`;
+  return `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px">
+    <span style="font-size:13px; color:var(--text-muted)">EMAs</span>
+    <input class="field-input" style="width:112px" value="${(c.s || SSCAN_EANG.s).join(',')}" title="Short EMA periods, comma separated" oninput="sscanGmmaList(${i},'s',this.value)">
+    <span style="font-size:13px; color:var(--text-muted)">all slope</span>
+    <select class="field-input" style="width:92px" onchange="sscanDraft.conds[${i}].op=this.value"><option value="below" ${c.op==='below'?'selected':''}>down ↓</option><option value="above" ${c.op==='above'?'selected':''}>up ↑</option></select>
+    ${inp('lo', 56, 'Minimum angle in degrees', 1, 1)}<span style="font-size:13px; color:var(--text-muted)">° to</span>${inp('hi', 56, 'Maximum angle in degrees', 1, 1)}<span style="font-size:13px; color:var(--text-muted)">° over</span>${inp('n', 50, 'Candles the slope is measured over', 1, 1)}
+    <span style="font-size:13px; color:var(--text-muted)">candles · close ${c.op==='below'?'below':'above'} EMA</span>${inp('x', 52, 'Reference EMA period', 1, 1)}
+    <span style="font-size:13px; color:var(--text-muted)">· exit when flat under</span>${inp('f', 50, 'Flat angle in degrees', 0, 1)}<span style="font-size:13px; color:var(--text-muted)">° or close crosses back</span>
+    <button class="leg-remove" aria-label="Remove condition" onclick="sscanDraft.conds.splice(${i},1);renderSScanConds()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>`;
+}
+function sscanAddEang() { sscanDraft.conds.push(Object.assign({ op: sscanDraft.side === 'Sell' ? 'below' : 'above', k: 'eang' }, SSCAN_EANG, { s: SSCAN_EANG.s.slice() })); renderSScanConds(); }
+function sscanPresetEang(side) {
+  const d = sscanDraft, nm = document.getElementById('sscan-name'), dn = side === 'Sell';
+  d.conds = [Object.assign({ op: dn ? 'below' : 'above', k: 'eang' }, SSCAN_EANG, { s: SSCAN_EANG.s.slice() })];
+  d.fresh = true; document.getElementById('sscan-fresh').checked = true;
+  setSScanSide(side);
+  if (!nm.value.trim()) nm.value = (dn ? 'Bearish' : 'Bullish') + ' EMA angle ' + SSCAN_EANG.lo + '°–' + SSCAN_EANG.hi + '°';
+  renderSScanConds();
+}
+function sscanCmp(c, px, v, below, isExit) {
+  if (c.k === 'eang') return isExit ? (v.flat || (below === false ? px > v.ref : px < v.ref)) : (below ? v.dn : v.up);   // is this condition true? (below=true: bearish / close under the line)
   if (c.k === 'gsq') return isExit ? (below ? px < v.la : px > v.la) : (below ? v.dn : v.up);
   if (c.k === 'gmma') return c.mode === 'all' ? (below ? v.smax < v.lmin : v.smin > v.lmax) : (below ? v.sa < v.la : v.sa > v.la);
   return below ? px < v : px > v;
 }
 function sscanRefLine(candles, c) {
+  if (c.k === 'eang') return sscanAngleLine(candles, c);
   if (c.k === 'gmma') return sscanGmmaLine(candles, c);
   if (c.k === 'gsq') return sscanSqueezeLine(candles, c);
   const closes = candles.map(x => x.c);
@@ -3735,8 +3793,9 @@ function sscanEval(candles, conds, xr, slr) {
   const lines = conds.map(c => sscanRefLine(candles, c));
   const at = i => conds.map((c, j) => {
     const px = candles[i].c, v = lines[j][i];
-    if (v == null) return { ok: false, text: (c.k === 'gmma' ? '' : 'Close vs ') + sscanRefLabel(c) + ' — not enough candles' };
+    if (v == null) return { ok: false, text: (c.k === 'gmma' || c.k === 'eang' ? '' : 'Close vs ') + sscanRefLabel(c) + ' — not enough candles' };
     const ok = sscanCmp(c, px, v, c.op === 'below');
+    if (c.k === 'eang') return { ok, text: `EMA angles ${v.ang.map(a => Math.round(a) + '°').join(' ')} (need ${c.op === 'below' ? '−' : '+'}${v.lo}° to ${c.op === 'below' ? '−' : '+'}${v.hi}° on every EMA) · close ${sscanFmt(px)} ${c.op === 'below' ? 'vs' : 'vs'} EMA ${v.xp} ${sscanFmt(v.ref)}` };
     if (c.k === 'gsq') return { ok, text: `EMA squeeze: ribbon ${sscanFmt(v.w)}×ATR (≤ ${v.a}), squeezed ${v.cnt}/${v.n} prior bars (need ${v.m}) · close ${sscanFmt(px)} ${c.op === 'below' ? 'vs ribbon low ' + sscanFmt(v.lo) : 'vs ribbon high ' + sscanFmt(v.hi)}` };
     if (c.k === 'gmma') return { ok, text: c.mode === 'all' ? `${sscanRefLabel(c)}: short EMAs ${sscanFmt(v.smin)}–${sscanFmt(v.smax)} vs long EMAs ${sscanFmt(v.lmin)}–${sscanFmt(v.lmax)}` : `${sscanRefLabel(c)}: short avg ${sscanFmt(v.sa)} ${c.op === 'below' ? '<' : '>'} long avg ${sscanFmt(v.la)}` };
     return { ok, text: `Close ${sscanFmt(px)} ${c.op === 'below' ? '<' : '>'} ${sscanRefLabel(c)} ${sscanFmt(v)}` };
@@ -4496,6 +4555,7 @@ function oiCard(lay, rows, yAt, SH) {
 /* Straddle exit: a Sell straddle is bought back when the premium closes above EMA 20 (a Buy straddle: closes below EMA 20). */
 function sscanSlRule(sc) { return sc && sc.sl && sc.sl.on ? { n: Math.max(1, sc.sl.n | 0 || 4), buf: Math.max(0, +sc.sl.buf || 0), mode: sc.sl.mode === 'trail' ? 'trail' : 'fixed', side: sc.side } : null; }
 function sscanExitRule(sc) {
+  if (sc && Array.isArray(sc.conds) && sc.conds.some(c => c && c.k === 'eang')) return null;   // EMA angle scans exit on their own rule (flat EMAs / close back over the EMA)
   if (sc && sc.strat === 'Guppy crossover') return { p: 15, op: sc.side === 'Sell' ? 'above' : 'below' };   // Guppy: SELL exits on a close above EMA 15, BUY exits on a close below EMA 15
   return sc && /^straddle$/i.test(sc.strat) ? { p: 20, op: sc.side === 'Sell' ? 'above' : 'below' } : null;
 }
@@ -6774,9 +6834,6 @@ const INDICATOR_DEFS = {
   supertrend: { name: 'Supertrend', full: 'Supertrend', type: 'overlay', editableColor: false,
     params: [{ key:'period', label:'ATR period', default:10 }, { key:'mult', label:'Multiplier', default:3 }],
     calc: (candles, p) => supertrendSeries(candles, p.period, p.mult) },
-  chandelier: { name: 'Chandelier', full: 'Chandelier Exit (ATR trailing stop)', type: 'overlay', editableColor: false,
-    params: [{ key:'period', label:'ATR period', default:22 }, { key:'mult', label:'ATR multiplier', default:3 }, { key:'src', label:'Highest / lowest of', type:'select', options:['High/Low','Close'], default:'High/Low' }],
-    calc: (candles, p) => chandelierSeries(candles, p.period, p.mult, p.src === 'Close') },
   rsi: { name: 'RSI', full: 'RSI', type: 'oscillator', renderKind: 'rsi', secondaryLabel: 'Smoothed MA',
     params: [{ key:'period', label:'Length', default:14 }, { key:'smoothType', label:'Smoothing Line', type:'select', options:['None','SMA','EMA','WMA'], default:'SMA' }, { key:'smoothLen', label:'Smoothing Length', default:20 }],
     calc: (candles, p) => {
@@ -6820,16 +6877,14 @@ const INDICATOR_DEFS = {
   gmma: { name: 'GMMA', full: 'Guppy Multiple Moving Average', type: 'overlay', editableColor: false,
     params: [],
     calc: (candles) => gmmaSeries(candles) },
-  htf_ma: { name: 'HTF MA', full: 'HTF MA Ribbon (chart timeframe + higher timeframe)', type: 'overlay', secondaryLabel: 'Line 2 color (higher timeframe)',
+  htf_ma: { name: 'HTF MA', full: 'Higher TimeFrame MA', type: 'overlay',
     params: [
-      { key:'len', label:'MA length', default:20 },
-      { key:'maType', label:'MA type', default:'EMA', type:'select', options:['SMA','EMA','WMA','DEMA','TEMA'] },
-      { key:'tfMult', label:'Line 2 timeframe ×', default:15 },
-      { key:'tfUnit', label:'Line 2 timeframe unit', default:'Minutes', type:'select', options:['Minutes','Hours','Days','Weeks'] },
-      { key:'flatPct', label:'Flat if slope under (% / 3 bars)', default:0.02, step:0.01 },
-      { key:'fillOpacity', label:'Ribbon fill opacity (%)', default:35, step:5 },
+      { key:'len', label:'MA length', default:8 },
+      { key:'maType', label:'MA type', default:'SMA', type:'select', options:['SMA','EMA','WMA','DEMA','TEMA'] },
+      { key:'tfMult', label:'Timeframe ×', default:1 },
+      { key:'tfUnit', label:'Timeframe unit', default:'Days', type:'select', options:['Minutes','Hours','Days','Weeks'] },
     ],
-    calc: (candles, p) => htfRibbonSeries(candles, p.maType, p.len, p.tfMult, p.tfUnit, p.flatPct) },
+    calc: (candles, p) => ({ line: htfMaSeries(candles, p.maType, p.len, p.tfMult, p.tfUnit) }) },
   ichimoku: { name: 'Ichimoku', full: 'Ichimoku Cloud', type: 'overlay', editableColor: false,
     params: [
       { key:'tenkanPeriod', label:'Tenkan', default:9 },
@@ -7219,35 +7274,6 @@ function stochasticSeries(candles, kPeriod, dPeriod, smoothK) {
   const d = smaSeriesNullable(k, dPeriod);
   return { k, d };
 }
-function chandelierSeries(candles, period, mult, useClose) {
-  // Chandelier Exit (LeBeau / Elder): long stop = highest high (or close) over `period` bars minus mult x ATR,
-  // short stop = lowest low (or close) plus mult x ATR. Each stop only ratchets in the trade's favour, and the
-  // direction flips when the close crosses the opposite stop.
-  const n = candles.length, per = Math.max(1, Math.round(period));
-  const atr = atrSeriesGeneric(candles, per);
-  const longStop = new Array(n).fill(null), shortStop = new Array(n).fill(null), dir = new Array(n).fill(null);
-  const buy = new Array(n).fill(false), sell = new Array(n).fill(false);
-  for (let i = per - 1; i < n; i++) {
-    if (atr[i] == null) continue;
-    let hh = -Infinity, ll = Infinity;
-    for (let j = i - per + 1; j <= i; j++) {
-      const hi = useClose ? candles[j].c : candles[j].h, lo = useClose ? candles[j].c : candles[j].l;
-      if (hi > hh) hh = hi;
-      if (lo < ll) ll = lo;
-    }
-    let ls = hh - mult * atr[i], ss = ll + mult * atr[i];
-    const pl = i > 0 ? longStop[i-1] : null, ps = i > 0 ? shortStop[i-1] : null, pc = i > 0 ? candles[i-1].c : null;
-    if (pl != null && pc > pl) ls = Math.max(ls, pl);
-    if (ps != null && pc < ps) ss = Math.min(ss, ps);
-    longStop[i] = ls; shortStop[i] = ss;
-    let d = (i > 0 && dir[i-1] != null) ? dir[i-1] : 1;
-    if (ps != null && candles[i].c > ps) d = 1;
-    else if (pl != null && candles[i].c < pl) d = -1;
-    dir[i] = d;
-    if (i > 0 && dir[i-1] != null) { if (d === 1 && dir[i-1] === -1) buy[i] = true; if (d === -1 && dir[i-1] === 1) sell[i] = true; }
-  }
-  return { longStop, shortStop, dir, buy, sell };
-}
 function supertrendSeries(candles, period, mult) {
   const n = candles.length;
   const tr = new Array(n).fill(0);
@@ -7357,58 +7383,6 @@ function detectBarSeconds(candles) {
   if (!gaps.length) return 86400;
   gaps.sort((a, b) => a - b);
   return gaps[Math.floor(gaps.length / 2)];
-}
-function htfMaOf(values, maType, len) {
-  switch (maType) {
-    case 'EMA': return emaSeries(values, len);
-    case 'WMA': return wmaSeries(values, len);
-    case 'DEMA': return demaSeries(values, len);
-    case 'TEMA': return temaSeries(values, len);
-    default: return smaSeries(values, len);
-  }
-}
-function htfRibbonSeries(candles, maType, len, tfMult, tfUnit, flatPct) {
-  // Line 1 = the MA on the chart's own bars. Line 2 = the same MA on real higher-timeframe closes (candles are
-  // grouped into buckets by timestamp). No look-ahead: on each bar, line 2 uses the COMPLETED higher-timeframe
-  // closes plus the current bar's close as the forming one. State per bar: 1 = close above both lines and the
-  // ribbon rising, -1 = close below both and falling, 0 = flat or mixed.
-  const n = candles.length, L = Math.max(1, Math.round(len));
-  const closes = candles.map(c => c.c);
-  const line = htfMaOf(closes, maType, L);
-  const barSec = detectBarSeconds(candles);
-  const targetSec = (+tfMult || 1) * (HTF_SECONDS_PER_UNIT[tfUnit] || 60);
-  const ts = candles.map(c => new Date(c.t).getTime() / 1000);
-  const okTs = ts.every(t => isFinite(t));
-  let line2 = new Array(n).fill(null);
-  if (!okTs || targetSec <= barSec * 1.01) {
-    line2 = line.slice();   // higher timeframe is not above the chart's own: both lines coincide
-  } else {
-    const bucketOf = new Array(n), lastClose = [];
-    let prevKey = null, b = -1;
-    for (let i = 0; i < n; i++) {
-      const key = Math.floor(ts[i] / targetSec);
-      if (key !== prevKey) { b++; prevKey = key; }
-      bucketOf[i] = b; lastClose[b] = closes[i];
-    }
-    const W = Math.max(L * 6, L + 5);
-    for (let i = 0; i < n; i++) {
-      const bi = bucketOf[i], from = Math.max(0, bi - W + 1);
-      const arr = lastClose.slice(from, bi); arr.push(closes[i]);
-      if (arr.length < L) continue;
-      const m = htfMaOf(arr, maType, L);
-      line2[i] = m[m.length - 1];
-    }
-  }
-  const thr = (flatPct == null || isNaN(flatPct) ? 0.02 : flatPct) / 100;
-  const state = new Array(n).fill(0);
-  for (let i = 3; i < n; i++) {
-    if (line[i] == null || line2[i] == null || line[i-3] == null || line2[i-3] == null) continue;
-    const mid = (line[i] + line2[i]) / 2, mid0 = (line[i-3] + line2[i-3]) / 2;
-    const slope = mid0 ? (mid - mid0) / mid0 : 0;
-    if (closes[i] > Math.max(line[i], line2[i]) && slope > thr) state[i] = 1;
-    else if (closes[i] < Math.min(line[i], line2[i]) && slope < -thr) state[i] = -1;
-  }
-  return { line, line2, state };
 }
 function htfMaSeries(candles, maType, len, tfMult, tfUnit) {
   // Ported from the "Higher TimeFrame Smooth Moving Averages" Pine Script (EsIstTurnt,
@@ -7881,7 +7855,6 @@ function addIndicator(key) {
   def.params.forEach(p => { params[p.key] = p.default; });
   const inst = { id: 'ind' + (indicatorSeq++), key, params, color: IND_COLORS[activeIndicators.length % IND_COLORS.length], width: 1.5, opacity: 100, lineStyle: 'solid' };
   if (def.secondaryLabel) inst.secondaryColor = key === 'rsi' ? DRAW_INK() : '#D9A441';
-  if (key === 'htf_ma') { inst.color = '#378ADD'; inst.secondaryColor = '#EF9F27'; inst.htfBullColor = '#2EBD85'; inst.htfBearColor = '#F6465D'; inst.htfFlatColor = '#888780'; }
   if (key === 'gmma') {
     inst.gmmaShortColor = '#009956'; // base hue each ribbon is shaded from, lightest (period 3) to this (period 15)
     inst.gmmaLongColor = '#FF5723';  // base hue for the long-term ribbon, lightest (period 30) to this (period 60)
@@ -8280,7 +8253,7 @@ function openCustomColorEditor(instId, field) {
   if (String(instId).startsWith('draw:')) { const d = drawings[+instId.slice(5)]; if (!d) return; colorPickerHSV = hexToHsv(d.color || '#2962FF'); customColorEditorFor = { instId, field }; refreshDrawingSettingsPopup(); return; }
   const inst = activeIndicators.find(i => i.id === instId);
   if (!inst) return;
-  const startHex = field === 'secondary' ? (inst.secondaryColor || '#D9A441') : field === 'primary' ? inst.color : (inst[field] || HTF_FIELD_DEFAULTS[field] || '#2962FF');
+  const startHex = field === 'secondary' ? (inst.secondaryColor || '#D9A441') : field === 'primary' ? inst.color : (inst[field] || '#2962FF');
   colorPickerHSV = hexToHsv(startHex);
   customColorEditorFor = { instId, field };
   refreshIndicatorSettings(instId);
@@ -8397,9 +8370,8 @@ function customColorEditorHtml() {
     </div>
   `;
 }
-const HTF_FIELD_DEFAULTS = { htfBullColor: '#2EBD85', htfBearColor: '#F6465D', htfFlatColor: '#888780' };
 function colorFieldHtml(inst, field, label) {
-  const current = field === 'secondary' ? (inst.secondaryColor || '#D9A441') : field === 'primary' ? inst.color : (inst[field] || HTF_FIELD_DEFAULTS[field] || '#2962FF');
+  const current = field === 'secondary' ? (inst.secondaryColor || '#D9A441') : field === 'primary' ? inst.color : (inst[field] || '#2962FF');
   const isGridOpen = colorGridOpenFor && colorGridOpenFor.instId === inst.id && colorGridOpenFor.field === field;
   const isCustomOpen = customColorEditorFor && customColorEditorFor.instId === inst.id && customColorEditorFor.field === field;
   const row = `
@@ -8428,7 +8400,6 @@ function paramSummary(inst) {
   }
   if (!def.params.length) return '';
   if (inst.key === 'rsi') { rsiEnsure(inst); return ' ' + inst.params.period + (inst.params.smoothType !== 'None' ? ',' + inst.params.smoothType + ',' + inst.params.smoothLen : ''); }
-  if (inst.key === 'htf_ma') return ' ' + inst.params.maType + ' ' + inst.params.len + ' · ' + inst.params.tfMult + String(inst.params.tfUnit || 'Minutes').charAt(0).toLowerCase();
   return ' ' + def.params.map(p => inst.params[p.key]).join(',');
 }
 
@@ -8506,7 +8477,7 @@ function openIndicatorSettings(e, id) {
     ` : `
       <div class="ind-settings-row">
         <label>${p.label}</label>
-        <input type="number" value="${inst.params[p.key]}" step="${p.step || (p.key==='mult'?'0.1':'1')}"
+        <input type="number" value="${inst.params[p.key]}" step="${p.key==='mult'?'0.1':'1'}"
           onchange="updateIndicatorParam('${inst.id}','${p.key}',this.value); refreshIndicatorSettings('${inst.id}')">
       </div>
     `).join('')}
@@ -8515,7 +8486,7 @@ function openIndicatorSettings(e, id) {
   const isGmma = inst.key === 'gmma';
   const colorEditable = def.editableColor !== false;
   const colorRow = isGmma ? (colorFieldHtml(inst, 'gmmaShortColor', 'Short-term color') + colorFieldHtml(inst, 'gmmaLongColor', 'Long-term color'))
-    : colorEditable ? colorFieldHtml(inst, 'primary', inst.key === 'htf_ma' ? 'Line 1 color (chart timeframe)' : 'Color') : `
+    : colorEditable ? colorFieldHtml(inst, 'primary', 'Color') : `
     <div class="ind-settings-row">
       <label>Color</label>
       <span style="font-size:11.5px;color:var(--text-faint)">Trend-colored (up/down)</span>
@@ -8561,7 +8532,7 @@ function openIndicatorSettings(e, id) {
     </div>
   `;
 
-  const secondaryColorRow = isGmma ? gmmaTogglesHtml(inst) : inst.key === 'htf_ma' ? (colorFieldHtml(inst, 'secondary', def.secondaryLabel) + colorFieldHtml(inst, 'htfBullColor', 'Ribbon: bullish') + colorFieldHtml(inst, 'htfBearColor', 'Ribbon: bearish') + colorFieldHtml(inst, 'htfFlatColor', 'Ribbon: flat / mixed')) : def.secondaryLabel ? colorFieldHtml(inst, 'secondary', def.secondaryLabel) : '';
+  const secondaryColorRow = isGmma ? gmmaTogglesHtml(inst) : def.secondaryLabel ? colorFieldHtml(inst, 'secondary', def.secondaryLabel) : '';
 
   const stdHtml = `
     <div class="ind-settings-head">
@@ -8855,46 +8826,6 @@ function renderChart(forceEnd) {
       overlays += seriesPath(result.line, yAt, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
     } else if (inst.key === 'supertrend') {
       overlays += segmentedPath(result.line, result.trendUp, yAt, 'var(--green)', 'var(--red)', inst.width);
-    } else if (inst.key === 'htf_ma') {
-      // Ribbon: fill between the two lines, coloured by state (bullish / bearish / flat), then both lines on top.
-      const fillOp = Math.max(0, Math.min(100, +inst.params.fillOpacity >= 0 ? +inst.params.fillOpacity : 35)) / 100;
-      const stCol = { 1: inst.htfBullColor || '#2EBD85', '-1': inst.htfBearColor || '#F6465D', 0: inst.htfFlatColor || '#888780' };
-      let runTop = [], runBot = [], runState = null;
-      const flushRun = () => {
-        if (runTop.length > 1) overlays += `<polygon points="${runTop.concat(runBot.slice().reverse()).map(q => q[0].toFixed(2) + ',' + q[1].toFixed(2)).join(' ')}" fill="${stCol[runState]}" opacity="${fillOp}"/>`;
-        runTop = []; runBot = []; runState = null;
-      };
-      for (let i = Math.max(1, drawLo); i < Math.min(dispN, drawHi + 2); i++) {
-        if (result.line[i] == null || result.line2[i] == null || result.line[i-1] == null || result.line2[i-1] == null) { flushRun(); continue; }
-        if (runState !== result.state[i]) { flushRun(); runState = result.state[i]; runTop = [[xAt(i-1), yAt(result.line[i-1])]]; runBot = [[xAt(i-1), yAt(result.line2[i-1])]]; }
-        runTop.push([xAt(i), yAt(result.line[i])]); runBot.push([xAt(i), yAt(result.line2[i])]);
-      }
-      flushRun();
-      overlays += seriesPath(result.line, yAt, inst.color, dashForStyle(inst.lineStyle), inst.width, inst.opacity);
-      overlays += seriesPath(result.line2, yAt, inst.secondaryColor || '#EF9F27', dashForStyle(inst.lineStyle), inst.width, inst.opacity);
-    } else if (inst.key === 'chandelier') {
-      // Green long-exit stop below price while in an uptrend, red short-exit stop above price in a downtrend.
-      // Segments are only drawn within one trend, so the line breaks (no vertical jump) when the stop flips.
-      const chOp = (inst.opacity == null ? 100 : inst.opacity) / 100;
-      for (let i = Math.max(1, drawLo); i < Math.min(dispN, drawHi + 2); i++) {
-        if (result.dir[i] == null || result.dir[i] !== result.dir[i-1]) continue;
-        const arr = result.dir[i] === 1 ? result.longStop : result.shortStop;
-        if (arr[i] == null || arr[i-1] == null) continue;
-        overlays += `<line x1="${xAt(i-1).toFixed(2)}" y1="${yAt(arr[i-1]).toFixed(2)}" x2="${xAt(i).toFixed(2)}" y2="${yAt(arr[i]).toFixed(2)}" stroke="${result.dir[i] === 1 ? 'var(--green)' : 'var(--red)'}" stroke-width="${inst.width || 1.5}" opacity="${chOp}"/>`;
-      }
-      for (let i = Math.max(0, drawLo); i < Math.min(dispN, drawHi + 1); i++) {
-        const c = dispCS[i], x = xAt(i);
-        if (result.buy[i]) {
-          const y = clampY(yAt(c.l) + 14);
-          signalMarkers += `<path d="M${x.toFixed(2)},${(y-7).toFixed(2)} L${(x-6).toFixed(2)},${(y+5).toFixed(2)} L${(x+6).toFixed(2)},${(y+5).toFixed(2)} Z" fill="#2EBD85"/>`;
-          signalMarkers += `<text x="${x.toFixed(2)}" y="${(y+17).toFixed(2)}" font-size="9" text-anchor="middle" fill="#2EBD85" font-family="var(--mono)">Buy</text>`;
-        }
-        if (result.sell[i]) {
-          const y = clampY(yAt(c.h) - 14);
-          signalMarkers += `<path d="M${x.toFixed(2)},${(y+7).toFixed(2)} L${(x-6).toFixed(2)},${(y-5).toFixed(2)} L${(x+6).toFixed(2)},${(y-5).toFixed(2)} Z" fill="#F6465D"/>`;
-          signalMarkers += `<text x="${x.toFixed(2)}" y="${(y-11).toFixed(2)}" font-size="9" text-anchor="middle" fill="#F6465D" font-family="var(--mono)">Sell</text>`;
-        }
-      }
     } else if (inst.key === 'confluence') {
       // SSL channel band (high/low MA), shaded per contiguous trend segment — bull runs
       // tinted green, bear runs tinted red — at a much higher opacity than a single flat
