@@ -3640,11 +3640,13 @@ function sscanSqueezeLine(candles, c) {
   });
 }
 
-/* EMA angle condition. Angle of each EMA over the last n candles, measured against the average candle move (mean |close change|, last 14):
-   45 deg = the EMA moved one average candle per candle. It is scale-free, so the same range works on any price level or timeframe.
+/* EMA angle condition. Angle of each EMA over the last n candles, as it LOOKS on a chart (mode 'range', default): the price range of the last
+   100 candles fills the chart height, 100 candles fill the width (height:width = 1.4), so a premium sliding from the top to the bottom of the
+   screen reads about 54 deg. That matches what you see. Mode 'atr' instead measures against the average candle move (mean |close change|, last 14):
+   45 deg = the EMA moved one average candle per candle - much stricter on a steady slide. Both are scale-free (any price level or timeframe).
    Bearish (op 'below'): ALL short EMAs slope down by lo..hi degrees AND the close is below the slow reference EMA (default 15).
    Exit: the EMAs flatten (average angle under f degrees) OR the close crosses back over the reference EMA. */
-const SSCAN_EANG = { s: [3, 5, 8, 10, 12, 15], lo: 40, hi: 70, n: 5, f: 10, x: 15 };
+const SSCAN_EANG = { s: [3, 5, 8, 10, 12, 15], lo: 40, hi: 70, n: 5, f: 10, x: 15, mode: 'range' };
 function sscanAngleLine(candles, c) {
   const closes = candles.map(x => x.c), per = c.s && c.s.length ? c.s : SSCAN_EANG.s;
   const lo = c.lo > 0 ? c.lo : SSCAN_EANG.lo, hi = c.hi > 0 ? c.hi : SSCAN_EANG.hi, n = c.n >= 1 ? c.n : SSCAN_EANG.n, f = c.f >= 0 ? c.f : SSCAN_EANG.f, xp = c.x >= 1 ? c.x : SSCAN_EANG.x;
@@ -3652,9 +3654,11 @@ function sscanAngleLine(candles, c) {
   const ad = closes.map((v, i) => i ? Math.abs(v - closes[i - 1]) : 0);
   return candles.map((cd, i) => {
     if (i < maxP * 3 + n) return null;   // let the slowest EMA settle first
-    let sc = 0; for (let k = i - 13; k <= i; k++) sc += ad[k]; sc /= 14;
-    if (!(sc > 0) || X[i] == null) return null;
-    const ang = E.map(a => (a[i] == null || a[i - n] == null) ? null : Math.atan((a[i] - a[i - n]) / (n * sc)) * 180 / Math.PI);
+    let sc = 0, rg = 0;
+    if (c.mode === 'atr') { for (let k = i - 13; k <= i; k++) sc += ad[k]; sc /= 14; }
+    else { let hiP = -Infinity, loP = Infinity; for (let k = Math.max(0, i - 99); k <= i; k++) { if (candles[k].h > hiP) hiP = candles[k].h; if (candles[k].l < loP) loP = candles[k].l; } rg = hiP - loP; }
+    if ((c.mode === 'atr' ? !(sc > 0) : !(rg > 0)) || X[i] == null) return null;
+    const ang = E.map(a => (a[i] == null || a[i - n] == null) ? null : Math.atan(c.mode === 'atr' ? (a[i] - a[i - n]) / (n * sc) : ((a[i] - a[i - n]) / rg) / (n / 100) * 1.4) * 180 / Math.PI);
     if (ang.some(v => v == null || !isFinite(v))) return null;
     const avg = ang.reduce((t, v) => t + v, 0) / ang.length;
     return { ang, avg, lo, hi, f, n, ref: X[i], xp, dn: ang.every(v => v <= -lo && v >= -hi) && cd.c < X[i], up: ang.every(v => v >= lo && v <= hi) && cd.c > X[i], flat: Math.abs(avg) < f };
@@ -3668,7 +3672,9 @@ function sscanEangHtml(c, i) {
     <span style="font-size:13px; color:var(--text-muted)">all slope</span>
     <select class="field-input" style="width:92px" onchange="sscanDraft.conds[${i}].op=this.value"><option value="below" ${c.op==='below'?'selected':''}>down ↓</option><option value="above" ${c.op==='above'?'selected':''}>up ↑</option></select>
     ${inp('lo', 56, 'Minimum angle in degrees', 1, 1)}<span style="font-size:13px; color:var(--text-muted)">° to</span>${inp('hi', 56, 'Maximum angle in degrees', 1, 1)}<span style="font-size:13px; color:var(--text-muted)">° over</span>${inp('n', 50, 'Candles the slope is measured over', 1, 1)}
-    <span style="font-size:13px; color:var(--text-muted)">candles · close ${c.op==='below'?'below':'above'} EMA</span>${inp('x', 52, 'Reference EMA period', 1, 1)}
+    <span style="font-size:13px; color:var(--text-muted)">candles, measured</span>
+    <select class="field-input" style="width:132px" title="chart = how steep it looks on a chart; candle move = against the average candle size (stricter)" onchange="sscanDraft.conds[${i}].mode=this.value"><option value="range" ${c.mode!=='atr'?'selected':''}>as on the chart</option><option value="atr" ${c.mode==='atr'?'selected':''}>vs candle move</option></select>
+    <span style="font-size:13px; color:var(--text-muted)">· close ${c.op==='below'?'below':'above'} EMA</span>${inp('x', 52, 'Reference EMA period', 1, 1)}
     <span style="font-size:13px; color:var(--text-muted)">· exit when flat under</span>${inp('f', 50, 'Flat angle in degrees', 0, 1)}<span style="font-size:13px; color:var(--text-muted)">° or close crosses back</span>
     <button class="leg-remove" aria-label="Remove condition" onclick="sscanDraft.conds.splice(${i},1);renderSScanConds()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>`;
