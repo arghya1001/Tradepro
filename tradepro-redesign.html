@@ -3646,7 +3646,7 @@ function sscanSqueezeLine(candles, c) {
    45 deg = the EMA moved one average candle per candle - much stricter on a steady slide. Both are scale-free (any price level or timeframe).
    Bearish (op 'below'): ALL short EMAs slope down by lo..hi degrees AND the close is below the slow reference EMA (default 15).
    Exit: the EMAs flatten (average angle under f degrees) OR the close crosses back over the reference EMA. */
-const SSCAN_EANG = { s: [3, 5, 8, 10, 12, 15], lo: 40, hi: 70, n: 5, f: 10, x: 15, mode: 'range' };
+const SSCAN_EANG = { s: [3, 5, 8, 10, 12, 15], lo: 40, hi: 70, n: 5, f: 10, x: 15, mode: 'range', q: 4 };
 function sscanAngleLine(candles, c) {
   const closes = candles.map(x => x.c), per = c.s && c.s.length ? c.s : SSCAN_EANG.s;
   const lo = c.lo > 0 ? c.lo : SSCAN_EANG.lo, hi = c.hi > 0 ? c.hi : SSCAN_EANG.hi, n = c.n >= 1 ? c.n : SSCAN_EANG.n, f = c.f >= 0 ? c.f : SSCAN_EANG.f, xp = c.x >= 1 ? c.x : SSCAN_EANG.x;
@@ -3661,7 +3661,8 @@ function sscanAngleLine(candles, c) {
     const ang = E.map(a => (a[i] == null || a[i - n] == null) ? null : Math.atan(c.mode === 'atr' ? (a[i] - a[i - n]) / (n * sc) : ((a[i] - a[i - n]) / rg) / (n / 100) * 1.4) * 180 / Math.PI);
     if (ang.some(v => v == null || !isFinite(v))) return null;
     const avg = ang.reduce((t, v) => t + v, 0) / ang.length;
-    return { ang, avg, lo, hi, f, n, ref: X[i], xp, dn: ang.every(v => v <= -lo && v >= -hi) && cd.c < X[i], up: ang.every(v => v >= lo && v <= hi) && cd.c > X[i], flat: Math.abs(avg) < f };
+    const need = Math.min(ang.length, c.q >= 1 ? c.q : SSCAN_EANG.q), nDn = ang.filter(v => v <= -lo && v >= -hi).length, nUp = ang.filter(v => v >= lo && v <= hi).length;   // q = how many of the EMAs must be in range (4 of 6 by default - waiting for the slow EMAs too makes entries late)
+    return { ang, avg, lo, hi, f, n, k: need, nDn, nUp, ref: X[i], xp, dn: nDn >= need && cd.c < X[i], up: nUp >= need && cd.c > X[i], flat: Math.abs(avg) < f };
   });
 }
 function sscanEangHtml(c, i) {
@@ -3669,7 +3670,9 @@ function sscanEangHtml(c, i) {
   return `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px">
     <span style="font-size:13px; color:var(--text-muted)">EMAs</span>
     <input class="field-input" style="width:112px" value="${(c.s || SSCAN_EANG.s).join(',')}" title="Short EMA periods, comma separated" oninput="sscanGmmaList(${i},'s',this.value)">
-    <span style="font-size:13px; color:var(--text-muted)">all slope</span>
+    <span style="font-size:13px; color:var(--text-muted)">at least</span>
+    <input class="field-input" style="width:50px" type="number" min="1" max="12" value="${c.q != null ? c.q : SSCAN_EANG.q}" title="How many of the EMAs must be in the angle range (4 = faster entry; 6 = all, later but stricter)" oninput="sscanDraft.conds[${i}].q=Math.max(1,parseInt(this.value)||4)">
+    <span style="font-size:13px; color:var(--text-muted)">slope</span>
     <select class="field-input" style="width:92px" onchange="sscanDraft.conds[${i}].op=this.value"><option value="below" ${c.op==='below'?'selected':''}>down ↓</option><option value="above" ${c.op==='above'?'selected':''}>up ↑</option></select>
     ${inp('lo', 56, 'Minimum angle in degrees', 1, 1)}<span style="font-size:13px; color:var(--text-muted)">° to</span>${inp('hi', 56, 'Maximum angle in degrees', 1, 1)}<span style="font-size:13px; color:var(--text-muted)">° over</span>${inp('n', 50, 'Candles the slope is measured over', 1, 1)}
     <span style="font-size:13px; color:var(--text-muted)">candles, measured</span>
@@ -3801,7 +3804,7 @@ function sscanEval(candles, conds, xr, slr) {
     const px = candles[i].c, v = lines[j][i];
     if (v == null) return { ok: false, text: (c.k === 'gmma' || c.k === 'eang' ? '' : 'Close vs ') + sscanRefLabel(c) + ' — not enough candles' };
     const ok = sscanCmp(c, px, v, c.op === 'below');
-    if (c.k === 'eang') return { ok, text: `EMA angles ${v.ang.map(a => Math.round(a) + '°').join(' ')} (need ${c.op === 'below' ? '−' : '+'}${v.lo}° to ${c.op === 'below' ? '−' : '+'}${v.hi}° on every EMA) · close ${sscanFmt(px)} ${c.op === 'below' ? 'vs' : 'vs'} EMA ${v.xp} ${sscanFmt(v.ref)}` };
+    if (c.k === 'eang') return { ok, text: `EMA angles ${v.ang.map(a => Math.round(a) + '°').join(' ')} (need ${c.op === 'below' ? '−' : '+'}${v.lo}° to ${c.op === 'below' ? '−' : '+'}${v.hi}° on ${v.k >= v.ang.length ? 'every EMA' : 'at least ' + v.k + ' of ' + v.ang.length + ' EMAs'}; now ${c.op === 'below' ? v.nDn : v.nUp}) · close ${sscanFmt(px)} ${c.op === 'below' ? 'vs' : 'vs'} EMA ${v.xp} ${sscanFmt(v.ref)}` };
     if (c.k === 'gsq') return { ok, text: `EMA squeeze: ribbon ${sscanFmt(v.w)}×ATR (≤ ${v.a}), squeezed ${v.cnt}/${v.n} prior bars (need ${v.m}) · close ${sscanFmt(px)} ${c.op === 'below' ? 'vs ribbon low ' + sscanFmt(v.lo) : 'vs ribbon high ' + sscanFmt(v.hi)}` };
     if (c.k === 'gmma') return { ok, text: c.mode === 'all' ? `${sscanRefLabel(c)}: short EMAs ${sscanFmt(v.smin)}–${sscanFmt(v.smax)} vs long EMAs ${sscanFmt(v.lmin)}–${sscanFmt(v.lmax)}` : `${sscanRefLabel(c)}: short avg ${sscanFmt(v.sa)} ${c.op === 'below' ? '<' : '>'} long avg ${sscanFmt(v.la)}` };
     return { ok, text: `Close ${sscanFmt(px)} ${c.op === 'below' ? '<' : '>'} ${sscanRefLabel(c)} ${sscanFmt(v)}` };
